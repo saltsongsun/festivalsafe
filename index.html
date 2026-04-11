@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>축제 안전관리시스템</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0a0a1a;-webkit-font-smoothing:antialiased}
+    #error-fallback{display:none;min-height:100vh;background:#0a0a1a;align-items:center;justify-content:center;padding:24px;font-family:-apple-system,sans-serif}
+    #error-fallback.show{display:flex}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="error-fallback">
+    <div style="max-width:400px;text-align:center">
+      <div style="font-size:64px;margin-bottom:16px">⚠️</div>
+      <h2 style="color:#F44336;font-size:20px;font-weight:800;margin-bottom:8px">앱 로드 실패</h2>
+      <p style="color:#8892b0;font-size:13px;margin-bottom:20px">이전 데이터와 충돌이 발생했습니다.</p>
+      <button onclick="localStorage.clear();sessionStorage.clear();location.href=location.pathname" style="width:100%;padding:14px;border-radius:12px;border:none;background:#F44336;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 데이터 초기화 후 재시작</button>
+      <p style="color:#556;font-size:10px;margin-top:12px">또는 URL에 ?reset=1 추가</p>
+    </div>
+  </div>
+  <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show')"></script>
+  <script>setTimeout(function(){if(!document.getElementById('root').children.length)document.getElementById('error-fallback').classList.add('show')},5000)</script>
+</body>
+</html>
