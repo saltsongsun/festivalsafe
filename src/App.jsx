@@ -2065,7 +2065,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(key)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(station)}&dataTerm=DAILY&ver=1.0`;
               const res = await fetch(url);
               const json = await res.json();
-              const item = json?.response?.body?.items?.[0];
+              const rawItems = json?.response?.body?.items; const item = Array.isArray(rawItems) ? rawItems[0] : rawItems?.item?.[0] || rawItems?.[0];
               if (item) {
                 const pm10 = item.pm10Value || "-"; const pm25 = item.pm25Value || "-";
                 const grade10 = item.pm10Grade || ""; const grade25 = item.pm25Grade || "";
@@ -2079,7 +2079,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 alert(`✅ 측정소: ${station}\n📅 ${item.dataTime || ""}\n\n🌫️ 미세먼지(PM10): ${pm10} ㎍/㎥ (${gradeMap[grade10] || grade10})\n😷 초미세먼지(PM2.5): ${pm25} ㎍/㎥ (${gradeMap[grade25] || grade25})\n\n대시보드에 반영되었습니다.`);
               } else {
                 const msg = json?.response?.header?.resultMsg || "데이터 없음";
-                alert(`❌ 응답 오류: ${msg}\n\n측정소명을 확인하세요.\n예: 진주시, 중구, 종로구 등`);
+                const code = json?.response?.header?.resultCode || "";
+                const bodyStr = JSON.stringify(json?.response?.body || {}).slice(0, 300);
+                alert(`❌ 데이터 파싱 실패\n\n상태: ${code} ${msg}\n응답 구조: ${bodyStr}\n\n측정소명을 확인하세요.\n예: 진주, 중구, 종로구 등`);
               }
             } catch (e) {
               alert(`❌ API 호출 실패: ${e.message}\n\nCORS 정책으로 직접 호출이 불가능할 수 있습니다.\n배포 환경(Vercel)에서는 정상 동작합니다.`);
@@ -2893,7 +2895,7 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
         const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(aq.serviceKey)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(aq.stationName)}&dataTerm=DAILY&ver=1.0`;
         const res = await fetch(url);
         const json = await res.json();
-        const item = json?.response?.body?.items?.[0];
+        const rawItems = json?.response?.body?.items; const item = Array.isArray(rawItems) ? rawItems[0] : rawItems?.item?.[0] || rawItems?.[0];
         if (item) {
           const pm10 = parseFloat(item.pm10Value) || 0;
           const pm25 = parseFloat(item.pm25Value) || 0;
