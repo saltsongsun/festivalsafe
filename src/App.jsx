@@ -734,47 +734,73 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <span style={{ color: "#8892b0", fontSize: 14, fontWeight: 800 }}>👥 축제장 인원관리</span>
     </div>
     <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-      {categories.filter(c => c.id === "crowd" && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
+      {categories.filter(c => c.id === "crowd" && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0];
+        const crowdLS = (() => { try { return JSON.parse(localStorage.getItem("_crowd") || "{}"); } catch { return {}; } })();
+        const cumVal = crowdLS.cumulative || 0;
+        const gateData = (settings.gates || []).map(g => { const s = (crowdLS.zones || []).find(sz => sz.id === g.id); return { ...g, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
+        return (
         <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "18px 20px", border: `2px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: li.color, animation: "blink 1.5s infinite" }} />}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 24 }}>{cat.icon}</span>
-            <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 20 }}>{cat.name}</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 20 }}>체류 인원</span>
             {cat.actionStatus && <span style={{ padding: "2px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700, marginLeft: "auto" }}>🔧조치중</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📡 실황</div>
+              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📡 실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                 <span style={{ fontSize: 44, fontWeight: 900, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
                 <span style={{ fontSize: 18, color: "#8892b0" }}>{cat.unit}</span>
               </div>
             </div>
-            {nextFc && <div style={{ textAlign: "right", paddingBottom: 4 }}>
-              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📋 예보</div>
-              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}</div>
-              <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
-            </div>}
+            <div style={{ textAlign: "right", paddingBottom: 4 }}>
+              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: "#2196F3", lineHeight: 1 }}>{cumVal.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>명</div>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          {/* 출입구별 현황 */}
+          {gateData.filter(g => g.name).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 6, marginBottom: 8 }}>
+            {gateData.filter(g => g.name).map(g => (
+              <div key={g.id} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222" }}>
+                <div style={{ color: "#8892b0", fontSize: 11 }}>🚪 {g.name}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
+                  <span style={{ color: "#4CAF50", fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>{g.count}</span>
+                  <span style={{ color: "#556", fontSize: 10 }}>체류</span>
+                  <span style={{ color: "#556", fontSize: 10, marginLeft: "auto" }}>누적 {g.cumulative}</span>
+                </div>
+              </div>
+            ))}
+          </div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.lastUpdated && <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>🕐 {cat.lastUpdated}</span>}
           </div>
         </div>); })}
     </div>
     {/* 구역별 혼잡도 */}
-    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
+    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
       {(settings.zones || []).filter(z => z.name).map(z => {
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
-        return (<div key={z.id} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${cl?.color || "#333"}33` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>{cl?.icon || "⚪"}</span>
-            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{z.name}</span>
-            <span style={{ color: cl?.color || "#556", fontSize: 15, fontWeight: 800 }}>{cl?.label || "미보고"}</span>
-            {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 12 }}>📷{c.photos.length}</span>}
+        return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1.5px solid ${cl?.color || "#333"}44` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: c?.memo || c?.photos?.length ? 8 : 0 }}>
+            <span style={{ fontSize: 22 }}>{cl?.icon || "⚪"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800 }}>{z.name}</div>
+              {c?.reportedAt && <div style={{ color: "#556", fontSize: 12 }}>👤 {c.reportedByName} · {c.reportedAt}</div>}
+            </div>
+            <span style={{ color: cl?.color || "#556", fontSize: 20, fontWeight: 900 }}>{cl?.label || "미보고"}</span>
           </div>
+          {c?.memo && <div style={{ color: "#ccd6f6", fontSize: 13, lineHeight: 1.5, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 8 }}>💬 {c.memo}</div>}
+          {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {c.photos.map(p => <div key={p.id} style={{ flexShrink: 0 }}>
+              <img src={p.data} alt="" style={{ width: 100, height: 75, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
+              <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+            </div>)}
+          </div>}
         </div>);
       })}
     </div>}
