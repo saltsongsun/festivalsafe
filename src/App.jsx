@@ -97,7 +97,7 @@ const DEFAULT_SETTINGS = {
   location: { lat: 0, lon: 0, name: "", mode: "auto" },
   kma: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", enabled: true, interval: 10, lastFetch: null, nxOverride: null, nyOverride: null },
   airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", sidoName: "경남", stationFilter: "진주", enabled: true, interval: 30, lastFetch: null },
-  dam: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", damName: "남강댐", enabled: true, interval: 30, lastFetch: null },
+  dam: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", damName: "남강", enabled: true, interval: 30, lastFetch: null },
   zones: [ { id: "z1", name: "A구역", range: "", assignee: "" } ],
   gates: [ { id: "g1", name: "출입구1", assignee: "", accountId: "" } ],
   workers: [],
@@ -2116,7 +2116,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           </div>
           <div><Label>API 인증키</Label><Input value={settings.dam?.serviceKey || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, serviceKey: e.target.value } }))} placeholder="공공데이터포털 인증키" /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <div><Label>댐 이름</Label><Input value={settings.dam?.damName || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, damName: e.target.value } }))} placeholder="남강댐" /></div>
+            <div><Label>댐 이름</Label><select value={settings.dam?.damName || "남강"} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, damName: e.target.value } }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+              {["소양강","충주","횡성","안동","임하","합천","남강","밀양","운문","대청","용담","섬진강","주암","장흥"].map(d => <option key={d} value={d}>{d}댐</option>)}
+            </select></div>
             <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.dam?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, interval: parseInt(e.target.value) || 30 } }))} /></div>
           </div>
           {settings.dam?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.dam.lastFetch}</p>}
@@ -2134,16 +2136,17 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               const json = await res.json();
               const items = json?.response?.body?.items?.item || [];
               const allItems = Array.isArray(items) ? items : [items];
-              const target = d.damName ? allItems.find(i => i.damNm?.includes(d.damName)) : allItems[0];
+              const filter = d.damName || "";
+              const target = filter ? allItems.find(i => (i.damnm || i.damNm || "").includes(filter)) : allItems[0];
               if (target) {
-                const discharge = parseFloat(target.tdw) || 0;
-                setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
+                const nm = target.damnm || target.damnm || "";
+                setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: parseFloat(target.inflowqy) || 0, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
                 setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR") } }));
-                const allDams = allItems.map(i => i.damNm).filter(Boolean).join(", ");
-                alert(`✅ ${target.damNm || d.damName}\n📅 ${vdate} ${vtime}시\n\n🌊 총방류량: ${target.tdw || "-"} ㎥/s\n💧 유입량: ${target.tiw || "-"} ㎥/s\n📏 수위: ${target.rwl || "-"} EL.m\n📈 저수율: ${target.rrs || "-"} %\n📦 저수량: ${target.rsv || "-"} 백만㎥\n\n전체 댐: ${allDams}\n\n대시보드에 반영되었습니다.`);
+                const allDams = allItems.map(i => i.damnm || i.damNm).filter(Boolean).join(", ");
+                alert(`✅ ${nm}댐\n📅 ${vdate} ${vtime}시\n\n💧 유입량: ${target.inflowqy || "-"} ㎥/s\n📏 현재수위: ${target.nowlowlevel || "-"} EL.m\n📦 현재저수량: ${target.nowrsvwtqy || "-"} 백만㎥\n📏 전일수위: ${target.lastlowlevel || "-"} EL.m\n📦 전일저수량: ${target.lastrsvwtqy || "-"} 백만㎥\n\n🏗️ 전체 댐 목록:\n${allDams}\n\n대시보드에 반영되었습니다.`);
               } else {
-                const bodyStr = JSON.stringify(json?.response?.body || {}).slice(0, 300);
-                alert(`❌ 데이터 없음\n\n응답: ${bodyStr}\n\n댐 이름을 확인하세요.`);
+                const allDams = allItems.map(i => i.damnm || i.damNm).filter(Boolean).join(", ");
+                alert(`❌ "${filter}" 댐을 찾을 수 없습니다.\n\n전체 댐 목록:\n${allDams}\n\n위 이름 중 하나를 입력하세요.`);
               }
             } catch (e) { alert(`❌ API 호출 실패: ${e.message}`); }
           }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🌊 댐 방류량 테스트</button>
@@ -2152,7 +2155,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
         <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
           ℹ️ <strong>API:</strong> 한국수자원공사_다목적댐 운영 정보 (/multipurPoseDamlist)<br />
-          • <strong>수집항목:</strong> 총방류량(tdw), 유입량(tiw), 수위(rwl), 저수율(rrs)<br />
+          • <strong>수집항목:</strong> 유입량(inflowqy), 수위(nowlowlevel), 저수량(nowrsvwtqy)<br />
           • <strong>인증키:</strong> 공공데이터포털 → 한국수자원공사_다목적댐 운영 정보 활용신청
         </p>
       </Card>
@@ -2948,13 +2951,14 @@ function useDamFetcher(categories, setCategories, settings, setSettings, active,
         const json = await res.json();
         const items = json?.response?.body?.items?.item || [];
         const allItems = Array.isArray(items) ? items : [items];
-        const target = dam.damName ? allItems.find(i => i.damNm?.includes(dam.damName)) : allItems[0];
+        const filter = dam.damName || "";
+        const target = filter ? allItems.find(i => (i.damnm || i.damNm || "").includes(filter)) : allItems[0];
         if (target) {
-          const discharge = parseFloat(target.tdw) || 0; // tdw: 총방류량
+          const discharge = parseFloat(target.inflowqy) || 0;
           setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
           setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR"), lastData: target } }));
         }
-      } catch (e) { console.warn("댐 방류량 API 오류:", e); }
+      } catch (e) { console.warn("댐 API 오류:", e); }
     };
     doFetch();
     timer.current = setInterval(doFetch, (dam.interval || 30) * 60000);
