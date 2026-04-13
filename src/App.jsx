@@ -413,6 +413,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
   const [spinning, setSpinning] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [showOrgChart, setShowOrgChart] = useState(false);
+  const [viewPhoto, setViewPhoto] = useState(null);
 
   // ★ 인파 데이터: Supabase가 진실 + localStorage 보조 + Realtime 즉시
   const [crowdLive, setCrowdLive] = useState(0);
@@ -796,7 +797,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           </div>
           {c?.memo && <div style={{ color: "#ccd6f6", fontSize: 13, lineHeight: 1.5, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 8 }}>💬 {c.memo}</div>}
           {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-            {c.photos.map(p => <div key={p.id} style={{ flexShrink: 0 }}>
+            {c.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => setViewPhoto(p)}>
               <img src={p.data} alt="" style={{ width: 100, height: 75, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
               <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
@@ -973,6 +974,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     })()}
 
     <div style={{ textAlign: "center", marginTop: 24, color: "#334", fontSize: 13 }}>{settings.organization} | {settings.contactNumber}</div>
+    <PhotoViewer photo={viewPhoto} onClose={() => setViewPhoto(null)} />
   </div>);
 }
 
@@ -1426,21 +1428,36 @@ function ShuttlePage({ settings, setSettings, session }) {
   </div>);
 }
 
+// ─── Photo Viewer Modal ──────────────────────────────────────────
+function PhotoViewer({ photo, onClose, onDelete }) {
+  if (!photo) return null;
+  return (<div onClick={onClose} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <img src={photo.data} alt="" style={{ maxWidth: "100%", maxHeight: "75vh", objectFit: "contain", borderRadius: 8 }} onClick={e => e.stopPropagation()} />
+    <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{ color: "#8892b0", fontSize: 14 }}>🕐 {photo.time}</span>
+      {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #F44336", background: "rgba(244,67,54,0.15)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 사진 삭제</button>}
+      <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #555", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 14, cursor: "pointer" }}>닫기</button>
+    </div>
+  </div>);
+}
+
 // ─── Congestion Page (인파혼잡도) ─────────────────────────────────
 function CongestionPage({ settings, setSettings, session }) {
   const zones = settings.zones || [];
   const myZone = zones.find(z => z.accountId === session?.id);
   const congestion = settings.zoneCongestion || [];
-  const [memo, setMemo] = useState("");
-  const [photos, setPhotos] = useState([]);
+  const [selLevel, setSelLevel] = useState({});
+  const [memos, setMemos] = useState({});
+  const [zonePhotos, setZonePhotos] = useState({});
+  const [viewPhoto, setViewPhoto] = useState(null);
+  const [viewPhotoZone, setViewPhotoZone] = useState(null);
   const CONG_LEVELS = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢", bg: "rgba(76,175,80,0.1)" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡", bg: "rgba(255,152,0,0.1)" }, danger: { label: "위험", color: "#F44336", icon: "🔴", bg: "rgba(244,67,54,0.1)" } };
 
-  const handlePhoto = (e) => {
+  const handlePhoto = (zoneId, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      // 리사이즈 (max 400px)
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -1450,7 +1467,7 @@ function CongestionPage({ settings, setSettings, session }) {
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const thumb = canvas.toDataURL("image/jpeg", 0.6);
-        setPhotos(p => [...p, { id: "p_" + Date.now(), data: thumb, time: new Date().toLocaleTimeString("ko-KR") }]);
+        setZonePhotos(p => ({ ...p, [zoneId]: [...(p[zoneId] || []), { id: "p_" + Date.now(), data: thumb, time: new Date().toLocaleTimeString("ko-KR") }] }));
       };
       img.src = reader.result;
     };
@@ -1458,14 +1475,21 @@ function CongestionPage({ settings, setSettings, session }) {
     e.target.value = "";
   };
 
-  const submitReport = (zoneId, level) => {
+  const submitReport = (zoneId) => {
+    const level = selLevel[zoneId];
+    if (!level) { alert("혼잡도 단계를 선택하세요."); return; }
     const zone = zones.find(z => z.id === zoneId);
+    const photos = zonePhotos[zoneId] || [];
+    const memo = memos[zoneId] || "";
     const report = { zoneId, zoneName: zone?.name || "", level, reportedBy: session.id, reportedByName: session.name, reportedAt: new Date().toLocaleString("ko-KR"), photos: photos.map(p => ({ ...p })), memo };
     setSettings(prev => ({
       ...prev,
       zoneCongestion: [...(prev.zoneCongestion || []).filter(c => c.zoneId !== zoneId), report]
     }));
-    setPhotos([]); setMemo("");
+    setZonePhotos(p => ({ ...p, [zoneId]: [] }));
+    setMemos(p => ({ ...p, [zoneId]: "" }));
+    setSelLevel(p => ({ ...p, [zoneId]: null }));
+    alert("✅ 혼잡도 보고 완료!");
   };
 
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
@@ -1473,17 +1497,19 @@ function CongestionPage({ settings, setSettings, session }) {
 
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "24px 16px" }}>
     <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 6px" }}>🚦 인파혼잡도 관리</h2>
-    <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>구역별 혼잡 상태를 보고합니다</p>
+    <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>① 단계 선택 → ② 사진/메모 → ③ 보고 완료</p>
 
     {viewZones.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>배정된 구역이 없습니다.<br/>관리자가 구역을 설정하고 계정에 배정해주세요.</div>}
 
     {viewZones.map(zone => {
       const cur = congestion.find(c => c.zoneId === zone.id);
       const cl = cur ? CONG_LEVELS[cur.level] : null;
-      const canEdit = !isAdmin || myZone?.id === zone.id || isAdmin;
+      const canEdit = isAdmin || myZone?.id === zone.id;
+      const selected = selLevel[zone.id];
+      const curPhotos = zonePhotos[zone.id] || [];
+      const curMemo = memos[zone.id] || "";
 
       return (<div key={zone.id} style={{ maxWidth: 500, margin: "0 auto 16px", background: "rgba(255,255,255,0.03)", borderRadius: 16, border: `2px solid ${cl?.color || "#333"}`, padding: "20px", overflow: "hidden" }}>
-        {/* 구역 헤더 */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <span style={{ fontSize: 20 }}>📍</span>
           <div style={{ flex: 1 }}>
@@ -1496,7 +1522,7 @@ function CongestionPage({ settings, setSettings, session }) {
           </div>}
         </div>
 
-        {/* 현재 상태 */}
+        {/* 현재 보고 내역 */}
         {cur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
             <span style={{ color: "#8892b0", fontSize: 12 }}>마지막 보고:</span>
@@ -1505,43 +1531,47 @@ function CongestionPage({ settings, setSettings, session }) {
           </div>
           {cur.memo && <div style={{ color: "#ccd6f6", fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>💬 {cur.memo}</div>}
           {cur.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-            {cur.photos.map(p => <div key={p.id} style={{ flexShrink: 0 }}>
+            {cur.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => { setViewPhoto(p); setViewPhotoZone(zone.id); }}>
               <img src={p.data} alt="" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
               <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
           </div>}
         </div>}
 
-        {/* 혼잡도 선택 버튼 */}
+        {/* 새 보고 */}
         {canEdit && <>
+          {/* ① 단계 선택 */}
+          <div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>① 혼잡도 단계 선택</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
             {Object.entries(CONG_LEVELS).map(([k, v]) => (
-              <button key={k} onClick={() => submitReport(zone.id, k)} style={{ padding: "16px 8px", borderRadius: 12, border: cur?.level === k ? `2px solid ${v.color}` : "1px solid #333", background: cur?.level === k ? v.bg : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "center", transition: "all .2s" }}>
+              <button key={k} onClick={() => setSelLevel(p => ({ ...p, [zone.id]: k }))} style={{ padding: "16px 8px", borderRadius: 12, border: selected === k ? `3px solid ${v.color}` : "1px solid #333", background: selected === k ? v.bg : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "center" }}>
                 <div style={{ fontSize: 28 }}>{v.icon}</div>
                 <div style={{ color: v.color, fontSize: 16, fontWeight: 800, marginTop: 4 }}>{v.label}</div>
               </button>
             ))}
           </div>
 
-          {/* 메모 */}
-          <textarea value={memo} onChange={e => setMemo(e.target.value)} placeholder="현장 상황 메모 (선택)" rows={2} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 8 }} />
-
-          {/* 사진 촬영 */}
+          {/* ② 사진/메모 */}
+          <div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>② 사진/메모 (선택)</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
             <label style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "rgba(255,255,255,0.02)", color: "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
               📷 사진 촬영 / 첨부
-              <input type="file" accept="image/*,video/*" capture="environment" onChange={handlePhoto} style={{ display: "none" }} />
+              <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhoto(zone.id, e)} style={{ display: "none" }} />
             </label>
-            {photos.length > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>{photos.length}장 첨부</span>}
+            {curPhotos.length > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>{curPhotos.length}장</span>}
           </div>
-
-          {/* 첨부 미리보기 */}
-          {photos.length > 0 && <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
-            {photos.map((p, i) => <div key={p.id} style={{ position: "relative", flexShrink: 0 }}>
+          {curPhotos.length > 0 && <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
+            {curPhotos.map((p, i) => <div key={p.id} style={{ position: "relative", flexShrink: 0 }}>
               <img src={p.data} alt="" style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
-              <button onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: 10, border: "none", background: "#F44336", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              <button onClick={() => setZonePhotos(prev => ({ ...prev, [zone.id]: prev[zone.id].filter((_, idx) => idx !== i) }))} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: 10, border: "none", background: "#F44336", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>)}
           </div>}
+          <textarea value={curMemo} onChange={e => setMemos(p => ({ ...p, [zone.id]: e.target.value }))} placeholder="현장 상황 메모" rows={2} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 10 }} />
+
+          {/* ③ 보고 완료 */}
+          <button onClick={() => submitReport(zone.id)} style={{ width: "100%", padding: "16px", borderRadius: 12, border: "none", background: selected ? (CONG_LEVELS[selected]?.color || "#2196F3") : "#333", color: "#fff", fontSize: 16, fontWeight: 800, cursor: selected ? "pointer" : "default", opacity: selected ? 1 : 0.4 }}>
+            {selected ? `${CONG_LEVELS[selected].icon} ${CONG_LEVELS[selected].label} 보고 완료` : "단계를 먼저 선택하세요"}
+          </button>
         </>}
       </div>);
     })}
@@ -1565,6 +1595,16 @@ function CongestionPage({ settings, setSettings, session }) {
         })}
       </div>
     </div>}
+
+    {/* 사진 뷰어 */}
+    <PhotoViewer photo={viewPhoto} onClose={() => setViewPhoto(null)} onDelete={isAdmin && viewPhoto ? () => {
+      if (!confirm("이 사진을 삭제하시겠습니까?")) return;
+      setSettings(prev => ({
+        ...prev,
+        zoneCongestion: (prev.zoneCongestion || []).map(c => c.zoneId === viewPhotoZone ? { ...c, photos: (c.photos || []).filter(p => p.id !== viewPhoto.id) } : c)
+      }));
+      setViewPhoto(null);
+    } : null} />
   </div>);
 }
 
