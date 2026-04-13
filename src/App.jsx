@@ -362,19 +362,31 @@ function DashboardOrgChart({ settings, show, onToggle }) {
 
   const renderNode = (node, depth) => {
     const children = getChildren(node.id);
+    const childOrgs = children.filter(c => c.type === "org");
+    const childPersons = children.filter(c => c.type === "person");
     const isOrg = node.type === "org";
-    return (<div key={node.id} style={{ marginLeft: depth * 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: isOrg ? "10px 12px" : "8px 10px", background: isOrg ? "rgba(33,150,243,0.06)" : "transparent", borderRadius: 8, marginBottom: 4, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 16 }}>{isOrg ? "🏢" : "👤"}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ color: isOrg ? "#2196F3" : "#ccd6f6", fontSize: isOrg ? 15 : 14, fontWeight: 700 }}>{node.name}</span>
-            {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: isOrg ? "rgba(33,150,243,0.1)" : "rgba(76,175,80,0.1)", color: isOrg ? "#2196F3" : "#4CAF50", fontSize: 13, fontWeight: 700 }}>{node.position}</span>}
-          </div>
+
+    if (!isOrg) {
+      return (<div key={node.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, marginBottom: 2 }}>
+        <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
+        {node.position && <span style={{ color: "#4CAF50", fontSize: 12 }}>{node.position}</span>}
+        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "5px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
+      </div>);
+    }
+
+    return (<div key={node.id} style={{ marginLeft: depth * 14, marginBottom: 6 }}>
+      <div style={{ borderRadius: 10, border: "1px solid rgba(33,150,243,0.15)", overflow: "hidden" }}>
+        <div style={{ padding: "8px 12px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 14 }}>🏢</span>
+          <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 800, flex: 1 }}>{node.name}</span>
+          {node.position && <span style={{ color: "#2196F3", fontSize: 12 }}>{node.position}</span>}
+          <span style={{ color: "#556", fontSize: 11 }}>{childPersons.length}명</span>
         </div>
-        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", color: "#4CAF50", fontSize: 14, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞 {node.phone}</a>}
+        {childPersons.length > 0 && <div style={{ padding: "4px 10px 6px" }}>
+          {childPersons.map(p => renderNode(p, 0))}
+        </div>}
       </div>
-      {children.map(c => renderNode(c, depth + 1))}
+      {childOrgs.map(c => renderNode(c, depth + 1))}
     </div>);
   };
 
@@ -1906,32 +1918,60 @@ function OrgChartTab({ settings, setSettings }) {
 
   const renderNode = (node, depth) => {
     const children = getChildren(node.id);
+    const childOrgs = children.filter(c => c.type === "org");
+    const childPersons = children.filter(c => c.type === "person");
     const isCol = collapsed[node.id];
     const isOrg = node.type === "org";
+
+    if (!isOrg) {
+      // 인원: 조직 내부 멤버로 표시
+      return (
+        <div key={node.id} draggable onDragStart={(e) => { e.stopPropagation(); setDragId(node.id); }}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.style.outline = "2px solid #4CAF50"; }}
+          onDragLeave={(e) => { e.currentTarget.style.outline = "none"; }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.style.outline = "none"; handleDrop(node.id); }}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", border: "1px solid transparent" }}>
+          <span style={{ fontSize: 12, color: "#556" }}>⠿</span>
+          <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
+          {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+          {node.memo && <span style={{ color: "#556", fontSize: 12 }}>{node.memo}</span>}
+          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto", whiteSpace: "nowrap" }}>📞</a>}
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 조직: 카드 형태
     return (
-      <div key={node.id} style={{ marginLeft: depth * 20 }}>
+      <div key={node.id} style={{ marginLeft: depth * 16, marginBottom: 8 }}>
         <div draggable onDragStart={(e) => { e.stopPropagation(); setDragId(node.id); }}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.style.outline = "2px solid #2196F3"; }}
           onDragLeave={(e) => { e.currentTarget.style.outline = "none"; }}
           onDrop={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.style.outline = "none"; handleDrop(node.id); }}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: isOrg ? "10px 14px" : "8px 12px", background: isOrg ? "rgba(33,150,243,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 10, border: isOrg ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222", marginBottom: 4, cursor: "grab", flexWrap: "wrap" }}>
-          {children.length > 0 ? <button onClick={() => setCollapsed(p => ({ ...p, [node.id]: !p[node.id] }))} style={{ background: "none", border: "none", color: isOrg ? "#2196F3" : "#556", fontSize: 14, cursor: "pointer", padding: 0, width: 18 }}>{isCol ? "▶" : "▼"}</button> : <span style={{ width: 18 }} />}
-          {depth > 0 && <span style={{ color: "#333", fontSize: 14 }}>└</span>}
-          <span style={{ fontSize: 16 }}>{isOrg ? "🏢" : "👤"}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ color: isOrg ? "#2196F3" : "#ccd6f6", fontSize: isOrg ? 14 : 13, fontWeight: isOrg ? 800 : 700 }}>{node.name}</span>
-              {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: isOrg ? "rgba(33,150,243,0.12)" : "rgba(76,175,80,0.12)", color: isOrg ? "#2196F3" : "#4CAF50", fontSize: 14, fontWeight: 700 }}>{node.position}</span>}
-            </div>
-            {node.memo && <div style={{ color: "#556", fontSize: 14, marginTop: 2 }}>{node.memo}</div>}
+          style={{ borderRadius: 12, border: "1px solid rgba(33,150,243,0.2)", overflow: "hidden", cursor: "grab" }}>
+          {/* 조직 헤더 */}
+          <div style={{ padding: "10px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+            {children.length > 0 ? <button onClick={() => setCollapsed(p => ({ ...p, [node.id]: !p[node.id] }))} style={{ background: "none", border: "none", color: "#2196F3", fontSize: 14, cursor: "pointer", padding: 0, width: 18 }}>{isCol ? "▶" : "▼"}</button> : <span style={{ width: 18 }} />}
+            <span style={{ fontSize: 16 }}>🏢</span>
+            <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{node.name}</span>
+            {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(33,150,243,0.12)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+            <span style={{ color: "#556", fontSize: 12 }}>{childPersons.length}명</span>
+            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
-          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 8, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 14, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞 {node.phone}</a>}
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>✏️</button>
-            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 14, cursor: "pointer" }}>🗑</button>
-          </div>
+          {node.memo && <div style={{ padding: "4px 14px 6px", color: "#556", fontSize: 12 }}>{node.memo}</div>}
+
+          {/* 소속 인원 */}
+          {!isCol && childPersons.length > 0 && <div style={{ padding: "6px 14px 10px" }}>
+            {childPersons.map(p => renderNode(p, 0))}
+          </div>}
         </div>
-        {!isCol && children.map(c => renderNode(c, depth + 1))}
+
+        {/* 하위 조직 */}
+        {!isCol && childOrgs.map(c => renderNode(c, depth + 1))}
       </div>
     );
   };
@@ -2516,7 +2556,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
           </select></div>
           <div><Label>역할</Label><select id="sw-role" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-            {["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+            {["관리자","계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
           </select></div>
         </div>
         <button onClick={() => {
@@ -2569,7 +2609,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                         <option value="">선택</option>{(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
                       </select></div>
                       <div><Label>역할</Label><select value={w.role || ""} onChange={e => updateW("role", e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                        <option value="">선택</option>{["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="">선택</option>{["관리자","계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
                       </select></div>
                     </div>
                     <button onClick={() => setEditWorker(null)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✅ 수정 완료</button>
@@ -2619,7 +2659,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                           <option value="">선택</option>{(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
                         </select></div>
                         <div><Label>역할</Label><select value={w.role || ""} onChange={e => updateW("role", e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
-                          <option value="">선택</option>{["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+                          <option value="">선택</option>{["관리자","계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
                         </select></div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
@@ -2636,6 +2676,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                       {w.role && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
                       {w.phone && <span style={{ color: "#556", fontSize: 12 }}>{w.phone}</span>}
                       <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
+                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
                         <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
                         <button onClick={(e) => { e.stopPropagation(); deleteW(); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
                       </div>
