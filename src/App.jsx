@@ -2008,6 +2008,7 @@ function OrgChartTab({ settings, setSettings }) {
 function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset }) {
   const [tab, setTab] = useState(initialTab || "monitor");
   const [focusCat, setFocusCat] = useState(initialCatId || null);
+  const [editWorker, setEditWorker] = useState(null); // {siteId, workerId}
   const [nc, setNc] = useState({ name: "", phone: "" });
   const [locLoading, setLocLoading] = useState(false);
   const [apiTestResult, setApiTestResult] = useState({});
@@ -2541,15 +2542,36 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,152,0,0.3)"; const wid = e.dataTransfer.getData("workerId"); const from = e.dataTransfer.getData("fromSite"); if (wid && from && from !== "_pool") { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === from); const pi = ws.findIndex(s => s.id === "_pool"); if (fi >= 0 && pi >= 0) { const w = ws[fi].workers.find(ww => ww.id === wid); if (w) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) }; ws[pi] = { ...ws[pi], workers: [...ws[pi].workers, w] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
             <div style={{ color: "#FF9800", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>⚠️ 미배치 근무자 ({poolWorkers.length}명)</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {poolWorkers.map(w => (
-                <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
-                  style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid #333", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                  {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
-                  {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
-                  <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "1px 4px", border: "none", background: "none", color: "#F44336", fontSize: 11, cursor: "pointer" }}>✕</button>
-                </div>
-              ))}
+              {poolWorkers.map(w => {
+                const isEditing = editWorker?.siteId === "_pool" && editWorker?.workerId === w.id;
+                const updateW = (field, val) => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.map(ww => ww.id === w.id ? { ...ww, [field]: val } : ww) }; setSettings(prev => ({ ...prev, workSites: ws })); } };
+                return isEditing ? (
+                  <div key={w.id} style={{ width: "100%", padding: "10px", borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.2)", marginBottom: 4 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                      <div><Label>이름</Label><Input value={w.name} onChange={e => updateW("name", e.target.value)} /></div>
+                      <div><Label>연락처</Label><Input value={w.phone || ""} onChange={e => updateW("phone", e.target.value)} /></div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                      <div><Label>근무유형</Label><select value={w.type || ""} onChange={e => updateW("type", e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                        <option value="">선택</option>{(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
+                      </select></div>
+                      <div><Label>역할</Label><select value={w.role || ""} onChange={e => updateW("role", e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                        <option value="">선택</option>{["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+                      </select></div>
+                    </div>
+                    <button onClick={() => setEditWorker(null)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✅ 수정 완료</button>
+                  </div>
+                ) : (
+                  <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
+                    style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid #333", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
+                    {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
+                    {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
+                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "1px 6px", border: "1px solid #333", background: "none", color: "#8892b0", fontSize: 11, cursor: "pointer", borderRadius: 4 }}>✏️</button>
+                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "1px 4px", border: "none", background: "none", color: "#F44336", fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </div>
+                );
+              })}
             </div>
           </div>);
         })()}
@@ -2569,16 +2591,37 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 onDragLeave={e => { e.currentTarget.style.background = "transparent"; }}
                 onDrop={e => { e.preventDefault(); e.currentTarget.style.background = "transparent"; const wid = e.dataTransfer.getData("workerId"); const from = e.dataTransfer.getData("fromSite"); if (wid && from && from !== site.id) { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === from); const ti = ws.findIndex(s => s.id === site.id); if (fi >= 0 && ti >= 0) { const w = (ws[fi].workers || []).find(ww => ww.id === wid); if (w) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) }; ws[ti] = { ...ws[ti], workers: [...(ws[ti].workers || []), w] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
                 <div style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🏠 {site.name} <span style={{ color: "#556", fontWeight: 400 }}>({(site.workers || []).length}명)</span></div>
-                {(site.workers || []).map(w => (
-                  <div key={w.id} draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}
-                    style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, color: "#556" }}>⠿</span>
-                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                    {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
-                    {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
-                    {w.phone && <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>{w.phone}</span>}
-                  </div>
-                ))}
+                {(site.workers || []).map(w => {
+                  const isEditing = editWorker?.siteId === site.id && editWorker?.workerId === w.id;
+                  const updateW = (field, val) => { const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 >= 0) { ws[si2] = { ...ws[si2], workers: ws[si2].workers.map(ww => ww.id === w.id ? { ...ww, [field]: val } : ww) }; setSettings(prev => ({ ...prev, workSites: ws })); } };
+                  return isEditing ? (
+                    <div key={w.id} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.2)", marginBottom: 4 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                        <div><Label>이름</Label><Input value={w.name} onChange={e => updateW("name", e.target.value)} /></div>
+                        <div><Label>연락처</Label><Input value={w.phone || ""} onChange={e => updateW("phone", e.target.value)} /></div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                        <div><Label>근무유형</Label><select value={w.type || ""} onChange={e => updateW("type", e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                          <option value="">선택</option>{(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
+                        </select></div>
+                        <div><Label>역할</Label><select value={w.role || ""} onChange={e => updateW("role", e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                          <option value="">선택</option>{["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+                        </select></div>
+                      </div>
+                      <button onClick={() => setEditWorker(null)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✅ 수정 완료</button>
+                    </div>
+                  ) : (
+                    <div key={w.id} draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}
+                      style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, color: "#556" }}>⠿</span>
+                      <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
+                      {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
+                      {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
+                      {w.phone && <span style={{ color: "#556", fontSize: 11 }}>{w.phone}</span>}
+                      <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ marginLeft: "auto", padding: "2px 8px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                    </div>
+                  );
+                })}
                 {(site.workers || []).length === 0 && <div style={{ color: "#445", fontSize: 12, padding: "8px", textAlign: "center", border: "1px dashed #333", borderRadius: 8 }}>여기에 근무자를 드래그하세요</div>}
               </div>);
             })}
