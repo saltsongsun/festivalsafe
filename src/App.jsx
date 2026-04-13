@@ -2667,14 +2667,20 @@ function simpleHash(str) {
 }
 
 const DEFAULT_ACCOUNTS = [
-  { id: "admin", password: simpleHash("admin1234"), name: "관리자", role: "admin", festivalId: "default" },
-  { id: "counter1", password: simpleHash("1234"), name: "계수원1", role: "counter", festivalId: "default" },
-  { id: "viewer", password: simpleHash("view"), name: "상황실", role: "viewer", festivalId: "default" },
-  { id: "parking1", password: simpleHash("1234"), name: "주차요원1", role: "parking", festivalId: "default", parkingLotId: "" },
-  { id: "shuttle1", password: simpleHash("1234"), name: "셔틀요원1", role: "shuttle", festivalId: "default" },
+  { id: "sysadmin", password: simpleHash("sysadmin"), name: "시스템관리자", role: "sysadmin", festivals: ["all"] },
+  { id: "admin", password: simpleHash("admin1234"), name: "관리자", role: "admin", festivalId: "default", festivals: ["default"] },
+  { id: "counter1", password: simpleHash("1234"), name: "계수원1", role: "counter", festivalId: "default", festivals: ["default"] },
+  { id: "viewer", password: simpleHash("view"), name: "상황실", role: "viewer", festivalId: "default", festivals: ["default"] },
+  { id: "parking1", password: simpleHash("1234"), name: "주차요원1", role: "parking", festivalId: "default", festivals: ["default"], parkingLotId: "" },
+  { id: "shuttle1", password: simpleHash("1234"), name: "셔틀요원1", role: "shuttle", festivalId: "default", festivals: ["default"] },
+];
+
+const DEFAULT_FESTIVALS = [
+  { id: "default", name: "기본 축제", subtitle: "안전관리시스템", createdAt: new Date().toISOString() },
 ];
 
 const ROLES = {
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "축제 생성/관리 + 모든 기능" },
   admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "모든 기능 접근" },
   manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
   counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "dashboard", "inbox"], desc: "인파 계수 + 대시보드 조회" },
@@ -2752,11 +2758,12 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
   const addAccount = () => {
     if (!newAcc.id || !newAcc.pw || !newAcc.name) return;
     if (accounts.find(a => a.id === newAcc.id)) { alert("이미 존재하는 아이디입니다."); return; }
-    setAccounts([...accounts, { id: newAcc.id, password: simpleHash(newAcc.pw), name: newAcc.name, role: newAcc.role, festivalId: currentUser.festivalId }]);
+    setAccounts([...accounts, { id: newAcc.id, password: simpleHash(newAcc.pw), name: newAcc.name, role: newAcc.role, festivalId: currentUser.festivalId, festivals: [currentUser.festivalId] }]);
     setNewAcc({ id: "", pw: "", name: "", role: "counter" });
   };
 
   const deleteAcc = (id) => {
+    if (id === "sysadmin") { alert("시스템관리자는 삭제할 수 없습니다."); return; }
     if (id === "admin") { alert("기본 관리자는 삭제할 수 없습니다."); return; }
     if (id === currentUser.id) { alert("현재 로그인된 계정은 삭제할 수 없습니다."); return; }
     if (confirm(`"${id}" 계정을 삭제하시겠습니까?`)) setAccounts(accounts.filter(a => a.id !== id));
@@ -2871,39 +2878,165 @@ export default function App() {
 }
 
 function AppMain({ onError }) {
-  const [accounts, setAccounts] = usePersist("fest_accounts_v1", DEFAULT_ACCOUNTS);
+  const [accounts, setAccounts] = usePersist("fest_accounts_v2", DEFAULT_ACCOUNTS);
+  const [festivals, setFestivals] = usePersist("fest_festivals_v1", DEFAULT_FESTIVALS);
   const [session, setSession] = useState(null);
+  const [selectedFestival, setSelectedFestival] = useState(null);
   const [page, setPage] = useState("dashboard");
 
   // Restore session
   useEffect(() => {
     try {
-      const s = sessionStorage.getItem("fest_session");
+      const s = sessionStorage.getItem("fest_session_v2");
       if (s) {
         const parsed = JSON.parse(s);
         const acc = accounts.find(a => a.id === parsed.id);
-        if (acc) setSession(acc);
+        if (acc) {
+          setSession(acc);
+          if (parsed.festivalId) {
+            const fest = festivals.find(f => f.id === parsed.festivalId);
+            if (fest) setSelectedFestival(fest);
+          }
+        }
       }
     } catch {}
   }, []);
 
   const handleLogin = (acc) => {
     setSession(acc);
-    sessionStorage.setItem("fest_session", JSON.stringify(acc));
-    setPage(acc.role === "counter" ? "counter" : acc.role === "parking" ? "parking" : acc.role === "shuttle" ? "shuttle" : "dashboard");
+    // 축제 1개만 배정된 경우 자동 선택
+    const myFests = acc.festivals?.includes("all") ? festivals : festivals.filter(f => (acc.festivals || [acc.festivalId || "default"]).includes(f.id));
+    if (myFests.length === 1) {
+      setSelectedFestival(myFests[0]);
+      sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: acc.id, festivalId: myFests[0].id }));
+      setPage(acc.role === "counter" ? "counter" : acc.role === "parking" ? "parking" : acc.role === "shuttle" ? "shuttle" : "dashboard");
+    } else {
+      sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: acc.id }));
+    }
+  };
+
+  const handleSelectFestival = (fest) => {
+    setSelectedFestival(fest);
+    sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: session.id, festivalId: fest.id }));
+    setPage(session.role === "counter" ? "counter" : session.role === "parking" ? "parking" : session.role === "shuttle" ? "shuttle" : "dashboard");
   };
 
   const handleLogout = () => {
     setSession(null);
-    sessionStorage.removeItem("fest_session");
+    setSelectedFestival(null);
+    sessionStorage.removeItem("fest_session_v2");
+  };
+
+  const handleBackToFestivalSelect = () => {
+    setSelectedFestival(null);
+    sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: session.id }));
   };
 
   if (!session) return <LoginPage onLogin={handleLogin} accounts={accounts} />;
 
-  return <AuthenticatedApp session={session} accounts={accounts} setAccounts={setAccounts} onLogout={handleLogout} initialPage={page} setPage={setPage} />;
+  // 축제 선택 안 된 상태
+  if (!selectedFestival) {
+    const isSysAdmin = session.role === "sysadmin";
+    const myFests = isSysAdmin ? festivals : festivals.filter(f => (session.festivals || [session.festivalId || "default"]).includes(f.id));
+
+    return (<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", fontFamily: "'Noto Sans KR',sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
+      <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>🎪 축제 선택</h1>
+      <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 24px" }}>{session.name}님, 관리할 축제를 선택하세요</p>
+
+      <div style={{ width: "100%", maxWidth: 500, display: "grid", gap: 12 }}>
+        {myFests.map(f => (
+          <div key={f.id} onClick={() => handleSelectFestival(f)} style={{ padding: "20px", borderRadius: 16, background: "rgba(255,255,255,0.03)", border: "1px solid #222", cursor: "pointer", transition: "all .2s" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#ccd6f6", marginBottom: 4 }}>🏮 {f.name}</div>
+            {f.subtitle && <div style={{ color: "#556", fontSize: 13 }}>{f.subtitle}</div>}
+            {f.dates && <div style={{ color: "#445", fontSize: 12, marginTop: 4 }}>📅 {f.dates}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* 시스템 관리자: 축제 생성 */}
+      {isSysAdmin && <FestivalManager festivals={festivals} setFestivals={setFestivals} accounts={accounts} setAccounts={setAccounts} />}
+
+      <button onClick={handleLogout} style={{ marginTop: 24, padding: "10px 24px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 14, cursor: "pointer" }}>로그아웃</button>
+    </div>);
+  }
+
+  return <AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} />;
 }
 
-function AuthenticatedApp({ session, accounts, setAccounts, onLogout, initialPage, setPage: setPageExt }) {
+// ─── Festival Manager (시스템관리자 전용) ────────────────────────
+function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
+  const [newFest, setNewFest] = useState({ name: "", subtitle: "", dates: "" });
+  const [showAccounts, setShowAccounts] = useState(false);
+
+  const addFestival = () => {
+    if (!newFest.name) { alert("축제명을 입력하세요."); return; }
+    const id = "fest_" + Date.now();
+    setFestivals(p => [...p, { id, ...newFest, createdAt: new Date().toISOString() }]);
+    setNewFest({ name: "", subtitle: "", dates: "" });
+    alert("✅ 축제가 생성되었습니다. 계정에 배정해주세요.");
+  };
+
+  const deleteFestival = (id) => {
+    if (id === "default") { alert("기본 축제는 삭제할 수 없습니다."); return; }
+    if (!confirm("축제를 삭제하시겠습니까?")) return;
+    setFestivals(p => p.filter(f => f.id !== id));
+  };
+
+  return (<div style={{ width: "100%", maxWidth: 500, marginTop: 24 }}>
+    <div style={{ padding: 20, borderRadius: 16, background: "rgba(233,30,99,0.06)", border: "1px solid rgba(233,30,99,0.15)" }}>
+      <h3 style={{ color: "#E91E63", fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>🎪 축제 관리 (시스템관리자)</h3>
+
+      {/* 축제 생성 */}
+      <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+        <input value={newFest.name} onChange={e => setNewFest(p => ({ ...p, name: e.target.value }))} placeholder="축제명 *" style={{ padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <input value={newFest.subtitle} onChange={e => setNewFest(p => ({ ...p, subtitle: e.target.value }))} placeholder="부제목" style={{ padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} />
+          <input value={newFest.dates} onChange={e => setNewFest(p => ({ ...p, dates: e.target.value }))} placeholder="기간 (예: 4/15~4/20)" style={{ padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} />
+        </div>
+        <button onClick={addFestival} style={{ padding: "12px", borderRadius: 8, border: "none", background: "#E91E63", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🎪 축제 생성</button>
+      </div>
+
+      {/* 축제 목록 */}
+      <div style={{ display: "grid", gap: 6, marginBottom: 14 }}>
+        {festivals.map(f => (
+          <div key={f.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, gap: 10 }}>
+            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>🏮 {f.name}</span>
+            <span style={{ color: "#445", fontSize: 12 }}>{f.dates || ""}</span>
+            {f.id !== "default" && <button onClick={() => deleteFestival(f.id)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>}
+          </div>
+        ))}
+      </div>
+
+      {/* 계정 관리 */}
+      <button onClick={() => setShowAccounts(!showAccounts)} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>{showAccounts ? "▲ 계정 관리 닫기" : "👤 계정 축제 배정 관리"}</button>
+      {showAccounts && <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+        {accounts.filter(a => a.role !== "sysadmin").map(acc => (
+          <div key={acc.id} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ color: ROLES[acc.role]?.color || "#888", fontSize: 12, fontWeight: 700 }}>{ROLES[acc.role]?.label}</span>
+              <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{acc.name}</span>
+              <span style={{ color: "#445", fontSize: 12 }}>({acc.id})</span>
+            </div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {festivals.map(f => {
+                const assigned = (acc.festivals || [acc.festivalId]).includes(f.id);
+                return <button key={f.id} onClick={() => {
+                  const curFests = acc.festivals || [acc.festivalId || "default"];
+                  const newFests = assigned ? curFests.filter(x => x !== f.id) : [...curFests, f.id];
+                  if (newFests.length === 0) { alert("최소 1개 축제에 배정해야 합니다."); return; }
+                  setAccounts(p => p.map(a => a.id === acc.id ? { ...a, festivals: newFests, festivalId: newFests[0] } : a));
+                }} style={{ padding: "4px 10px", borderRadius: 6, border: assigned ? "1px solid #4CAF50" : "1px solid #333", background: assigned ? "rgba(76,175,80,0.1)" : "transparent", color: assigned ? "#4CAF50" : "#556", fontSize: 12, cursor: "pointer" }}>{assigned ? "✅" : "⬜"} {f.name}</button>;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  </div>);
+}
+
+function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt }) {
   const [page, setPageInternal] = useState(initialPage);
   const setPage = (p) => { setPageInternal(p); setPageExt(p); };
 
@@ -3083,12 +3216,15 @@ function AuthenticatedApp({ session, accounts, setAccounts, onLogout, initialPag
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
 
     {/* Top bar - user info */}
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid #1a1a2e", padding: "6px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ padding: "2px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 14, fontWeight: 700 }}>{role.label}</span>
-        <span style={{ color: "#8892b0", fontSize: 14 }}>{session.name}</span>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid #1a1a2e", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <span style={{ padding: "2px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
+        <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
-      <button onClick={onLogout} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#FF9800", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
+        <button onClick={onLogout} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
+      </div>
     </div>
 
     {/* Bottom nav */}
