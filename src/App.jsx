@@ -113,7 +113,9 @@ const DEFAULT_SETTINGS = {
   dailyRecords: [],
   orgChart: [],
   zoneCongestion: [],
-  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "cms"],
+  workTypes: ["일용근로", "자원봉사", "파견", "공무원"],
+  workSites: [],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
+  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "cms"],
   features: {
     crowd: true,
     parking: true,
@@ -1441,6 +1443,105 @@ function PhotoViewer({ photo, onClose, onDelete }) {
   </div>);
 }
 
+// ─── Festival Status Page (축제현황) ─────────────────────────────
+function FestivalStatusPage({ settings, setSettings, session }) {
+  const zones = settings.zones || [];
+  const workSites = settings.workSites || [];
+  const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
+  const STATUS = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+
+  const setStatus = (siteId, status) => {
+    setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s) }));
+  };
+
+  const now = new Date();
+  const opStart = settings.operatingStart || "08:00";
+  const opEnd = settings.operatingEnd || "22:00";
+
+  return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "24px 16px 80px" }}>
+    <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🎪 축제현황</h2>
+    <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 16px" }}>{settings.festivalName || "축제"}</p>
+
+    {/* 운영시간 */}
+    <div style={{ maxWidth: 500, margin: "0 auto 16px", padding: "12px 16px", borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)", textAlign: "center" }}>
+      <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 700 }}>🕐 운영시간 {opStart} ~ {opEnd}</span>
+      <span style={{ color: "#8892b0", fontSize: 13, marginLeft: 12 }}>현재 {now.toLocaleTimeString("ko-KR")}</span>
+    </div>
+
+    {/* 구역별 현황 */}
+    {zones.filter(z => z.name).length === 0 && workSites.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>관리구역/근무지가 없습니다.<br/>⚙️ 관리 → 기능관리에서 설정하세요.</div>}
+
+    {zones.filter(z => z.name).map(zone => {
+      const sites = workSites.filter(s => s.zoneId === zone.id);
+      const congestion = (settings.zoneCongestion || []).find(c => c.zoneId === zone.id);
+      const CL = { smooth: { icon: "🟢", label: "원활" }, crowded: { icon: "🟡", label: "혼잡" }, danger: { icon: "🔴", label: "위험" } };
+      const cl = congestion ? CL[congestion.level] : null;
+
+      return (<div key={zone.id} style={{ maxWidth: 500, margin: "0 auto 12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid #222", overflow: "hidden" }}>
+        {/* 구역 헤더 */}
+        <div style={{ padding: "14px 16px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>📍</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#2196F3", fontSize: 17, fontWeight: 800 }}>{zone.name}</div>
+            {zone.range && <div style={{ color: "#556", fontSize: 12 }}>{zone.range}</div>}
+          </div>
+          {cl && <span style={{ color: CL[congestion.level]?.color || "#556", fontSize: 14, fontWeight: 700 }}>{cl.icon} {cl.label}</span>}
+        </div>
+
+        {/* 근무지 */}
+        {sites.length === 0 && <div style={{ padding: "16px", color: "#445", fontSize: 13, textAlign: "center" }}>배치된 근무지 없음</div>}
+        {sites.map(site => {
+          const st = STATUS[site.status] || STATUS.standby;
+          return (<div key={site.id} style={{ padding: "12px 16px", borderTop: "1px solid #1a1a2e" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 14 }}>🏠</span>
+              <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, flex: 1 }}>{site.name}</span>
+              <span style={{ padding: "3px 10px", borderRadius: 10, background: `${st.color}22`, color: st.color, fontSize: 13, fontWeight: 700 }}>{st.icon} {st.label}</span>
+            </div>
+
+            {/* 상태 변경 버튼 */}
+            {isAdmin && <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+              {Object.entries(STATUS).map(([k, v]) => (
+                <button key={k} onClick={() => setStatus(site.id, k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  {v.icon} {v.label}
+                </button>
+              ))}
+            </div>}
+
+            {/* 근무자 목록 */}
+            {(site.workers || []).length > 0 && <div style={{ display: "grid", gap: 4 }}>
+              {(site.workers || []).map(w => (
+                <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+                  <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, minWidth: 50 }}>{w.name}</span>
+                  {w.type && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#9C27B0", fontSize: 11, fontWeight: 600 }}>{w.type}</span>}
+                  {w.duty && <span style={{ color: "#556", fontSize: 12, flex: 1 }}>{w.duty}</span>}
+                  {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞</a>}
+                </div>
+              ))}
+            </div>}
+            {(site.workers || []).length === 0 && <div style={{ color: "#445", fontSize: 12 }}>배치된 근무자 없음</div>}
+          </div>);
+        })}
+      </div>);
+    })}
+
+    {/* 미배정 근무지 */}
+    {workSites.filter(s => !s.zoneId).length > 0 && <div style={{ maxWidth: 500, margin: "0 auto 12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid #333", overflow: "hidden" }}>
+      <div style={{ padding: "14px 16px", background: "rgba(255,152,0,0.06)" }}>
+        <span style={{ color: "#FF9800", fontSize: 15, fontWeight: 800 }}>⚠️ 미배정 근무지</span>
+      </div>
+      {workSites.filter(s => !s.zoneId).map(site => {
+        const st = STATUS[site.status] || STATUS.standby;
+        return (<div key={site.id} style={{ padding: "12px 16px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>🏠 {site.name}</span>
+          <span style={{ color: st.color, fontSize: 13 }}>{st.icon} {st.label}</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{(site.workers || []).length}명</span>
+        </div>);
+      })}
+    </div>}
+  </div>);
+}
+
 // ─── Congestion Page (인파혼잡도) ─────────────────────────────────
 function CongestionPage({ settings, setSettings, session }) {
   const zones = settings.zones || [];
@@ -1997,6 +2098,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       ft.shuttle !== false && { id: "shuttlecms", label: "셔틀버스" },
       ft.crowd !== false && { id: "crowdcms", label: "인파" },
       { id: "orgchart", label: "조직도" },
+      { id: "workmgmt", label: "근무관리" },
       { id: "alertmsg", label: "알림메시지" },
       ft.sms !== false && { id: "sms", label: "SMS" },
     ].filter(Boolean) },
@@ -2650,6 +2752,69 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {/* 📋 조직도 / 비상연락망 */}
     {tab === "orgchart" && <OrgChartTab settings={settings} setSettings={setSettings} />}
 
+    {/* 근무관리 */}
+    {tab === "workmgmt" && <div>
+      {/* 근무유형 설정 */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>📋 근무유형 설정</h3>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {(settings.workTypes || []).map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
+              <span style={{ color: "#CE93D8", fontSize: 13 }}>{t}</span>
+              <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input id="new-worktype" placeholder="새 유형 (예: 파견직)" style={{ flex: 1 }} />
+          <button onClick={() => { const inp = document.getElementById("new-worktype"); if (inp?.value) { setSettings(prev => ({ ...prev, workTypes: [...(prev.workTypes || []), inp.value] })); inp.value = ""; } }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#9C27B0", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+        </div>
+      </Card>
+
+      {/* 근무지 관리 */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🏠 근무지 관리</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>근무지를 만들고 구역에 배치합니다. 드래그로 이동 가능.</p>
+        {(settings.workSites || []).map((site, si) => (
+          <div key={site.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid #222", marginBottom: 10 }}
+            draggable onDragStart={e => e.dataTransfer.setData("siteId", site.id)}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.outline = "2px solid #2196F3"; }}
+            onDragLeave={e => { e.currentTarget.style.outline = "none"; }}
+            onDrop={e => { e.preventDefault(); e.currentTarget.style.outline = "none"; const dragId = e.dataTransfer.getData("siteId"); if (dragId && dragId !== site.id) { const ws = [...(settings.workSites || [])]; const di = ws.findIndex(s => s.id === dragId); const ti = ws.findIndex(s => s.id === site.id); if (di >= 0 && ti >= 0) { const [item] = ws.splice(di, 1); ws.splice(ti, 0, item); setSettings(prev => ({ ...prev, workSites: ws })); } } }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ cursor: "grab", fontSize: 16 }}>⠿</span>
+              <Input value={site.name} onChange={e => { const ws = [...(settings.workSites || [])]; ws[si] = { ...site, name: e.target.value }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="근무지명 (예: A구역 안내소)" style={{ flex: 1 }} />
+              <select value={site.zoneId || ""} onChange={e => { const ws = [...(settings.workSites || [])]; ws[si] = { ...site, zoneId: e.target.value || null }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13, maxWidth: 120 }}>
+                <option value="">구역 미지정</option>
+                {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
+              </select>
+              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            </div>
+
+            {/* 근무자 목록 */}
+            <div style={{ marginLeft: 20 }}>
+              {(site.workers || []).map((w, wi) => (
+                <div key={w.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}
+                  draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}>
+                  <span style={{ cursor: "grab", fontSize: 12, color: "#556" }}>⠿</span>
+                  <Input value={w.name} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, name: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="이름" style={{ width: 70 }} />
+                  <Input value={w.phone || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, phone: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="연락처" style={{ width: 100 }} />
+                  <select value={w.type || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, type: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 12 }}>
+                    <option value="">유형</option>
+                    {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <Input value={w.duty || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, duty: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="담당업무" style={{ flex: 1 }} />
+                  <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: (ws[si].workers || []).filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+                </div>
+              ))}
+              <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: [...(ws[si].workers || []), { id: "w_" + Date.now(), name: "", phone: "", type: "", duty: "" }] }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "8px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", width: "100%" }}>+ 근무자 추가</button>
+            </div>
+          </div>
+        ))}
+        <button onClick={() => setSettings(prev => ({ ...prev, workSites: [...(prev.workSites || []), { id: "site_" + Date.now(), name: "", zoneId: null, status: "standby", workers: [] }] }))} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 근무지 추가</button>
+      </Card>
+    </div>}
+
     {tab === "custom" && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>➕ 항목 추가</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "항목명", k: "name" }, { l: "단위", k: "unit" }, { l: "아이콘", k: "icon" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={newCat[f.k]} onChange={e => setNewCat({ ...newCat, [f.k]: e.target.value })} /></div>))}<div><Label>기상청 카테고리</Label><select value={newCat.kmaCategory || ""} onChange={e => setNewCat({ ...newCat, kmaCategory: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff" }}><option value="">없음</option>{Object.entries(KMA_CODES).map(([code, info]) => <option key={code} value={code}>{code} — {info.name}</option>)}</select></div>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ color: lv.color, fontSize: 13, fontWeight: 700, minWidth: 36 }}>{lv.label}</span><input type="number" value={newCat.thresholds[lk][0]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [parseFloat(e.target.value) || 0, t[lk][1]]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={newCat.thresholds[lk][1] === Infinity ? "∞" : newCat.thresholds[lk][1]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [t[lk][0], e.target.value === "∞" ? Infinity : parseFloat(e.target.value) || 0]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /></div>))}<button onClick={() => { if (!newCat.name) return; setCategories(p => [...p, { ...newCat, id: "c_" + Date.now(), source: newCat.kmaCategory ? "api" : "manual" }]); }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button></div></Card>}
 
     {/* Settings */}
@@ -2808,6 +2973,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "shuttle", icon: "🚌", label: "셔틀버스", feat: "shuttle" },
             { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
             { id: "message", icon: "📢", label: "발송", feat: "message" },
+            { id: "status", icon: "🎪", label: "축제현황" },
             { id: "cms", icon: "⚙️", label: "관리", fixed: true },
           ];
           const order = settings.navOrder || allItems.map(i => i.id);
@@ -3104,13 +3270,13 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "cms"], desc: "모든 기능 접근" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "cms"], desc: "모든 기능 접근" },
   manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
-  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox"], desc: "주차장 관리 + 대시보드 조회" },
-  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox"], desc: "셔틀버스 위치 관리" },
-  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox"], desc: "대시보드 조회만 가능" },
+  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox", "status"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox", "status"], desc: "주차장 관리 + 대시보드 조회" },
+  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox", "status"], desc: "셔틀버스 위치 관리" },
+  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox", "status"], desc: "대시보드 조회만 가능" },
 };
 
 // ─── Login Page ──────────────────────────────────────────────────
@@ -3642,6 +3808,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
     ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
+    { id: "status", icon: "🎪", label: "축제현황" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "inbox", icon: "💬", label: unreadCount > 0 ? `수신함(${unreadCount})` : "수신함" },
@@ -3690,6 +3857,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "message" && <MessagePage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
       {page === "inbox" && <InboxPage settings={settings} session={session} />}
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
           <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 14px" }}>👤 계정 관리</h2>
