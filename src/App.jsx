@@ -795,8 +795,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>); })}
     </div>
     {/* 구역별 혼잡도 */}
-    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-      {(settings.zones || []).filter(z => z.name).map(z => {
+    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+      {(settings.zones || []).filter(z => z.name && z.dashboardShow !== false).map(z => {
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
@@ -1459,96 +1459,173 @@ function PhotoViewer({ photo, onClose, onDelete }) {
 function FestivalStatusPage({ settings, setSettings, session }) {
   const zones = settings.zones || [];
   const workSites = settings.workSites || [];
-  const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
-  const STATUS = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin" || session?.role === "zonemgr";
+  const myZone = zones.find(z => z.accountId === session?.id);
+  const [reqTarget, setReqTarget] = useState("");
+  const [reqMsg, setReqMsg] = useState("");
+
+  const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
+  const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FF9800", icon: "🚗" }, supporting: { label: "현장지원중", color: "#4CAF50", icon: "🚑" } };
+
+  const getStatusMap = (zone) => {
+    if (zone?.zoneType === "safety") return STATUS_SAFETY;
+    if (zone?.zoneType === "support") return STATUS_SUPPORT;
+    return STATUS_NORMAL;
+  };
+
+  const ZTYPES = { normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" } };
 
   const setStatus = (siteId, status) => {
     setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s) }));
   };
 
+  const sendRequest = () => {
+    if (!reqTarget || !reqMsg) { alert("대상 구역과 내용을 입력하세요."); return; }
+    const req = { id: "req_" + Date.now(), fromZoneId: myZone?.id, fromZoneName: myZone?.name || session?.name, targetZoneId: reqTarget, message: reqMsg, status: "pending", createdAt: new Date().toLocaleString("ko-KR"), createdBy: session?.name };
+    setSettings(prev => ({ ...prev, zoneRequests: [...(prev.zoneRequests || []), req] }));
+    setReqMsg(""); setReqTarget("");
+    alert("✅ 요청이 전송되었습니다.");
+  };
+
+  const updateReqStatus = (reqId, status) => {
+    setSettings(prev => ({
+      ...prev,
+      zoneRequests: (prev.zoneRequests || []).map(r => r.id === reqId ? { ...r, status, [status === "accepted" ? "acceptedAt" : "completedAt"]: new Date().toLocaleString("ko-KR") } : r)
+    }));
+  };
+
   const now = new Date();
   const opStart = settings.operatingStart || "08:00";
   const opEnd = settings.operatingEnd || "22:00";
+  const safetyZones = zones.filter(z => z.zoneType === "safety" && z.name);
+  const supportZones = zones.filter(z => z.zoneType === "support" && z.name);
+  const myRequests = (settings.zoneRequests || []).filter(r => r.targetZoneId === myZone?.id && r.status !== "completed");
+  const sentRequests = (settings.zoneRequests || []).filter(r => r.fromZoneId === myZone?.id);
 
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "24px 16px 80px" }}>
     <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🎪 축제현황</h2>
     <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 16px" }}>{settings.festivalName || "축제"}</p>
 
-    {/* 운영시간 */}
     <div style={{ maxWidth: 500, margin: "0 auto 16px", padding: "12px 16px", borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)", textAlign: "center" }}>
       <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 700 }}>🕐 운영시간 {opStart} ~ {opEnd}</span>
       <span style={{ color: "#8892b0", fontSize: 13, marginLeft: 12 }}>현재 {now.toLocaleTimeString("ko-KR")}</span>
     </div>
 
-    {/* 구역별 현황 */}
-    {zones.filter(z => z.name).length === 0 && workSites.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>관리구역/근무지가 없습니다.<br/>⚙️ 관리 → 기능관리에서 설정하세요.</div>}
+    {/* 수신 요청 (안전/지원 구역관리자) */}
+    {myRequests.length > 0 && <div style={{ maxWidth: 500, margin: "0 auto 12px" }}>
+      <div style={{ color: "#F44336", fontSize: 15, fontWeight: 800, marginBottom: 8 }}>🔔 수신 요청 ({myRequests.length}건)</div>
+      {myRequests.map(req => {
+        const REQ_ST = { pending: { label: "접수대기", color: "#FF9800", icon: "⏳" }, accepted: { label: "접수완료", color: "#2196F3", icon: "✅" } };
+        const rst = REQ_ST[req.status] || REQ_ST.pending;
+        return (<div key={req.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(244,67,54,0.04)", border: `1.5px solid ${rst.color}44`, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ color: rst.color, fontSize: 14, fontWeight: 700 }}>{rst.icon} {rst.label}</span>
+            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>← {req.fromZoneName}</span>
+            <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{req.createdAt}</span>
+          </div>
+          <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 8 }}>💬 {req.message}</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {req.status === "pending" && <button onClick={() => updateReqStatus(req.id, "accepted")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 접수완료</button>}
+            {(req.status === "pending" || req.status === "accepted") && <button onClick={() => { updateReqStatus(req.id, "completed"); alert("조치완료 처리되었습니다."); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#4CAF50", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🏁 조치완료</button>}
+          </div>
+        </div>);
+      })}
+    </div>}
 
+    {/* 요청 보내기 (모든 구역관리자) */}
+    {myZone && (safetyZones.length > 0 || supportZones.length > 0) && <div style={{ maxWidth: 500, margin: "0 auto 12px", padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid #222" }}>
+      <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, marginBottom: 10 }}>📨 안전관리/지원관리 요청</div>
+      <select value={reqTarget} onChange={e => setReqTarget(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, marginBottom: 8 }}>
+        <option value="">요청 대상 선택...</option>
+        {safetyZones.map(z => <option key={z.id} value={z.id}>🛡️ {z.name} (안전관리)</option>)}
+        {supportZones.map(z => <option key={z.id} value={z.id}>🚑 {z.name} (지원관리)</option>)}
+      </select>
+      <textarea value={reqMsg} onChange={e => setReqMsg(e.target.value)} placeholder="요청 내용을 입력하세요 (예: B구역 무대 앞 관람객 밀집, 안전요원 지원 요청)" rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 8 }} />
+      <button onClick={sendRequest} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: reqTarget && reqMsg ? "#F44336" : "#333", color: "#fff", fontSize: 15, fontWeight: 700, cursor: reqTarget && reqMsg ? "pointer" : "default", opacity: reqTarget && reqMsg ? 1 : 0.5 }}>🚨 요청 전송</button>
+      {sentRequests.length > 0 && <div style={{ marginTop: 10 }}>
+        <div style={{ color: "#556", fontSize: 12, marginBottom: 4 }}>내가 보낸 요청:</div>
+        {sentRequests.slice(-3).reverse().map(r => {
+          const tZone = zones.find(z => z.id === r.targetZoneId);
+          const stMap = { pending: { label: "접수대기", color: "#FF9800" }, accepted: { label: "접수완료", color: "#2196F3" }, completed: { label: "조치완료", color: "#4CAF50" } };
+          const st = stMap[r.status] || stMap.pending;
+          return <div key={r.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, fontSize: 12 }}>
+            <span style={{ color: st.color, fontWeight: 700 }}>{st.label}</span>
+            <span style={{ color: "#ccd6f6" }}>→ {tZone?.name}</span>
+            <span style={{ color: "#556", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</span>
+          </div>;
+        })}
+      </div>}
+    </div>}
+
+    {zones.filter(z => z.name).length === 0 && workSites.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>관리구역/근무지가 없습니다.</div>}
+
+    {/* 구역별 현황 */}
     {zones.filter(z => z.name).map(zone => {
       const sites = workSites.filter(s => s.zoneId === zone.id);
       const congestion = (settings.zoneCongestion || []).find(c => c.zoneId === zone.id);
       const CL = { smooth: { icon: "🟢", label: "원활" }, crowded: { icon: "🟡", label: "혼잡" }, danger: { icon: "🔴", label: "위험" } };
       const cl = congestion ? CL[congestion.level] : null;
+      const zt = ZTYPES[zone.zoneType] || ZTYPES.normal;
+      const statusMap = getStatusMap(zone);
 
-      return (<div key={zone.id} style={{ maxWidth: 500, margin: "0 auto 12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid #222", overflow: "hidden" }}>
-        {/* 구역 헤더 */}
-        <div style={{ padding: "14px 16px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 18 }}>📍</span>
+      return (<div key={zone.id} style={{ maxWidth: 500, margin: "0 auto 12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: `1px solid ${zt.color}33`, overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", background: `${zt.color}08`, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>{zt.icon}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#2196F3", fontSize: 17, fontWeight: 800 }}>{zone.name}</div>
-            {zone.range && <div style={{ color: "#556", fontSize: 12 }}>{zone.range}</div>}
+            <div style={{ color: zt.color, fontSize: 17, fontWeight: 800 }}>{zone.name}</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ color: zt.color, fontSize: 11, fontWeight: 700 }}>{zt.label}</span>
+              {zone.range && <span style={{ color: "#556", fontSize: 12 }}>{zone.range}</span>}
+            </div>
           </div>
-          {cl && <span style={{ color: CL[congestion.level]?.color || "#556", fontSize: 14, fontWeight: 700 }}>{cl.icon} {cl.label}</span>}
+          {cl && <span style={{ fontSize: 14, fontWeight: 700 }}>{cl.icon} {cl.label}</span>}
         </div>
 
-        {/* 근무지 */}
         {sites.length === 0 && <div style={{ padding: "16px", color: "#445", fontSize: 13, textAlign: "center" }}>배치된 근무지 없음</div>}
         {sites.map(site => {
-          const st = STATUS[site.status] || STATUS.standby;
-          return (<div key={site.id} style={{ padding: "12px 16px", borderTop: "1px solid #1a1a2e" }}>
+          const st = statusMap[site.status] || Object.values(statusMap)[0] || { label: "대기", color: "#8892b0", icon: "⏳" };
+          return (<div key={site.id} style={{ padding: "12px 16px", borderTop: `1px solid ${zt.color}15` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 14 }}>🏠</span>
               <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, flex: 1 }}>{site.name}</span>
               <span style={{ padding: "3px 10px", borderRadius: 10, background: `${st.color}22`, color: st.color, fontSize: 13, fontWeight: 700 }}>{st.icon} {st.label}</span>
             </div>
-
-            {/* 상태 변경 버튼 */}
             {isAdmin && <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-              {Object.entries(STATUS).map(([k, v]) => (
-                <button key={k} onClick={() => setStatus(site.id, k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {Object.entries(statusMap).map(([k, v]) => (
+                <button key={k} onClick={() => setStatus(site.id, k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                   {v.icon} {v.label}
                 </button>
               ))}
             </div>}
-
-            {/* 근무자 목록 */}
             {(site.workers || []).length > 0 && <div style={{ display: "grid", gap: 4 }}>
               {(site.workers || []).map(w => (
                 <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
                   <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, minWidth: 50 }}>{w.name}</span>
-                  {w.type && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#9C27B0", fontSize: 11, fontWeight: 600 }}>{w.type}</span>}
-                  {w.duty && <span style={{ color: "#556", fontSize: 12, flex: 1 }}>{w.duty}</span>}
-                  {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞</a>}
+                  {w.type && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#9C27B0", fontSize: 11 }}>{w.type}</span>}
+                  {w.role && <span style={{ color: "#009688", fontSize: 11 }}>{w.role}</span>}
+                  {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
                 </div>
               ))}
             </div>}
-            {(site.workers || []).length === 0 && <div style={{ color: "#445", fontSize: 12 }}>배치된 근무자 없음</div>}
           </div>);
         })}
       </div>);
     })}
 
-    {/* 미배정 근무지 */}
-    {workSites.filter(s => !s.zoneId).length > 0 && <div style={{ maxWidth: 500, margin: "0 auto 12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid #333", overflow: "hidden" }}>
-      <div style={{ padding: "14px 16px", background: "rgba(255,152,0,0.06)" }}>
-        <span style={{ color: "#FF9800", fontSize: 15, fontWeight: 800 }}>⚠️ 미배정 근무지</span>
-      </div>
-      {workSites.filter(s => !s.zoneId).map(site => {
-        const st = STATUS[site.status] || STATUS.standby;
-        return (<div key={site.id} style={{ padding: "12px 16px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>🏠 {site.name}</span>
-          <span style={{ color: st.color, fontSize: 13 }}>{st.icon} {st.label}</span>
-          <span style={{ color: "#556", fontSize: 12 }}>{(site.workers || []).length}명</span>
-        </div>);
+    {/* 조치완료 이력 */}
+    {(settings.zoneRequests || []).filter(r => r.status === "completed").length > 0 && <div style={{ maxWidth: 500, margin: "16px auto 0" }}>
+      <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📋 조치완료 이력</div>
+      {(settings.zoneRequests || []).filter(r => r.status === "completed").reverse().slice(0, 10).map(r => {
+        const tZone = zones.find(z => z.id === r.targetZoneId);
+        return <div key={r.id} style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(76,175,80,0.04)", border: "1px solid rgba(76,175,80,0.1)", marginBottom: 4 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+            <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>✅ 조치완료</span>
+            <span style={{ color: "#ccd6f6", fontSize: 12 }}>{r.fromZoneName} → {tZone?.name}</span>
+            <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>{r.completedAt}</span>
+          </div>
+          <div style={{ color: "#556", fontSize: 12 }}>💬 {r.message}</div>
+        </div>;
       })}
     </div>}
   </div>);
@@ -2468,16 +2545,33 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {tab === "zonesetup" && <div>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 등록</h3>
-        {(settings.zones || []).map((z, i) => (
-          <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: "1px solid #222" }}>
+        {(settings.zones || []).map((z, i) => {
+          const ZTYPES = { normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" } };
+          const zt = ZTYPES[z.zoneType] || ZTYPES.normal;
+          return (
+          <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <span style={{ color: "#2196F3", fontWeight: 700, fontSize: 14 }}>📍 {z.name || `구역 ${i+1}`}</span>
+              <span style={{ color: zt.color, fontWeight: 700, fontSize: 14 }}>{zt.icon} {z.name || `구역 ${i+1}`}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 4, background: `${zt.color}15`, color: zt.color, fontSize: 11, fontWeight: 700 }}>{zt.label}</span>
               <span style={{ color: "#445", fontSize: 12, flex: 1 }}>{(settings.workSites || []).filter(s => s.zoneId === z.id).length}개 근무지</span>
               <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
               <div><Label>구역명</Label><Input value={z.name} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, name: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="A구역" /></div>
               <div><Label>범위</Label><Input value={z.range || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, range: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="동문~남문" /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
+              <div><Label>구역 속성</Label><select value={z.zoneType || "normal"} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, zoneType: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                <option value="normal">📍 일반관리</option>
+                <option value="safety">🛡️ 안전관리</option>
+                <option value="support">🚑 지원관리</option>
+              </select></div>
+              <div><Label>대시보드 표시</Label>
+                <div onClick={() => { const zs = [...settings.zones]; zs[i] = { ...z, dashboardShow: !(z.dashboardShow !== false) }; setSettings({ ...settings, zones: zs }); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", cursor: "pointer" }}>
+                  <div style={{ width: 36, height: 20, borderRadius: 10, background: z.dashboardShow !== false ? "#4CAF50" : "#333", position: "relative" }}><div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: z.dashboardShow !== false ? 18 : 2, transition: "all .3s" }} /></div>
+                  <span style={{ color: z.dashboardShow !== false ? "#4CAF50" : "#F44336", fontSize: 13 }}>{z.dashboardShow !== false ? "ON" : "OFF"}</span>
+                </div>
+              </div>
             </div>
             <div><Label>담당 계정 (구역관리자)</Label>
               <div style={{ display: "flex", gap: 6 }}>
@@ -2495,9 +2589,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 }} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "#009688", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>자동생성</button>}
               </div>
             </div>
-          </div>
-        ))}
-        <button onClick={() => setSettings({ ...settings, zones: [...(settings.zones || []), { id: "z" + Date.now(), name: "", range: "", assignee: "", accountId: "" }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 구역 추가</button>
+          </div>);
+        })}
+        <button onClick={() => setSettings({ ...settings, zones: [...(settings.zones || []), { id: "z" + Date.now(), name: "", range: "", assignee: "", accountId: "", zoneType: "normal", dashboardShow: true }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 구역 추가</button>
       </Card>
 
       <Card>
