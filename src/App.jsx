@@ -103,15 +103,17 @@ const DEFAULT_SETTINGS = {
   cumulativeVisitors: 0,
   hourlyLog: [],
   dailyRecords: [],
-  orgChart: [],  // [{id, name, org, position, phone, parentId, order}]
+  orgChart: [],
+  zoneCongestion: [],  // [{zoneId, level, reportedBy, reportedByName, reportedAt, photos:[], memo}]
   features: {
-    crowd: true,      // 인파관리
-    parking: true,     // 주차관리
-    shuttle: true,     // 셔틀버스
-    weather: true,     // 기상청 연동
-    sms: true,         // SMS 알림
-    message: true,     // 메시지/공지
-    customApi: true,   // 커스텀 API
+    crowd: true,
+    parking: true,
+    shuttle: true,
+    weather: true,
+    sms: true,
+    message: true,
+    customApi: true,
+    congestion: true,  // 인파혼잡도
   },
 };
 
@@ -718,41 +720,63 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       </div>
     ) : null; })()}
 
-    {/* ★ 전체 모니터링 — 통합 그리드 */}
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 8 }}>
+    {/* ★ 모니터링 카드 */}
+    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
       {categories.filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "12px", border: `1.5px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
-          {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}>
-            <span style={{ fontSize: 16 }}>{cat.icon}</span>
-            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 16, flex: 1 }}>{cat.name}</span>
-            {nextFc && <span style={{ fontSize: 13, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : "#2196F3" }}>{nextFc.value > cat.currentValue ? "↑" : "↓"}{nextFc.value}</span>}
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "18px 20px", border: `2px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
+          {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: li.color, animation: "blink 1.5s infinite" }} />}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 24 }}>{cat.icon}</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 20 }}>{cat.name}</span>
+            {cat.actionStatus && <span style={{ padding: "2px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700, marginLeft: "auto" }}>🔧조치중</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-            <span style={{ fontSize: 36, fontWeight: 900, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
-            <span style={{ fontSize: 15, color: "#8892b0" }}>{cat.unit}</span>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📡 실황</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span style={{ fontSize: 44, fontWeight: 900, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 18, color: "#8892b0" }}>{cat.unit}</span>
+              </div>
+            </div>
+            {nextFc && <div style={{ textAlign: "right", paddingBottom: 4 }}>
+              <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📋 예보</div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>
+                {nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}
+              </div>
+              <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
+            </div>}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-            <span style={{ padding: "1px 6px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span>
-            {cat.lastUpdated && <span style={{ color: "#445", fontSize: 9, marginLeft: "auto" }}>{cat.lastUpdated}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+            <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            {cat.lastUpdated && <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>🕐 {cat.lastUpdated}</span>}
           </div>
-        </div>); })}
-      {/* 기상 참고 — 같은 그리드 */}
-      {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const tl = getTempLabel(cat); const fc = cat.forecast || []; const nextFc = fc[0]; return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "12px", border: `1px solid ${li.border}`, cursor: "pointer" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-            <span style={{ fontSize: 16 }}>{cat.icon}</span>
-            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 16, flex: 1 }}>{cat.name}</span>
-            {tl && <span style={{ color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 10, fontWeight: 700 }}>{tl}</span>}
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-            <span style={{ fontSize: 30, fontWeight: 800, color: li.color, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}</span>
-            <span style={{ fontSize: 15, color: "#8892b0" }}>{cat.unit}</span>
-            {nextFc && <span style={{ fontSize: 13, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : "#2196F3", marginLeft: 4 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"}{nextFc.value}</span>}
-          </div>
-          <span style={{ padding: "1px 6px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.label}</span>
+          {fc.length > 1 && <div style={{ marginTop: 10, display: "flex", gap: 2, height: 20, alignItems: "flex-end" }}>
+            {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=4+((f.value-mn)/rng)*16; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.3+(i===0?0.7:0) }} />; })}
+          </div>}
         </div>); })}
     </div>
+
+    {/* 🌤️ 기상 참고 */}
+    {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).length > 0 && <div style={{ maxWidth: 1100, margin: "10px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
+      {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const tl = getTempLabel(cat); const fc = cat.forecast || []; const nextFc = fc[0]; return (
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "14px 16px", border: `1px solid ${li.border}`, cursor: "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 22 }}>{cat.icon}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 17 }}>{cat.name}</span>
+                {tl && <span style={{ color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 13, fontWeight: 700 }}>{tl}</span>}
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
+                <span style={{ fontSize: 32, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 16, color: "#8892b0" }}>{cat.unit}</span>
+                {nextFc && <span style={{ fontSize: 18, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
+              </div>
+            </div>
+            <span style={{ padding: "4px 10px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.label}</span>
+          </div>
+        </div>); })}
+    </div>}
 
     {/* 🅿️ 주차 + 🚌 셔틀 — 컴팩트 */}
     {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
@@ -779,6 +803,31 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           </div>
         </div>); })}
     </div>}
+
+    {/* 🚦 인파혼잡도 */}
+    {settings.features?.congestion !== false && (settings.zoneCongestion || []).length > 0 && <>
+      <div style={{ maxWidth: 1100, margin: "10px auto 4px" }}>
+        <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🚦 구역별 혼잡도</span>
+      </div>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+        {(settings.zones || []).filter(z => z.name).map(z => {
+          const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+          const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
+          const cl = c ? CL[c.level] : null;
+          return (<div key={z.id} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${cl?.color || "#333"}44` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 20 }}>{cl?.icon || "⚪"}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{z.name}</div>
+                {c?.reportedAt && <div style={{ color: "#556", fontSize: 11 }}>{c.reportedByName} · {c.reportedAt}</div>}
+              </div>
+              <span style={{ color: cl?.color || "#556", fontSize: 18, fontWeight: 800 }}>{cl?.label || "미보고"}</span>
+              {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 13 }}>📷{c.photos.length}</span>}
+            </div>
+          </div>);
+        })}
+      </div>
+    </>}
 
     {/* 범례 */}
     <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
@@ -1314,6 +1363,148 @@ function ShuttlePage({ settings, setSettings, session }) {
         </div>
       );
     })}
+  </div>);
+}
+
+// ─── Congestion Page (인파혼잡도) ─────────────────────────────────
+function CongestionPage({ settings, setSettings, session }) {
+  const zones = settings.zones || [];
+  const myZone = zones.find(z => z.accountId === session?.id);
+  const congestion = settings.zoneCongestion || [];
+  const [memo, setMemo] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const CONG_LEVELS = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢", bg: "rgba(76,175,80,0.1)" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡", bg: "rgba(255,152,0,0.1)" }, danger: { label: "위험", color: "#F44336", icon: "🔴", bg: "rgba(244,67,54,0.1)" } };
+
+  const handlePhoto = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      // 리사이즈 (max 400px)
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const max = 400;
+        let w = img.width, h = img.height;
+        if (w > max || h > max) { if (w > h) { h = h * max / w; w = max; } else { w = w * max / h; h = max; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const thumb = canvas.toDataURL("image/jpeg", 0.6);
+        setPhotos(p => [...p, { id: "p_" + Date.now(), data: thumb, time: new Date().toLocaleTimeString("ko-KR") }]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const submitReport = (zoneId, level) => {
+    const zone = zones.find(z => z.id === zoneId);
+    const report = { zoneId, zoneName: zone?.name || "", level, reportedBy: session.id, reportedByName: session.name, reportedAt: new Date().toLocaleString("ko-KR"), photos: photos.map(p => ({ ...p })), memo };
+    setSettings(prev => ({
+      ...prev,
+      zoneCongestion: [...(prev.zoneCongestion || []).filter(c => c.zoneId !== zoneId), report]
+    }));
+    setPhotos([]); setMemo("");
+  };
+
+  const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
+  const viewZones = isAdmin ? zones.filter(z => z.name) : myZone ? [myZone] : [];
+
+  return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "24px 16px" }}>
+    <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 6px" }}>🚦 인파혼잡도 관리</h2>
+    <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>구역별 혼잡 상태를 보고합니다</p>
+
+    {viewZones.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>배정된 구역이 없습니다.<br/>관리자가 구역을 설정하고 계정에 배정해주세요.</div>}
+
+    {viewZones.map(zone => {
+      const cur = congestion.find(c => c.zoneId === zone.id);
+      const cl = cur ? CONG_LEVELS[cur.level] : null;
+      const canEdit = !isAdmin || myZone?.id === zone.id || isAdmin;
+
+      return (<div key={zone.id} style={{ maxWidth: 500, margin: "0 auto 16px", background: "rgba(255,255,255,0.03)", borderRadius: 16, border: `2px solid ${cl?.color || "#333"}`, padding: "20px", overflow: "hidden" }}>
+        {/* 구역 헤더 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 20 }}>📍</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#ccd6f6", fontSize: 18, fontWeight: 800 }}>{zone.name}</div>
+            {zone.range && <div style={{ color: "#556", fontSize: 12 }}>{zone.range}</div>}
+          </div>
+          {cl && <div style={{ textAlign: "center", padding: "6px 14px", borderRadius: 10, background: cl.bg, border: `1px solid ${cl.color}44` }}>
+            <div style={{ fontSize: 20 }}>{cl.icon}</div>
+            <div style={{ color: cl.color, fontSize: 14, fontWeight: 800 }}>{cl.label}</div>
+          </div>}
+        </div>
+
+        {/* 현재 상태 */}
+        {cur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <span style={{ color: "#8892b0", fontSize: 12 }}>마지막 보고:</span>
+            <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{cur.reportedByName}</span>
+            <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{cur.reportedAt}</span>
+          </div>
+          {cur.memo && <div style={{ color: "#ccd6f6", fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>💬 {cur.memo}</div>}
+          {cur.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {cur.photos.map(p => <div key={p.id} style={{ flexShrink: 0 }}>
+              <img src={p.data} alt="" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
+              <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+            </div>)}
+          </div>}
+        </div>}
+
+        {/* 혼잡도 선택 버튼 */}
+        {canEdit && <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+            {Object.entries(CONG_LEVELS).map(([k, v]) => (
+              <button key={k} onClick={() => submitReport(zone.id, k)} style={{ padding: "16px 8px", borderRadius: 12, border: cur?.level === k ? `2px solid ${v.color}` : "1px solid #333", background: cur?.level === k ? v.bg : "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "center", transition: "all .2s" }}>
+                <div style={{ fontSize: 28 }}>{v.icon}</div>
+                <div style={{ color: v.color, fontSize: 16, fontWeight: 800, marginTop: 4 }}>{v.label}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* 메모 */}
+          <textarea value={memo} onChange={e => setMemo(e.target.value)} placeholder="현장 상황 메모 (선택)" rows={2} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 8 }} />
+
+          {/* 사진 촬영 */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <label style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "rgba(255,255,255,0.02)", color: "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+              📷 사진 촬영 / 첨부
+              <input type="file" accept="image/*,video/*" capture="environment" onChange={handlePhoto} style={{ display: "none" }} />
+            </label>
+            {photos.length > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>{photos.length}장 첨부</span>}
+          </div>
+
+          {/* 첨부 미리보기 */}
+          {photos.length > 0 && <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
+            {photos.map((p, i) => <div key={p.id} style={{ position: "relative", flexShrink: 0 }}>
+              <img src={p.data} alt="" style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
+              <button onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: 10, border: "none", background: "#F44336", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>)}
+          </div>}
+        </>}
+      </div>);
+    })}
+
+    {/* 전체 현황 (관리자) */}
+    {isAdmin && zones.filter(z => z.name).length > 0 && <div style={{ maxWidth: 500, margin: "20px auto 0" }}>
+      <h3 style={{ color: "#8892b0", fontSize: 15, fontWeight: 700, marginBottom: 10, textAlign: "center" }}>📊 전체 구역 혼잡도 현황</h3>
+      <div style={{ display: "grid", gap: 6 }}>
+        {zones.filter(z => z.name).map(z => {
+          const c = congestion.find(cc => cc.zoneId === z.id);
+          const cl = c ? CONG_LEVELS[c.level] : { label: "미보고", color: "#556", icon: "⚪" };
+          return (<div key={z.id} style={{ display: "flex", alignItems: "center", padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: `1px solid ${cl.color}33`, gap: 10 }}>
+            <span style={{ fontSize: 18 }}>{cl.icon}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{z.name}</div>
+              {c?.reportedAt && <div style={{ color: "#556", fontSize: 11 }}>{c.reportedByName} · {c.reportedAt}</div>}
+            </div>
+            <span style={{ color: cl.color, fontSize: 16, fontWeight: 800 }}>{cl.label}</span>
+            {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 12 }}>📷{c.photos.length}</span>}
+          </div>);
+        })}
+      </div>
+    </div>}
   </div>);
 }
 
@@ -2236,6 +2427,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           { k: "sms", icon: "📱", label: "SMS 알림", desc: "경보 발생 시 문자 자동 발송" },
           { k: "message", icon: "💬", label: "메시지/공지", desc: "내부 메시지 발송 및 공지 등록" },
           { k: "customApi", icon: "🔌", label: "커스텀 API", desc: "외부 API 데이터 연동" },
+          { k: "congestion", icon: "🚦", label: "인파혼잡도", desc: "구역별 혼잡도 보고 (사진 포함)" },
         ].map(f => {
           const on = settings.features?.[f.k] !== false;
           return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 6, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}`, transition: "all .2s" }}>
@@ -2575,10 +2767,10 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "모든 기능 접근" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "cms"], desc: "모든 기능 접근" },
   manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "message", "inbox", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
-  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "dashboard", "inbox"], desc: "인파 계수 + 대시보드 조회" },
+  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox"], desc: "인파 계수 + 대시보드 조회" },
   parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox"], desc: "주차장 관리 + 대시보드 조회" },
   shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox"], desc: "셔틀버스 위치 관리" },
   viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox"], desc: "대시보드 조회만 가능" },
@@ -3097,6 +3289,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "inbox", icon: "💬", label: unreadCount > 0 ? `수신함(${unreadCount})` : "수신함" },
     ft.message !== false && { id: "message", icon: "📢", label: "발송" },
+    ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
     { id: "cms", icon: "⚙️", label: "관리" },
   ].filter(Boolean);
   const navs = allNavs.filter(n => allowedPages.includes(n.id));
@@ -3138,6 +3331,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "shuttle" && <ShuttlePage settings={settings} setSettings={setSettings} session={session} />}
       {page === "message" && <MessagePage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
       {page === "inbox" && <InboxPage settings={settings} session={session} />}
+      {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
           <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 14px" }}>👤 계정 관리</h2>
