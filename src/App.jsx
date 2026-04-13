@@ -2426,10 +2426,20 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <div><Label>범위</Label><Input value={z.range || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, range: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="동문~남문" /></div>
             </div>
             <div><Label>담당 계정 (구역관리자)</Label>
-              <select value={z.accountId || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, accountId: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                <option value="">미지정</option>
-                {(accounts || []).filter(a => ["admin","manager","zonemgr","counter"].includes(a.role)).map(a => <option key={a.id} value={a.id}>{a.name} ({ROLES[a.role]?.label})</option>)}
-              </select>
+              <div style={{ display: "flex", gap: 6 }}>
+                <select value={z.accountId || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, accountId: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                  <option value="">미지정</option>
+                  {(accounts || []).filter(a => ["admin","manager","zonemgr","counter"].includes(a.role)).map(a => <option key={a.id} value={a.id}>{a.name} ({ROLES[a.role]?.label})</option>)}
+                </select>
+                {z.name && !z.accountId && <button onClick={() => {
+                  const accId = "zm_" + z.id;
+                  if (accounts.find(a => a.id === accId)) { alert("이미 생성된 계정입니다."); const zs = [...settings.zones]; zs[i] = { ...z, accountId: accId }; setSettings({ ...settings, zones: zs }); return; }
+                  const pw = "1234";
+                  setAccounts(prev => [...prev, { id: accId, password: simpleHash(pw), name: z.name + " 관리자", role: "zonemgr", festivalId: settings.festivalId || "default", festivals: [settings.festivalId || "default"] }]);
+                  const zs = [...settings.zones]; zs[i] = { ...z, accountId: accId }; setSettings({ ...settings, zones: zs });
+                  alert(`✅ 구역관리자 계정 생성\n\n아이디: ${accId}\n비밀번호: ${pw}\n역할: 구역관리자\n\n로그인 후 비밀번호를 변경하세요.`);
+                }} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "#009688", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>자동생성</button>}
+              </div>
             </div>
           </div>
         ))}
@@ -2464,8 +2474,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {tab === "staffmgmt" && <div>
       {/* 근무유형 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>📋 근무유형</h3>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 8px" }}>📋 근무유형</h3>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {(settings.workTypes || []).map((t, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 6, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
               <span style={{ color: "#CE93D8", fontSize: 13 }}>{t}</span>
@@ -2473,89 +2483,114 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             </div>
           ))}
           <div style={{ display: "flex", gap: 4 }}>
-            <Input id="new-wt" placeholder="새 유형" style={{ width: 100 }} />
-            <button onClick={() => { const inp = document.getElementById("new-wt"); if (inp?.value) { setSettings(prev => ({ ...prev, workTypes: [...(prev.workTypes || []), inp.value] })); inp.value = ""; } }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#9C27B0", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+</button>
+            <Input id="new-wt2" placeholder="새 유형" style={{ width: 100 }} />
+            <button onClick={() => { const inp = document.getElementById("new-wt2"); if (inp?.value) { setSettings(prev => ({ ...prev, workTypes: [...(prev.workTypes || []), inp.value] })); inp.value = ""; } }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#9C27B0", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+</button>
           </div>
         </div>
       </Card>
 
-      {/* 근무자 등록 + 배치 */}
+      {/* ① 근무자 등록 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>👷 근무자 배치</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>미배정 근무자를 근무지에 드래그하여 배치합니다.</p>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>👤 근무자 등록</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>먼저 근무자를 등록하면 아래 '미배치' 목록에 추가됩니다.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+          <div><Label>이름 *</Label><Input id="sw-name" placeholder="홍길동" /></div>
+          <div><Label>연락처</Label><Input id="sw-phone" placeholder="010-1234-5678" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div><Label>근무유형</Label><select id="sw-type" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+            {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
+          </select></div>
+          <div><Label>역할</Label><select id="sw-role" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+            {["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+          </select></div>
+        </div>
+        <button onClick={() => {
+          const name = document.getElementById("sw-name")?.value;
+          if (!name) { alert("이름을 입력하세요."); return; }
+          const phone = document.getElementById("sw-phone")?.value || "";
+          const type = document.getElementById("sw-type")?.value || "";
+          const role = document.getElementById("sw-role")?.value || "";
+          const worker = { id: "w_" + Date.now(), name, phone, type, role, duty: "" };
+          // _unassigned 가상 근무지에 추가
+          const ws = [...(settings.workSites || [])];
+          let pool = ws.find(s => s.id === "_pool");
+          if (!pool) { pool = { id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] }; ws.push(pool); }
+          const pi = ws.indexOf(pool);
+          ws[pi] = { ...pool, workers: [...(pool.workers || []), worker] };
+          setSettings(prev => ({ ...prev, workSites: ws }));
+          document.getElementById("sw-name").value = "";
+          document.getElementById("sw-phone").value = "";
+          alert("✅ " + name + " 등록 완료 (미배치)");
+        }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "#4CAF50", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>👤 근무자 등록</button>
+      </Card>
 
-        {/* 미배정 근무자 */}
+      {/* ② 배치 관리 (드래그) */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📋 근무자 배치</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>근무자를 드래그하여 근무지에 배치합니다.</p>
+
+        {/* 미배치 근무자 */}
         {(() => {
-          const allAssigned = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => w.id));
-          const unassigned = (settings.workSites || []).flatMap(s => (s.workers || []).filter(w => false)); // placeholder
-          return null;
+          const pool = (settings.workSites || []).find(s => s.id === "_pool");
+          const poolWorkers = pool?.workers || [];
+          if (poolWorkers.length === 0) return null;
+          return (<div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 12, background: "rgba(255,152,0,0.06)", border: "1.5px dashed rgba(255,152,0,0.3)" }}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "#FF9800"; }}
+            onDragLeave={e => { e.currentTarget.style.borderColor = "rgba(255,152,0,0.3)"; }}
+            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,152,0,0.3)"; const wid = e.dataTransfer.getData("workerId"); const from = e.dataTransfer.getData("fromSite"); if (wid && from && from !== "_pool") { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === from); const pi = ws.findIndex(s => s.id === "_pool"); if (fi >= 0 && pi >= 0) { const w = ws[fi].workers.find(ww => ww.id === wid); if (w) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) }; ws[pi] = { ...ws[pi], workers: [...ws[pi].workers, w] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
+            <div style={{ color: "#FF9800", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>⚠️ 미배치 근무자 ({poolWorkers.length}명)</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {poolWorkers.map(w => (
+                <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
+                  style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid #333", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
+                  {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
+                  {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
+                  <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "1px 4px", border: "none", background: "none", color: "#F44336", fontSize: 11, cursor: "pointer" }}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>);
         })()}
 
-        {/* 구역별 아코디언 */}
+        {/* 구역 아코디언 */}
         {(settings.zones || []).filter(z => z.name).map(zone => {
-          const sites = (settings.workSites || []).filter(s => s.zoneId === zone.id);
-          return (<div key={zone.id} style={{ marginBottom: 12, border: "1px solid #222", borderRadius: 12, overflow: "hidden" }}>
+          const sites = (settings.workSites || []).filter(s => s.zoneId === zone.id && s.id !== "_pool");
+          return (<div key={zone.id} style={{ marginBottom: 10, border: "1px solid #222", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "10px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14 }}>📍</span>
-              <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+              <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>📍 {zone.name}</span>
               <span style={{ color: "#556", fontSize: 12 }}>{sites.reduce((n, s) => n + (s.workers || []).length, 0)}명</span>
             </div>
-            {sites.map((site, si) => {
-              const siteIdx = (settings.workSites || []).indexOf(site);
+            {sites.map(site => {
+              const sIdx = (settings.workSites || []).findIndex(s => s.id === site.id);
               return (<div key={site.id} style={{ padding: "10px 14px", borderTop: "1px solid #1a1a2e" }}
                 onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(76,175,80,0.06)"; }}
                 onDragLeave={e => { e.currentTarget.style.background = "transparent"; }}
-                onDrop={e => { e.preventDefault(); e.currentTarget.style.background = "transparent"; const wid = e.dataTransfer.getData("workerId"); const fromSite = e.dataTransfer.getData("fromSite"); if (wid && fromSite && fromSite !== site.id) { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === fromSite); const ti = ws.findIndex(s => s.id === site.id); if (fi >= 0 && ti >= 0) { const worker = (ws[fi].workers || []).find(w => w.id === wid); if (worker) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(w => w.id !== wid) }; ws[ti] = { ...ws[ti], workers: [...(ws[ti].workers || []), worker] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  <span style={{ fontSize: 12 }}>🏠</span>
-                  <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{site.name || "근무지"}</span>
-                  <span style={{ color: "#556", fontSize: 11 }}>{(site.workers || []).length}명</span>
-                </div>
-                {(site.workers || []).map((w, wi) => (
+                onDrop={e => { e.preventDefault(); e.currentTarget.style.background = "transparent"; const wid = e.dataTransfer.getData("workerId"); const from = e.dataTransfer.getData("fromSite"); if (wid && from && from !== site.id) { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === from); const ti = ws.findIndex(s => s.id === site.id); if (fi >= 0 && ti >= 0) { const w = (ws[fi].workers || []).find(ww => ww.id === wid); if (w) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) }; ws[ti] = { ...ws[ti], workers: [...(ws[ti].workers || []), w] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
+                <div style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🏠 {site.name} <span style={{ color: "#556", fontWeight: 400 }}>({(site.workers || []).length}명)</span></div>
+                {(site.workers || []).map(w => (
                   <div key={w.id} draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}
-                    style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4, padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", cursor: "grab", flexWrap: "wrap" }}>
+                    style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, color: "#556" }}>⠿</span>
-                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, minWidth: 50 }}>{w.name || "?"}</span>
-                    {w.type && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 11 }}>{w.type}</span>}
-                    {w.role && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 11 }}>{w.role}</span>}
-                    {w.phone && <span style={{ color: "#556", fontSize: 11 }}>{w.phone}</span>}
-                    <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[siteIdx] = { ...ws[siteIdx], workers: ws[siteIdx].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer", marginLeft: "auto" }}>✕</button>
+                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
+                    {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
+                    {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
+                    {w.phone && <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>{w.phone}</span>}
                   </div>
                 ))}
-                <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[siteIdx] = { ...ws[siteIdx], workers: [...(ws[siteIdx].workers || []), { id: "w_" + Date.now(), name: "", phone: "", type: (settings.workTypes || [])[0] || "", role: "", duty: "" }] }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "6px", borderRadius: 6, border: "1px dashed #333", background: "transparent", color: "#667", fontSize: 11, cursor: "pointer", width: "100%", marginTop: 4 }}>+ 근무자</button>
+                {(site.workers || []).length === 0 && <div style={{ color: "#445", fontSize: 12, padding: "8px", textAlign: "center", border: "1px dashed #333", borderRadius: 8 }}>여기에 근무자를 드래그하세요</div>}
               </div>);
             })}
+            {sites.length === 0 && <div style={{ padding: "12px 14px", color: "#445", fontSize: 12 }}>이 구역에 근무지가 없습니다. 구역설정에서 추가하세요.</div>}
           </div>);
         })}
-      </Card>
-
-      {/* 근무자 정보 편집 */}
-      <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>✏️ 근무자 정보 편집</h3>
-        {(settings.workSites || []).map((site, si) => (site.workers || []).map((w, wi) => (
-          <div key={w.id} style={{ padding: 10, background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, border: "1px solid #222" }}>
-            <div style={{ color: "#556", fontSize: 11, marginBottom: 6 }}>🏠 {site.name} → {w.name || "이름없음"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              <div><Label>이름</Label><Input value={w.name} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...ws[si].workers]; wk[wi] = { ...w, name: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} /></div>
-              <div><Label>연락처</Label><Input value={w.phone || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...ws[si].workers]; wk[wi] = { ...w, phone: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} /></div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 6 }}>
-              <div><Label>근무유형</Label><select value={w.type || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...ws[si].workers]; wk[wi] = { ...w, type: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                <option value="">선택</option>
-                {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
-              </select></div>
-              <div><Label>역할</Label><select value={w.role || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...ws[si].workers]; wk[wi] = { ...w, role: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                <option value="">선택</option>
-                {["계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
-              </select></div>
-            </div>
-          </div>
-        ))).flat()}
       </Card>
 
       {/* 조직도 */}
       <OrgChartTab settings={settings} setSettings={setSettings} />
     </div>}
+
 
     {tab === "gates" && <div>
       <Card>
@@ -3108,10 +3143,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📱 하단 메뉴 순서</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>▲▼ 버튼으로 메뉴 순서를 변경하세요. 대시보드와 관리는 고정입니다.</p>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>드래그하여 메뉴 순서를 변경하세요.</p>
         {(() => {
           const allItems = [
-            { id: "dashboard", icon: "📊", label: "대시보드", fixed: true },
+            { id: "dashboard", icon: "📊", label: "대시보드" },
             { id: "counter", icon: "👥", label: "인파계수", feat: "crowd" },
             { id: "congestion", icon: "🚦", label: "혼잡도", feat: "congestion" },
             { id: "parking", icon: "🅿️", label: "주차관리", feat: "parking" },
@@ -3119,35 +3154,26 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
             { id: "message", icon: "📢", label: "발송", feat: "message" },
             { id: "status", icon: "🎪", label: "축제현황" },
-            { id: "cms", icon: "⚙️", label: "관리", fixed: true },
+            { id: "cms", icon: "⚙️", label: "관리" },
           ];
           const order = settings.navOrder || allItems.map(i => i.id);
           const sorted = [...allItems].sort((a, b) => {
             const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
             return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
           });
-          const moveItem = (id, dir) => {
-            const cur = [...(settings.navOrder || allItems.map(i => i.id))];
-            const idx = cur.indexOf(id);
-            if (idx < 0) return;
-            const newIdx = idx + dir;
-            if (newIdx < 0 || newIdx >= cur.length) return;
-            // 대시보드(0)/관리(마지막) 고정
-            if (cur[newIdx] === "dashboard" || cur[newIdx] === "cms") return;
-            [cur[idx], cur[newIdx]] = [cur[newIdx], cur[idx]];
-            setSettings({ ...settings, navOrder: cur });
-          };
           return (<div style={{ display: "grid", gap: 4 }}>
-            {sorted.map((item, idx) => {
+            {sorted.map((item) => {
               const enabled = !item.feat || settings.features?.[item.feat] !== false;
-              return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: item.fixed ? "rgba(33,150,243,0.06)" : enabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, border: item.fixed ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222", opacity: enabled ? 1 : 0.4 }}>
-                <span style={{ fontSize: 18 }}>{item.icon}</span>
-                <span style={{ color: item.fixed ? "#2196F3" : "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{item.label}</span>
-                {item.fixed ? <span style={{ color: "#556", fontSize: 12 }}>고정</span> : <>
-                  <button onClick={() => moveItem(item.id, -1)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>▲</button>
-                  <button onClick={() => moveItem(item.id, 1)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>▼</button>
-                </>}
-                {!enabled && <span style={{ color: "#F44336", fontSize: 11 }}>OFF</span>}
+              return (<div key={item.id} draggable
+                onDragStart={e => e.dataTransfer.setData("navId", item.id)}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.outline = "2px solid #2196F3"; }}
+                onDragLeave={e => { e.currentTarget.style.outline = "none"; }}
+                onDrop={e => { e.preventDefault(); e.currentTarget.style.outline = "none"; const dragId = e.dataTransfer.getData("navId"); if (dragId && dragId !== item.id) { const cur = [...(settings.navOrder || allItems.map(i => i.id))]; const di = cur.indexOf(dragId); const ti = cur.indexOf(item.id); if (di >= 0 && ti >= 0) { const [moved] = cur.splice(di, 1); cur.splice(ti, 0, moved); setSettings({ ...settings, navOrder: cur }); } } }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: enabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, border: "1px solid #222", opacity: enabled ? 1 : 0.4, cursor: "grab" }}>
+                <span style={{ fontSize: 14, color: "#556" }}>⠿</span>
+                <span style={{ fontSize: 20 }}>{item.icon}</span>
+                <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, flex: 1 }}>{item.label}</span>
+                {!enabled && <span style={{ color: "#F44336", fontSize: 12 }}>OFF</span>}
               </div>);
             })}
           </div>);
