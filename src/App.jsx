@@ -670,224 +670,119 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
   }
 
   // ── Main Dashboard View ──
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(145deg,#0a0a1a 0%,#0d1b2a 50%,#0a0a1a 100%)", padding: "24px 20px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(145deg,#0a0a1a 0%,#0d1b2a 50%,#0a0a1a 100%)", padding: "16px 12px 80px" }}>
     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    <div style={{ textAlign: "center", marginBottom: 24 }}>
-      <div style={{ fontSize: 48, marginBottom: 8 }}>{settings.logoEmoji}</div>
-      <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: 2 }}>{settings.festivalName}</h1>
-      <p style={{ color: "#8892b0", fontSize: 14, margin: "4px 0 0" }}>{settings.festivalSubtitle}</p>
-      <div style={{ marginTop: 10, display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ color: "#8892b0", fontSize: 14 }}>📅 {fmtDate(now)}</span>
-        <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, fontFamily: "monospace" }}>🕐 {fmtTime(now)}</span>
-        {settings.is24HourMode && <span style={{ padding: "2px 8px", borderRadius: 20, background: "rgba(76,175,80,0.15)", border: "1px solid rgba(76,175,80,0.3)", color: "#4CAF50", fontSize: 14, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
+
+    {/* 컴팩트 헤더 */}
+    <div style={{ textAlign: "center", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 2 }}>
+        <span style={{ fontSize: 28 }}>{settings.logoEmoji}</span>
+        <div>
+          <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: 0 }}>{settings.festivalName || "축제 안전관리"}</h1>
+          <p style={{ color: "#556", fontSize: 11, margin: 0 }}>{settings.festivalSubtitle}</p>
+        </div>
       </div>
-      <div style={{ marginTop: 6, display: "flex", justifyContent: "center", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ color: "#445", fontSize: 13 }}>📍 {loc.name || "미설정"}</span>
-        {kma.enabled && <span style={{ padding: "1px 6px", borderRadius: 10, background: kma.mode === "live" ? "rgba(76,175,80,0.1)" : "rgba(255,152,0,0.1)", border: `1px solid ${kma.mode === "live" ? "rgba(76,175,80,0.2)" : "rgba(255,152,0,0.2)"}`, color: kma.mode === "live" ? "#4CAF50" : "#FF9800", fontSize: 13 }}>{kma.mode === "live" ? "🌤️ LIVE" : "🔄 SIM"} {kma.lastFetch ? kma.lastFetch.split(" ").pop() : ""}</span>}
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "10px 28px", borderRadius: 24, border: "1px solid rgba(33,150,243,0.3)", background: spinning ? "rgba(33,150,243,0.2)" : "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 13, fontWeight: 700, cursor: spinning ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 8, transition: "all .3s" }}>
-          <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none", fontSize: 16 }}>🔄</span>
-          {spinning ? "수집 중..." : "최신화"}
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: "#8892b0", fontSize: 12 }}>📅 {fmtDate(now)}</span>
+        <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>{fmtTime(now)}</span>
+        {settings.is24HourMode && <span style={{ padding: "1px 6px", borderRadius: 10, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 10, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
+        {loc.name && <span style={{ color: "#445", fontSize: 11 }}>📍{loc.name}</span>}
+        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 10 }}>🌤️LIVE</span>}
+        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "4px 12px", borderRadius: 16, border: "1px solid rgba(33,150,243,0.2)", background: "transparent", color: "#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+          <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none" }}>🔄</span> {spinning ? "..." : "최신화"}
         </button>
       </div>
     </div>
-    <div style={{ maxWidth: 900, margin: "0 auto 20px", padding: "12px 20px", borderRadius: 12, background: olv.bg, border: `1.5px solid ${olv.border}`, textAlign: "center" }}>
+
+    {/* 종합 상태 */}
+    <div style={{ maxWidth: 900, margin: "0 auto 8px", padding: "8px 16px", borderRadius: 10, background: olv.bg, border: `1.5px solid ${olv.border}`, textAlign: "center" }}>
       <span style={{ color: olv.color, fontWeight: 800, fontSize: 18 }}>{olv.icon} 종합: {olv.label}</span>
     </div>
 
-    {/* 📢 공지사항 */}
-    {(settings.notices || []).length > 0 && (
-      <div style={{ maxWidth: 1100, margin: "0 auto 12px" }}>
-        {settings.notices.map(n => (
-          <div key={n.id} style={{ padding: "12px 16px", borderRadius: 10, background: "linear-gradient(135deg,rgba(33,150,243,0.08),rgba(156,39,176,0.06))", border: "1.5px solid rgba(33,150,243,0.2)", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 10 }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>📢</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 600, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{n.content}</div>
-              <div style={{ color: "#556", fontSize: 13, marginTop: 4 }}>{n.createdBy} · {n.createdAt}</div>
-            </div>
-            {(userRole === "admin" || userRole === "manager") && <button onClick={() => onDeleteNotice?.(n.id)} style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 14, cursor: "pointer", flexShrink: 0 }}>✕</button>}
-          </div>
-        ))}
-      </div>
-    )}
-
-    {/* ★ 조치중 항목 패널 */}
-    {(() => { const handling = categories.filter(c => c.actionStatus === "handling"); return handling.length > 0 ? (
-      <div style={{ maxWidth: 1100, margin: "0 auto 16px" }}>
-        <div style={{ padding: "12px 16px", borderRadius: 12, background: "rgba(255,152,0,0.08)", border: "1.5px solid rgba(255,152,0,0.25)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <span style={{ fontSize: 14 }}>🔧</span>
-            <span style={{ color: "#FF9800", fontWeight: 700, fontSize: 14 }}>조치 진행중 ({handling.length}건)</span>
-          </div>
-          {handling.map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (
-            <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", marginBottom: 4, cursor: "pointer", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 16 }}>{cat.icon}</span>
-              <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 13 }}>{cat.name}</span>
-              <span style={{ color: li.color, fontWeight: 800, fontFamily: "monospace", fontSize: 15 }}>{cat.currentValue.toLocaleString()}{cat.unit}</span>
-              <span style={{ padding: "2px 8px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span>
-              {cat.actionReport?.assigneeName && <span style={{ color: "#FF9800", fontSize: 13 }}>👤 {cat.actionReport.assigneeName}</span>}
-              {cat.actionReport?.content && <span style={{ color: "#888", fontSize: 13, flex: 1 }}>{cat.actionReport.content.slice(0, 40)}{cat.actionReport.content.length > 40 ? "..." : ""}</span>}
-            </div>
-          ); })}
+    {/* 📢 공지 */}
+    {(settings.notices || []).length > 0 && <div style={{ maxWidth: 1100, margin: "0 auto 6px" }}>
+      {settings.notices.map(n => (
+        <div key={n.id} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 14 }}>📢</span>
+          <span style={{ color: "#ccd6f6", fontSize: 12, fontWeight: 600, flex: 1 }}>{n.content}</span>
+          {(userRole === "admin" || userRole === "manager" || userRole === "sysadmin") && <button onClick={() => onDeleteNotice?.(n.id)} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 12, cursor: "pointer" }}>✕</button>}
         </div>
+      ))}
+    </div>}
+
+    {/* 조치중 */}
+    {(() => { const handling = categories.filter(c => c.actionStatus === "handling"); return handling.length > 0 ? (
+      <div style={{ maxWidth: 1100, margin: "0 auto 6px", padding: "8px 12px", borderRadius: 10, background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.2)" }}>
+        <span style={{ color: "#FF9800", fontWeight: 700, fontSize: 13 }}>🔧 조치중 {handling.length}건</span>
+        {handling.map(cat => <span key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ marginLeft: 8, color: "#ccd6f6", fontSize: 12, cursor: "pointer" }}>{cat.icon}{cat.name}</span>)}
       </div>
     ) : null; })()}
 
-    {/* 주요 모니터링 항목 */}
-    <div style={{ maxWidth: 1100, margin: "0 auto 8px" }}>
-      <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🔴 주요 모니터링 (종합경보 반영)</span>
-    </div>
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-      {categories.filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const tl = getTempLabel(cat); const fc = cat.forecast || []; const nextFc = fc[0]; return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: "16px 16px 12px", border: `1.5px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", transition: "all .2s" }}
-          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.02)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+    {/* ★ 전체 모니터링 — 통합 그리드 */}
+    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 8 }}>
+      {categories.filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "12px", border: `1.5px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <span style={{ fontSize: 20 }}>{cat.icon}</span>
-            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{cat.name}</span>
-            {cat.actionStatus && <span style={{ padding: "1px 6px", borderRadius: 10, background: cat.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", color: cat.actionStatus === "handling" ? "#FF9800" : "#4CAF50", fontSize: 8, fontWeight: 700 }}>{cat.actionStatus === "handling" ? "🔧조치중" : "✅완료"}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}>
+            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 16, flex: 1 }}>{cat.name}</span>
+            {nextFc && <span style={{ fontSize: 13, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : "#2196F3" }}>{nextFc.value > cat.currentValue ? "↑" : "↓"}{nextFc.value}</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 6 }}>
-            <div>
-              {cat.dataType && <div style={{ fontSize: 13, color: "#445", marginBottom: 2 }}>{cat.dataType === "실황" ? "📡 실황" : "📊 관측"}</div>}
-              <span style={{ fontSize: 30, fontWeight: 800, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
-              <span style={{ fontSize: 13, color: "#8892b0", marginLeft: 3 }}>{cat.unit}</span>
-            </div>
-            {nextFc && <div style={{ marginLeft: "auto", textAlign: "right" }}>
-              <div style={{ fontSize: 13, color: "#556" }}>📋 예보</div>
-              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0" }}>
-                {nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}
-              </div>
-              <div style={{ fontSize: 8, color: "#445" }}>{nextFc.time}</div>
-            </div>}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+            <span style={{ fontSize: 36, fontWeight: 900, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
+            <span style={{ fontSize: 15, color: "#8892b0" }}>{cat.unit}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-            <span style={{ padding: "2px 8px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span>
-            {cat.lastUpdated && <span style={{ color: "#445", fontSize: 8, marginLeft: "auto" }}>🕐 {cat.lastUpdated}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+            <span style={{ padding: "1px 6px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            {cat.lastUpdated && <span style={{ color: "#445", fontSize: 9, marginLeft: "auto" }}>{cat.lastUpdated}</span>}
           </div>
-          {fc.length > 1 && <div style={{ marginTop: 8, display: "flex", gap: 1, height: 18, alignItems: "flex-end" }}>
-            {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=4+((f.value-mn)/rng)*14; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.4+(i===0?0.6:0) }} />; })}
-          </div>}
         </div>); })}
-    </div>
-
-    {/* 기상 참고정보 (기온, 습도) — 종합경보 미반영 */}
-    <div style={{ maxWidth: 1100, margin: "16px auto 8px" }}>
-      <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🌤️ 기상 참고정보 (종합경보 미반영)</span>
-    </div>
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
+      {/* 기상 참고 — 같은 그리드 */}
       {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const tl = getTempLabel(cat); const fc = cat.forecast || []; const nextFc = fc[0]; return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "12px 14px", border: `1px solid ${li.border}`, cursor: "pointer", transition: "all .2s" }}
-          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.02)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>{cat.icon}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 13 }}>{cat.name}</span>
-                {tl && <span style={{ padding: "1px 6px", borderRadius: 10, background: tl.includes("저온") ? "rgba(33,150,243,0.12)" : "rgba(244,67,54,0.12)", color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 8, fontWeight: 700 }}>{tl}</span>}
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: li.color, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}</span>
-                <span style={{ fontSize: 14, color: "#8892b0" }}>{cat.unit}</span>
-                {nextFc && <span style={{ fontSize: 14, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 4 }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}</span>}
-              </div>
-            </div>
-            <span style={{ padding: "2px 6px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.label}</span>
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "12px", border: `1px solid ${li.border}`, cursor: "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 16, flex: 1 }}>{cat.name}</span>
+            {tl && <span style={{ color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 10, fontWeight: 700 }}>{tl}</span>}
           </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+            <span style={{ fontSize: 30, fontWeight: 800, color: li.color, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}</span>
+            <span style={{ fontSize: 15, color: "#8892b0" }}>{cat.unit}</span>
+            {nextFc && <span style={{ fontSize: 13, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : "#2196F3", marginLeft: 4 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"}{nextFc.value}</span>}
+          </div>
+          <span style={{ padding: "1px 6px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.label}</span>
         </div>); })}
     </div>
 
-    {/* 🅿️ 주차장 현황 */}
-    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <>
-      <div style={{ maxWidth: 1100, margin: "16px auto 8px" }}>
-        <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🅿️ 주차장 현황 (종합경보 미반영)</span>
-      </div>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
-        {(settings.parkingLots || []).map(lot => {
-          const remain = lot.capacity - (lot.current || 0);
-          const pct = lot.capacity > 0 ? ((lot.current || 0) / lot.capacity * 100) : 0;
-          const color = remain <= 0 ? "#F44336" : pct >= 90 ? "#FF9800" : pct >= 70 ? "#FFC107" : "#4CAF50";
-          return (
-            <div key={lot.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "12px 14px", border: `1px solid ${color}33` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 16 }}>🅿️</span>
-                <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 13, flex: 1 }}>{lot.name}</span>
-                <span style={{ padding: "2px 8px", borderRadius: 10, background: `${color}22`, color, fontSize: 13, fontWeight: 700 }}>
-                  {remain <= 0 ? "🚫 만차" : pct >= 90 ? "⚠️ 거의만차" : pct >= 70 ? "⚡ 혼잡" : "✅ 여유"}
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "monospace" }}>{(lot.current || 0)}</span>
-                <span style={{ color: "#556", fontSize: 13 }}>/ {lot.capacity}대</span>
-                <span style={{ color: remain <= 0 ? "#F44336" : "#4CAF50", fontSize: 14, fontWeight: 700, marginLeft: "auto" }}>잔여 {Math.max(0, remain)}대</span>
-              </div>
-              <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: color, borderRadius: 3, transition: "width .5s" }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>}
+    {/* 🅿️ 주차 + 🚌 셔틀 — 컴팩트 */}
+    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
+      {(settings.parkingLots || []).map(lot => { const pct = lot.capacity > 0 ? ((lot.current||0)/lot.capacity*100) : 0; const color = pct>=100?"#F44336":pct>=90?"#FF9800":pct>=70?"#FFC107":"#4CAF50"; return (
+        <div key={lot.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "10px 12px", border: `1px solid ${color}33` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>🅿️ {lot.name}</span>
+            <span style={{ color, fontSize: 15, fontWeight: 800, fontFamily: "monospace" }}>{lot.current||0}/{lot.capacity}</span>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}><div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: color, borderRadius: 2 }} /></div>
+        </div>); })}
+    </div>}
+    {settings.features?.shuttle !== false && (settings.shuttleBuses || []).length > 0 && <div style={{ maxWidth: 1100, margin: "6px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 6 }}>
+      {(settings.shuttleBuses || []).map(bus => { const sc = bus.status==="running"?"#4CAF50":"#FF9800"; const cap=bus.capacity||45; const pax=bus.passengers||0; return (
+        <div key={bus.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "10px 12px", border: `1px solid ${sc}33` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 14 }}>🚌</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{bus.name}</span>
+            <span style={{ color: sc, fontSize: 11, fontWeight: 700 }}>●{bus.status==="running"?"운행":"대기"}</span>
+            <span style={{ color: pax>=cap?"#F44336":"#4CAF50", fontSize: 12, fontWeight: 800, fontFamily: "monospace" }}>👥{pax}/{cap}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+            <span style={{ color: "#00BCD4", fontSize: 11 }}>📍{bus.currentStopName || "미확인"}</span>
+          </div>
+        </div>); })}
+    </div>}
 
-    {/* 🚌 셔틀버스 현황 */}
-    {settings.features?.shuttle !== false && (settings.shuttleBuses || []).length > 0 && <>
-      <div style={{ maxWidth: 1100, margin: "16px auto 8px" }}>
-        <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🚌 셔틀버스 현황</span>
-      </div>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 10 }}>
-        {(settings.shuttleBuses || []).map(bus => {
-          const sc = bus.status === "running" ? "#4CAF50" : bus.status === "stopped" ? "#FF9800" : "#F44336";
-          const sl = bus.status === "running" ? "운행중" : bus.status === "stopped" ? "대기" : "종료";
-          const stops = (settings.shuttleStops || []).sort((a,b)=>(a.order||0)-(b.order||0));
-          const currentIdx = stops.findIndex(s => s.id === bus.currentStopId);
-          return (
-            <div key={bus.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, padding: "12px 14px", border: `1px solid ${sc}33` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 18 }}>🚌</span>
-                <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 13, flex: 1 }}>{bus.name}</span>
-                <span style={{ padding: "2px 8px", borderRadius: 10, background: `${sc}22`, color: sc, fontSize: 13, fontWeight: 700 }}>● {sl}</span>
-              </div>
-              {/* 탑승인원 */}
-              {(() => { const cap = bus.capacity || 45; const pax = bus.passengers || 0; const full = pax >= cap; const pc = full ? "#F44336" : pax >= cap * 0.8 ? "#FF9800" : "#4CAF50"; return (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 10px", borderRadius: 8, background: full ? "rgba(244,67,54,0.08)" : "rgba(255,255,255,0.02)" }}>
-                  <span style={{ color: "#556", fontSize: 14 }}>👥</span>
-                  <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min((pax/cap)*100, 100)}%`, background: pc, borderRadius: 3, transition: "width .3s" }} />
-                  </div>
-                  <span style={{ color: pc, fontSize: 14, fontWeight: 800, fontFamily: "monospace", minWidth: 55, textAlign: "right" }}>{pax}/{cap}</span>
-                  {full && <span style={{ padding: "1px 6px", borderRadius: 10, background: "#F44336", color: "#fff", fontSize: 8, fontWeight: 700 }}>만차</span>}
-                </div>
-              ); })()}
-              {bus.route && <div style={{ color: "#556", fontSize: 14, marginBottom: 4 }}>🛤️ {bus.route} · {bus.capacity||45}인승</div>}
-              {/* 정류장 진행 표시 */}
-              {stops.length > 0 && <div style={{ display: "flex", alignItems: "center", gap: 2, marginBottom: 4 }}>
-                {stops.map((stop, i) => (
-                  <div key={stop.id} style={{ flex: 1, display: "flex", alignItems: "center" }}>
-                    <div title={stop.name} style={{ width: 14, height: 14, borderRadius: 7, background: i === currentIdx ? "#00BCD4" : i < currentIdx ? `${sc}66` : "#333", border: i === currentIdx ? "2px solid #00BCD4" : "1px solid #444", transition: "all .3s", flexShrink: 0 }} />
-                    {i < stops.length - 1 && <div style={{ flex: 1, height: 2, background: i < currentIdx ? `${sc}44` : "#333" }} />}
-                  </div>
-                ))}
-              </div>}
-              {/* 정류장 이름 */}
-              {stops.length > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#556", fontSize: 8 }}>{stops[0]?.name}</span>
-                <span style={{ color: "#556", fontSize: 8 }}>{stops[stops.length-1]?.name}</span>
-              </div>}
-              {/* 현재 위치 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-                <span style={{ color: bus.currentStopName ? "#00BCD4" : "#556", fontSize: 14, fontWeight: 700 }}>📍 {bus.currentStopName || "위치 미확인"}</span>
-                {bus.lastUpdated && <span style={{ color: "#445", fontSize: 13 }}>🕐 {bus.lastUpdated}</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>}
-
-    <div style={{ maxWidth: 1100, margin: "16px auto 0", display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
-      {Object.entries(LEVELS).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: "50%", background: v.color }} /><span style={{ color: "#8892b0", fontSize: 13 }}>{v.label}</span></div>))}
+    {/* 범례 */}
+    <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
+      {Object.entries(LEVELS).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: v.color }} /><span style={{ color: "#556", fontSize: 11 }}>{v.label}</span></div>))}
     </div>
     {alerts && alerts.length > 0 && (
       <div style={{ maxWidth: 1100, margin: "20px auto 0" }}>
