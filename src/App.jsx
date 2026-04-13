@@ -3186,14 +3186,24 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
     setNewAcc({ id: "", pw: "", name: "", role: "counter" });
   };
 
+  const ROLE_RANK = { sysadmin: 100, admin: 80, manager: 60, counter: 40, parking: 40, shuttle: 40, viewer: 20 };
+  const myRank = ROLE_RANK[currentUser.role] || 0;
+  const canManage = (acc) => {
+    if (acc.id === currentUser.id) return false; // 자기 자신 수정 불가
+    const targetRank = ROLE_RANK[acc.role] || 0;
+    return myRank > targetRank; // 자기보다 낮은 등급만 관리 가능
+  };
+
   const deleteAcc = (id) => {
-    if (id === "sysadmin") { alert("시스템관리자는 삭제할 수 없습니다."); return; }
-    if (id === "admin") { alert("기본 관리자는 삭제할 수 없습니다."); return; }
-    if (id === currentUser.id) { alert("현재 로그인된 계정은 삭제할 수 없습니다."); return; }
+    const target = accounts.find(a => a.id === id);
+    if (!target || !canManage(target)) { alert("상위 또는 동급 관리자 계정은 수정할 수 없습니다."); return; }
     if (confirm(`"${id}" 계정을 삭제하시겠습니까?`)) setAccounts(accounts.filter(a => a.id !== id));
   };
 
   const changePw = (id) => {
+    const target = accounts.find(a => a.id === id);
+    // 자기 자신 비밀번호는 변경 가능
+    if (id !== currentUser.id && (!target || !canManage(target))) { alert("상위 또는 동급 관리자 계정의 비밀번호는 변경할 수 없습니다."); return; }
     const np = editPw[id];
     if (!np || np.length < 4) { alert("비밀번호는 4자 이상이어야 합니다."); return; }
     setAccounts(accounts.map(a => a.id === id ? { ...a, password: simpleHash(np) } : a));
@@ -3202,7 +3212,10 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
   };
 
   const changeRole = (id, role) => {
-    if (id === "admin") return;
+    const target = accounts.find(a => a.id === id);
+    if (!target || !canManage(target)) return;
+    const newRank = ROLE_RANK[role] || 0;
+    if (newRank >= myRank) { alert("자신보다 높거나 같은 등급으로 변경할 수 없습니다."); return; }
     setAccounts(accounts.map(a => a.id === id ? { ...a, role } : a));
   };
 
@@ -3212,34 +3225,37 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>👤 계정 목록</h3>
         {accounts.map(acc => {
           const rl = ROLES[acc.role] || ROLES.viewer;
+          const editable = canManage(acc);
+          const isSelf = acc.id === currentUser.id;
           return (
-            <div key={acc.id} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: acc.id === currentUser.id ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent" }}>
+            <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{acc.name}</span>
                   <span style={{ color: "#556", fontSize: 14 }}>({acc.id})</span>
                   <span style={{ padding: "2px 8px", borderRadius: 10, background: `${rl.color}22`, border: `1px solid ${rl.color}44`, color: rl.color, fontSize: 14, fontWeight: 700 }}>{rl.label}</span>
-                  {acc.id === currentUser.id && <span style={{ color: "#2196F3", fontSize: 14 }}>← 현재</span>}
+                  {isSelf && <span style={{ color: "#2196F3", fontSize: 14 }}>← 현재</span>}
                 </div>
-                {acc.id !== "admin" && currentUser.role === "admin" && (
-                  <button onClick={() => deleteAcc(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
-                )}
+                {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                {currentUser.role === "admin" && acc.id !== "admin" && (
+                {editable && (
                   <select value={acc.role} onChange={e => changeRole(acc.id, e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                    {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label} — {v.desc}</option>)}
+                    {Object.entries(ROLES).filter(([k]) => (ROLE_RANK[k] || 0) < myRank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 )}
-                <input type="password" placeholder="새 비밀번호" value={editPw[acc.id] || ""} onChange={e => setEditPw({ ...editPw, [acc.id]: e.target.value })}
-                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, width: 120 }} />
-                <button onClick={() => changePw(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#FF9800", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>변경</button>
+                {(editable || isSelf) && <>
+                  <input type="password" placeholder="새 비밀번호" value={editPw[acc.id] || ""} onChange={e => setEditPw({ ...editPw, [acc.id]: e.target.value })}
+                    style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, width: 120 }} />
+                  <button onClick={() => changePw(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#FF9800", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>변경</button>
+                </>}
+                {!editable && !isSelf && <span style={{ color: "#556", fontSize: 12 }}>🔒 상위 관리자</span>}
               </div>
             </div>
           );
         })}
       </Card>
-      {currentUser.role === "admin" && <Card>
+      {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>➕ 계정 추가</h3>
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -3250,7 +3266,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
             <div><Label>비밀번호</Label><Input type="password" value={newAcc.pw} onChange={e => setNewAcc({ ...newAcc, pw: e.target.value })} placeholder="4자 이상" /></div>
             <div><Label>권한</Label>
               <select value={newAcc.role} onChange={e => setNewAcc({ ...newAcc, role: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-                {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                {Object.entries(ROLES).filter(([k]) => (ROLE_RANK[k] || 0) < myRank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
           </div>
