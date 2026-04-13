@@ -96,7 +96,7 @@ const DEFAULT_SETTINGS = {
   smsStaff: [],     // [{name, phone}] 안전요원
   location: { lat: 0, lon: 0, name: "", mode: "auto" },
   kma: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", enabled: true, interval: 10, lastFetch: null, nxOverride: null, nyOverride: null },
-  airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", stationName: "진주시", enabled: true, interval: 30, lastFetch: null },
+  airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", sidoName: "경남", stationFilter: "진주", enabled: true, interval: 30, lastFetch: null },
   dam: { enabled: true, obscd: "2018110", fbscd: "02", name: "남강댐", interval: 10, lastFetch: null },
   zones: [ { id: "z1", name: "A구역", range: "", assignee: "" } ],
   gates: [ { id: "g1", name: "출입구1", assignee: "", accountId: "" } ],
@@ -2054,21 +2054,27 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <span style={{ color: settings.airQuality?.enabled ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{settings.airQuality?.enabled ? "ON" : "OFF"}</span>
           </div>
           <div><Label>API 인증키 (공공데이터포털)</Label><Input value={settings.airQuality?.serviceKey || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, serviceKey: e.target.value } }))} placeholder="공공데이터포털에서 발급받은 인증키" /></div>
-          <div><Label>측정소명</Label><Input value={settings.airQuality?.stationName || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, stationName: e.target.value } }))} placeholder="진주시" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>시도명</Label><select value={settings.airQuality?.sidoName || "경남"} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, sidoName: e.target.value } }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+              {["서울","부산","대구","인천","광주","대전","울산","세종","경기","강원","충북","충남","전북","전남","경북","경남","제주"].map(s => <option key={s} value={s}>{s}</option>)}
+            </select></div>
+            <div><Label>지역 필터</Label><Input value={settings.airQuality?.stationFilter || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, stationFilter: e.target.value } }))} placeholder="진주, 종로 등" /></div>
+          </div>
           <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.airQuality?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, interval: parseInt(e.target.value) || 30 } }))} /></div>
           {settings.airQuality?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.airQuality.lastFetch}</p>}
           <button onClick={async () => {
             const aq = settings.airQuality || {};
-            const key = aq.serviceKey; const station = aq.stationName || "진주시";
+            const key = aq.serviceKey; const sido = aq.sidoName || "경남"; const filter = aq.stationFilter || "";
             if (!key) { alert("인증키를 입력하세요."); return; }
             try {
-              const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(key)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(station)}&dataTerm=DAILY&ver=1.0`;
+              const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty?serviceKey=${encodeURIComponent(key)}&returnType=json&numOfRows=100&pageNo=1&sidoName=${encodeURIComponent(sido)}&ver=1.0`;
               const res = await fetch(url);
               const json = await res.json();
-              const rawItems = json?.response?.body?.items; const item = Array.isArray(rawItems) ? rawItems[0] : rawItems?.item?.[0] || rawItems?.[0];
+              const rawItems = json?.response?.body?.items; 
+              const allItems = Array.isArray(rawItems) ? rawItems : rawItems?.item || [];
+              const item = filter ? allItems.find(i => i.stationName?.includes(filter)) || allItems[0] : allItems[0];
               if (item) {
                 const pm10 = item.pm10Value || "-"; const pm25 = item.pm25Value || "-";
-                const grade10 = item.pm10Grade || ""; const grade25 = item.pm25Grade || "";
                 const gradeMap = { "1": "좋음", "2": "보통", "3": "나쁨", "4": "매우나쁨" };
                 setCategories(p => p.map(c => {
                   if (c.id === "pm10") return { ...c, currentValue: parseFloat(pm10) || 0, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" };
@@ -2076,25 +2082,23 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   return c;
                 }));
                 setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, lastFetch: new Date().toLocaleString("ko-KR") } }));
-                alert(`✅ 측정소: ${station}\n📅 ${item.dataTime || ""}\n\n🌫️ 미세먼지(PM10): ${pm10} ㎍/㎥ (${gradeMap[grade10] || grade10})\n😷 초미세먼지(PM2.5): ${pm25} ㎍/㎥ (${gradeMap[grade25] || grade25})\n\n대시보드에 반영되었습니다.`);
+                const stations = allItems.filter(i => !filter || i.stationName?.includes(filter)).map(i => i.stationName).join(", ");
+                alert(`✅ ${sido} ${filter ? `(${filter} 필터)` : ""}\n📍 측정소: ${item.stationName}\n📅 ${item.dataTime || ""}\n\n🌫️ 미세먼지(PM10): ${pm10} ㎍/㎥ (${gradeMap[item.pm10Grade] || ""})\n😷 초미세먼지(PM2.5): ${pm25} ㎍/㎥ (${gradeMap[item.pm25Grade] || ""})\n\n${filter ? `해당 지역 측정소: ${stations}` : ""}\n\n대시보드에 반영되었습니다.`);
               } else {
-                const msg = json?.response?.header?.resultMsg || "데이터 없음";
-                const code = json?.response?.header?.resultCode || "";
-                const bodyStr = JSON.stringify(json?.response?.body || {}).slice(0, 300);
-                alert(`❌ 데이터 파싱 실패\n\n상태: ${code} ${msg}\n응답 구조: ${bodyStr}\n\n측정소명을 확인하세요.\n예: 진주, 중구, 종로구 등`);
+                alert(`❌ 데이터 없음\n\n시도명: ${sido}\n총 ${allItems.length}개 측정소 중 "${filter}" 포함 없음\n\n시도명을 확인하세요: 서울,부산,대구,인천,광주,대전,울산,경기,강원,충북,충남,전북,전남,경북,경남,제주,세종`);
               }
             } catch (e) {
-              alert(`❌ API 호출 실패: ${e.message}\n\nCORS 정책으로 직접 호출이 불가능할 수 있습니다.\n배포 환경(Vercel)에서는 정상 동작합니다.`);
+              alert(`❌ API 호출 실패: ${e.message}`);
             }
           }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#FF9800", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🧪 미세먼지 API 테스트</button>
         </div>
       </Card>
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
         <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
-          ℹ️ <strong>API:</strong> getMsrstnAcctoRltmMesureDnsty (측정소별 실시간 측정정보)<br />
-          • <strong>측정소명:</strong> 에어코리아 사이트에서 가까운 측정소 확인<br />
-          • <strong>수집항목:</strong> PM10(미세먼지), PM2.5(초미세먼지)<br />
-          • <strong>인증키:</strong> 공공데이터포털 → 한국환경공단_에어코리아_대기오염정보 활용신청
+          ℹ️ <strong>API:</strong> getCtprvnRltmMesureDnsty (시도별 실시간 측정정보)<br />
+          • <strong>시도명:</strong> 경남, 서울, 부산 등 선택<br />
+          • <strong>지역 필터:</strong> 측정소명에 포함된 텍스트 (예: 진주, 종로)<br />
+          • <strong>수집항목:</strong> PM10(미세먼지), PM2.5(초미세먼지)
         </p>
       </Card>
 
@@ -2888,14 +2892,18 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
   const aq = settings.airQuality || {};
   useEffect(() => {
     if (timer.current) clearInterval(timer.current);
-    if (!active || !aq.enabled || !aq.serviceKey || !aq.stationName) return;
+    if (!active || !aq.enabled || !aq.serviceKey) return;
 
     const doFetch = async () => {
       try {
-        const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(aq.serviceKey)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(aq.stationName)}&dataTerm=DAILY&ver=1.0`;
+        const sido = aq.sidoName || "경남";
+        const filter = aq.stationFilter || "";
+        const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty?serviceKey=${encodeURIComponent(aq.serviceKey)}&returnType=json&numOfRows=100&pageNo=1&sidoName=${encodeURIComponent(sido)}&ver=1.0`;
         const res = await fetch(url);
         const json = await res.json();
-        const rawItems = json?.response?.body?.items; const item = Array.isArray(rawItems) ? rawItems[0] : rawItems?.item?.[0] || rawItems?.[0];
+        const rawItems = json?.response?.body?.items;
+        const allItems = Array.isArray(rawItems) ? rawItems : rawItems?.item || [];
+        const item = filter ? allItems.find(i => i.stationName?.includes(filter)) || allItems[0] : allItems[0];
         if (item) {
           const pm10 = parseFloat(item.pm10Value) || 0;
           const pm25 = parseFloat(item.pm25Value) || 0;
@@ -2912,7 +2920,7 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
     doFetch();
     timer.current = setInterval(doFetch, (aq.interval || 30) * 60000);
     return () => { if (timer.current) clearInterval(timer.current); };
-  }, [active, aq.enabled, aq.serviceKey, aq.stationName, aq.interval, refreshKey]);
+  }, [active, aq.enabled, aq.serviceKey, aq.sidoName, aq.stationFilter, aq.interval, refreshKey]);
 }
 
 // ─── Dam Discharge Fetcher (댐 방류량) ───────────────────────────
