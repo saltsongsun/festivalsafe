@@ -2056,6 +2056,34 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div><Label>측정소명</Label><Input value={settings.airQuality?.stationName || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, stationName: e.target.value } }))} placeholder="진주시" /></div>
           <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.airQuality?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, interval: parseInt(e.target.value) || 30 } }))} /></div>
           {settings.airQuality?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.airQuality.lastFetch}</p>}
+          <button onClick={async () => {
+            const aq = settings.airQuality || {};
+            const key = aq.serviceKey; const station = aq.stationName || "진주시";
+            if (!key) { alert("인증키를 입력하세요."); return; }
+            try {
+              const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(key)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(station)}&dataTerm=DAILY&ver=1.0`;
+              const res = await fetch(url);
+              const json = await res.json();
+              const item = json?.response?.body?.items?.[0];
+              if (item) {
+                const pm10 = item.pm10Value || "-"; const pm25 = item.pm25Value || "-";
+                const grade10 = item.pm10Grade || ""; const grade25 = item.pm25Grade || "";
+                const gradeMap = { "1": "좋음", "2": "보통", "3": "나쁨", "4": "매우나쁨" };
+                setCategories(p => p.map(c => {
+                  if (c.id === "pm10") return { ...c, currentValue: parseFloat(pm10) || 0, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" };
+                  if (c.id === "pm25") return { ...c, currentValue: parseFloat(pm25) || 0, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" };
+                  return c;
+                }));
+                setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, lastFetch: new Date().toLocaleString("ko-KR") } }));
+                alert(`✅ 측정소: ${station}\n📅 ${item.dataTime || ""}\n\n🌫️ 미세먼지(PM10): ${pm10} ㎍/㎥ (${gradeMap[grade10] || grade10})\n😷 초미세먼지(PM2.5): ${pm25} ㎍/㎥ (${gradeMap[grade25] || grade25})\n\n대시보드에 반영되었습니다.`);
+              } else {
+                const msg = json?.response?.header?.resultMsg || "데이터 없음";
+                alert(`❌ 응답 오류: ${msg}\n\n측정소명을 확인하세요.\n예: 진주시, 중구, 종로구 등`);
+              }
+            } catch (e) {
+              alert(`❌ API 호출 실패: ${e.message}\n\nCORS 정책으로 직접 호출이 불가능할 수 있습니다.\n배포 환경(Vercel)에서는 정상 동작합니다.`);
+            }
+          }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#FF9800", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🧪 미세먼지 API 테스트</button>
         </div>
       </Card>
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
