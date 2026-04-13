@@ -75,11 +75,16 @@ const DEFAULT_CATEGORIES = [
     currentValue: 0, actionItems: ["미끄럼 주의 안내", "전기시설 점검", "불쾌지수 안내", "의료진 대기"],
     alertMessages: { BLUE: "습도 적정", YELLOW: "습도 높음, 불쾌지수 상승", ORANGE: "⚠️ 고습 경계! 미끄럼·전기 주의", RED: "🚨 극습! 안전 점검 강화" },
     apiConfig: { url: "", method: "GET", headers: "", responsePath: "", enabled: false }, kmaCategory: "REH", history: [] },
+  { id: "pm10", name: "미세먼지", unit: "㎍/㎥", source: "api", icon: "🌫️", apiInterval: 30,
+    thresholds: { BLUE: [0, 30], YELLOW: [30, 80], ORANGE: [80, 150], RED: [150, Infinity] },
+    currentValue: 0, actionItems: ["마스크 배부", "야외 활동 축소", "민감군 보호", "행사 축소 검토"],
+    alertMessages: { BLUE: "미세먼지 좋음", YELLOW: "미세먼지 보통", ORANGE: "⚠️ 미세먼지 나쁨! 마스크 착용", RED: "🚨 미세먼지 매우나쁨! 야외활동 자제" },
+    apiConfig: { url: "", method: "GET", headers: "", responsePath: "", enabled: false }, kmaCategory: "", history: [] },
   { id: "pm25", name: "초미세먼지", unit: "㎍/㎥", source: "api", icon: "😷", apiInterval: 30,
     thresholds: { BLUE: [0, 15], YELLOW: [15, 35], ORANGE: [35, 75], RED: [75, Infinity] },
     currentValue: 0, actionItems: ["마스크 배부 안내", "야외 활동 자제 안내", "민감군 보호 조치", "행사 축소 검토"],
     alertMessages: { BLUE: "초미세먼지 좋음", YELLOW: "초미세먼지 보통, 민감군 주의", ORANGE: "⚠️ 초미세먼지 나쁨! 마스크 착용 안내", RED: "🚨 초미세먼지 매우나쁨! 야외활동 자제" },
-    apiConfig: { url: "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey={serviceKey}&returnType=json&numOfRows=1&pageNo=1&stationName={station}&dataTerm=DAILY&ver=1.0", method: "GET", headers: "", responsePath: "response.body.items.0.pm25Value", enabled: false }, kmaCategory: "", history: [] },
+    apiConfig: { url: "", method: "GET", headers: "", responsePath: "", enabled: false }, kmaCategory: "", history: [] },
 ];
 
 const DEFAULT_SETTINGS = {
@@ -91,8 +96,10 @@ const DEFAULT_SETTINGS = {
   smsStaff: [],     // [{name, phone}] 안전요원
   location: { lat: 0, lon: 0, name: "", mode: "auto" },
   kma: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", enabled: true, interval: 10, lastFetch: null, nxOverride: null, nyOverride: null },
+  airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", stationName: "진주시", enabled: true, interval: 30, lastFetch: null },
   zones: [ { id: "z1", name: "A구역", range: "", assignee: "" } ],
-  workers: [],  // [{id, name, role:"manager"|"staff", phone, position, duty}]
+  gates: [ { id: "g1", name: "출입구1", assignee: "", accountId: "" } ],
+  workers: [],
   actionReports: [],
   parkingLots: [],
   notices: [],
@@ -104,7 +111,8 @@ const DEFAULT_SETTINGS = {
   hourlyLog: [],
   dailyRecords: [],
   orgChart: [],
-  zoneCongestion: [],  // [{zoneId, level, reportedBy, reportedByName, reportedAt, photos:[], memo}]
+  zoneCongestion: [],
+  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "cms"],
   features: {
     crowd: true,
     parking: true,
@@ -477,7 +485,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           {selected.id === "crowd" && (() => {
             const cd = JSON.parse(localStorage.getItem("_crowd") || "{}");
             const cumVal = crowdCumLive;
-            const zoneData = (settings.zones || []).map(z => { const s = (cd.zones || []).find(sz => sz.id === z.id); return { ...z, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
+            const zoneData = (settings.gates || []).map(z => { const s = (cd.zones || []).find(sz => sz.id === z.id); return { ...z, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
             const history = selected.history || [];
             const hLog = settings.hourlyLog || [];
             return (<>
@@ -720,9 +728,12 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       </div>
     ) : null; })()}
 
-    {/* ★ 모니터링 카드 */}
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
-      {categories.filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
+    {/* ═══ 👥 축제장 인원관리 ═══ */}
+    <div style={{ maxWidth: 1100, margin: "0 auto 6px" }}>
+      <span style={{ color: "#8892b0", fontSize: 14, fontWeight: 800 }}>👥 축제장 인원관리</span>
+    </div>
+    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+      {categories.filter(c => c.id === "crowd" && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
         <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "18px 20px", border: `2px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: li.color, animation: "blink 1.5s infinite" }} />}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -740,9 +751,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             </div>
             {nextFc && <div style={{ textAlign: "right", paddingBottom: 4 }}>
               <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📋 예보</div>
-              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>
-                {nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}
-              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}</div>
               <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
             </div>}
           </div>
@@ -750,11 +759,62 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.lastUpdated && <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>🕐 {cat.lastUpdated}</span>}
           </div>
-          {fc.length > 1 && <div style={{ marginTop: 10, display: "flex", gap: 2, height: 20, alignItems: "flex-end" }}>
-            {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=4+((f.value-mn)/rng)*16; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.3+(i===0?0.7:0) }} />; })}
-          </div>}
         </div>); })}
     </div>
+    {/* 구역별 혼잡도 */}
+    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
+      {(settings.zones || []).filter(z => z.name).map(z => {
+        const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+        const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
+        const cl = c ? CL[c.level] : null;
+        return (<div key={z.id} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${cl?.color || "#333"}33` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>{cl?.icon || "⚪"}</span>
+            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{z.name}</span>
+            <span style={{ color: cl?.color || "#556", fontSize: 15, fontWeight: 800 }}>{cl?.label || "미보고"}</span>
+            {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 12 }}>📷{c.photos.length}</span>}
+          </div>
+        </div>);
+      })}
+    </div>}
+
+    {/* ═══ 🌍 환경관리 ═══ */}
+    {categories.filter(c => c.id !== "crowd" && !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).length > 0 && <>
+      <div style={{ maxWidth: 1100, margin: "14px auto 6px" }}>
+        <span style={{ color: "#8892b0", fontSize: 14, fontWeight: 800 }}>🌍 환경관리</span>
+      </div>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
+        {categories.filter(c => c.id !== "crowd" && !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
+          <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "18px 20px", border: `2px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
+            {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: li.color, animation: "blink 1.5s infinite" }} />}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 24 }}>{cat.icon}</span>
+              <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 20 }}>{cat.name}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📡 실황</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <span style={{ fontSize: 44, fontWeight: 900, color: li.color, fontFamily: "monospace", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
+                  <span style={{ fontSize: 18, color: "#8892b0" }}>{cat.unit}</span>
+                </div>
+              </div>
+              {nextFc && <div style={{ textAlign: "right", paddingBottom: 4 }}>
+                <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📋 예보</div>
+                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}</div>
+                <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
+              </div>}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+              <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.icon} {li.label}</span>
+              {cat.lastUpdated && <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>🕐 {cat.lastUpdated}</span>}
+            </div>
+            {fc.length > 1 && <div style={{ marginTop: 10, display: "flex", gap: 2, height: 20, alignItems: "flex-end" }}>
+              {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=4+((f.value-mn)/rng)*16; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.3+(i===0?0.7:0) }} />; })}
+            </div>}
+          </div>); })}
+      </div>
+    </>}
 
     {/* 🌤️ 기상 참고 */}
     {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).length > 0 && <div style={{ maxWidth: 1100, margin: "10px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
@@ -778,8 +838,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>); })}
     </div>}
 
-    {/* 🅿️ 주차 + 🚌 셔틀 — 컴팩트 */}
-    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
+    {/* 주차/셔틀 */}
+    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "10px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
       {(settings.parkingLots || []).map(lot => { const pct = lot.capacity > 0 ? ((lot.current||0)/lot.capacity*100) : 0; const color = pct>=100?"#F44336":pct>=90?"#FF9800":pct>=70?"#FFC107":"#4CAF50"; return (
         <div key={lot.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "10px 12px", border: `1px solid ${color}33` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -798,37 +858,10 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <span style={{ color: sc, fontSize: 11, fontWeight: 700 }}>●{bus.status==="running"?"운행":"대기"}</span>
             <span style={{ color: pax>=cap?"#F44336":"#4CAF50", fontSize: 12, fontWeight: 800, fontFamily: "monospace" }}>👥{pax}/{cap}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-            <span style={{ color: "#00BCD4", fontSize: 11 }}>📍{bus.currentStopName || "미확인"}</span>
-          </div>
         </div>); })}
     </div>}
 
-    {/* 🚦 인파혼잡도 */}
-    {settings.features?.congestion !== false && (settings.zoneCongestion || []).length > 0 && <>
-      <div style={{ maxWidth: 1100, margin: "10px auto 4px" }}>
-        <span style={{ color: "#556", fontSize: 13, fontWeight: 700 }}>🚦 구역별 혼잡도</span>
-      </div>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
-        {(settings.zones || []).filter(z => z.name).map(z => {
-          const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
-          const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
-          const cl = c ? CL[c.level] : null;
-          return (<div key={z.id} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${cl?.color || "#333"}44` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 20 }}>{cl?.icon || "⚪"}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{z.name}</div>
-                {c?.reportedAt && <div style={{ color: "#556", fontSize: 11 }}>{c.reportedByName} · {c.reportedAt}</div>}
-              </div>
-              <span style={{ color: cl?.color || "#556", fontSize: 18, fontWeight: 800 }}>{cl?.label || "미보고"}</span>
-              {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 13 }}>📷{c.photos.length}</span>}
-            </div>
-          </div>);
-        })}
-      </div>
-    </>}
-
+    {/* 범례 */}
     {/* 범례 */}
     <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
       {Object.entries(LEVELS).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: v.color }} /><span style={{ color: "#556", fontSize: 11 }}>{v.label}</span></div>))}
@@ -922,10 +955,10 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
   const lv = crowd ? getLevel(crowd) : "BLUE"; const li = LEVELS[lv]; const now = useNow();
   const [log, setLog] = useState([]);
   const [showExport, setShowExport] = useState(false);
-  const zones = settings.zones || [];
-  const hasZones = zones.length > 1 || (zones.length === 1 && zones[0].name);
-  const myZone = session ? zones.find(z => z.accountId === session.id) : null;
-  const [selZone, setSelZone] = useState(myZone?.id || null);
+  const gates = settings.gates || [];
+  const hasGates = gates.length > 1 || (gates.length === 1 && zones[0].name);
+  const myGate = session ? gates.find(z => z.accountId === session.id) : null;
+  const [selZone, setSelZone] = useState(myGate?.id || null);
 
   // ★ 인파 데이터 상태
   const [crowdState, setCrowdState] = useState({ total: 0, cumulative: 0, zones: [] });
@@ -978,8 +1011,8 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
 
   const curTotal = crowdState.total || 0;
   const cumTotal = crowdState.cumulative || 0;
-  // ★ settings.zones가 구역 정의의 진실 → crowdState에서 카운트만 병합
-  const zoneData = zones.map(z => {
+  // ★ settings.gates가 구역 정의의 진실 → crowdState에서 카운트만 병합
+  const zoneData = gates.map(z => {
     const saved = (crowdState.zones || []).find(sz => sz.id === z.id);
     return { ...z, count: saved?.count || 0, cumulative: saved?.cumulative || 0 };
   });
@@ -989,8 +1022,8 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     const prev = stateRef.current;
     const newCur = Math.max(0, (prev.total || 0) + d);
     const newCum = d > 0 ? (prev.cumulative || 0) + d : (prev.cumulative || 0);
-    // settings.zones 기준으로 생성, 기존 카운트 병합
-    let newZones = zones.map(z => {
+    // settings.gates 기준으로 생성, 기존 카운트 병합
+    let newZones = gates.map(z => {
       const saved = (prev.zones || []).find(sz => sz.id === z.id);
       return { id: z.id, name: z.name, count: saved?.count || 0, cumulative: saved?.cumulative || 0, range: z.range, assignee: z.assignee };
     });
@@ -1050,7 +1083,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     XLSX.writeFile(wb, `축제현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const showZoneFirst = hasZones && myZone;
+  const showZoneFirst = hasGates && myGate;
   const Stat = ({ label, value, color }) => (
     <div style={{ textAlign: "center" }}>
       <div style={{ color: "#556", fontSize: 14 }}>{label}</div>
@@ -1062,9 +1095,9 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 4px" }}>{settings.festivalName} 인파 계수</h2>
     <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 16px" }}>{fmtTime(now)}</p>
 
-    {showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === myZone.id); return z ? (
+    {showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === myGate.id); return z ? (
       <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, padding: 16, borderRadius: 16, background: "rgba(76,175,80,0.06)", border: "1.5px solid rgba(76,175,80,0.2)", textAlign: "center" }}>
-        <div style={{ color: "#4CAF50", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 내 구역: {z.name}</div>
+        <div style={{ color: "#4CAF50", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 내 출입구: {z.name}</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 30 }}>
           <Stat label="체류" value={z.count || 0} color="#4CAF50" />
           <Stat label="누적" value={z.cumulative || 0} color="#2196F3" />
@@ -1089,7 +1122,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       {settings.venueArea > 0 && <div style={{ color: "#8892b0", fontSize: 13 }}>밀집도: {(curTotal / settings.venueArea).toFixed(2)}명/㎡</div>}
     </div>
 
-    {hasZones && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
+    {hasGates && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#2196F3" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>전체</button>
         {zoneData.filter(z => z.name).map(z => (
@@ -1124,8 +1157,8 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       </div>
     </div>
 
-    {hasZones && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
-      <h3 style={{ color: "#8892b0", fontSize: 13, marginBottom: 8 }}>🗺️ 구역별 현황</h3>
+    {hasGates && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
+      <h3 style={{ color: "#8892b0", fontSize: 13, marginBottom: 8 }}>🗺️ 출입구별 현황</h3>
       <div style={{ display: "grid", gap: 4 }}>
         {zoneData.filter(z => z.name).map(z => (
           <div key={z.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: selZone === z.id ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, border: selZone === z.id ? "1px solid rgba(76,175,80,0.2)" : "1px solid transparent" }}>
@@ -1890,7 +1923,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       { id: "custom", label: "항목추가" },
     ].filter(Boolean) },
     { label: "⚙️ 기능관리", tabs: [
-      { id: "zones", label: "구역" },
+      ft.crowd !== false && { id: "gates", label: "출입구" },
+      { id: "zones", label: "관리구역" },
       { id: "workers", label: "근무자" },
       ft.parking !== false && { id: "parking", label: "주차장" },
       ft.shuttle !== false && { id: "shuttlecms", label: "셔틀버스" },
@@ -1900,6 +1934,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       ft.sms !== false && { id: "sms", label: "SMS" },
     ].filter(Boolean) },
     { label: "🔧 시스템", tabs: [
+      { id: "navmgmt", label: "대시보드관리" },
       { id: "settings", label: "기본설정" },
       { id: "alerts", label: `이력(${alerts.length})` },
       ...(extraTabs || []),
@@ -2004,6 +2039,33 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           • <strong>응답 카테고리:</strong> T1H(기온), RN1(강수량), WSD(풍속), REH(습도), PTY(강수형태), VEC(풍향)
         </p>
       </Card>
+
+      {/* 에어코리아 미세먼지 API */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>😷 에어코리아 미세먼지 API</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 16px" }}>공공데이터포털 → 한국환경공단 에어코리아 대기오염정보</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Label style={{ minWidth: 60 }}>활성화</Label>
+            <div onClick={() => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, enabled: !(prev.airQuality?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.airQuality?.enabled ? "#4CAF50" : "#333", position: "relative", cursor: "pointer" }}>
+              <div style={{ width: 20, height: 20, borderRadius: 10, background: "#fff", position: "absolute", top: 2, left: settings.airQuality?.enabled ? 22 : 2, transition: "all .3s" }} />
+            </div>
+            <span style={{ color: settings.airQuality?.enabled ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{settings.airQuality?.enabled ? "ON" : "OFF"}</span>
+          </div>
+          <div><Label>API 인증키 (공공데이터포털)</Label><Input value={settings.airQuality?.serviceKey || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, serviceKey: e.target.value } }))} placeholder="공공데이터포털에서 발급받은 인증키" /></div>
+          <div><Label>측정소명</Label><Input value={settings.airQuality?.stationName || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, stationName: e.target.value } }))} placeholder="진주시" /></div>
+          <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.airQuality?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, interval: parseInt(e.target.value) || 30 } }))} /></div>
+          {settings.airQuality?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.airQuality.lastFetch}</p>}
+        </div>
+      </Card>
+      <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
+        <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+          ℹ️ <strong>API:</strong> getMsrstnAcctoRltmMesureDnsty (측정소별 실시간 측정정보)<br />
+          • <strong>측정소명:</strong> 에어코리아 사이트에서 가까운 측정소 확인<br />
+          • <strong>수집항목:</strong> PM10(미세먼지), PM2.5(초미세먼지)<br />
+          • <strong>인증키:</strong> 공공데이터포털 → 한국환경공단_에어코리아_대기오염정보 활용신청
+        </p>
+      </Card>
     </div>}
 
     {/* ── Custom API Config ── */}
@@ -2088,10 +2150,38 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     </div>}
 
     {/* Zone Management */}
+    {/* 출입구 관리 (계수용) */}
+    {tab === "gates" && <div>
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🚪 출입구 설정 (인파계수)</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>인파 계수를 위한 출입구를 등록합니다. 담당 계정을 지정하면 해당 계수원이 로그인 시 자동으로 배정됩니다.</p>
+        {(settings.gates || []).map((g, i) => (
+          <div key={g.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: "1px solid #222" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ color: "#4CAF50", fontWeight: 700, fontSize: 14 }}>🚪 {g.name || `출입구 ${i + 1}`}</span>
+              <button onClick={() => setSettings({ ...settings, gates: settings.gates.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div><Label>출입구명</Label><Input value={g.name} onChange={e => { const gs = [...settings.gates]; gs[i] = { ...g, name: e.target.value }; setSettings({ ...settings, gates: gs }); }} placeholder="정문, 동문 등" /></div>
+              <div><Label>담당자 이름</Label><Input value={g.assignee || ""} onChange={e => { const gs = [...settings.gates]; gs[i] = { ...g, assignee: e.target.value }; setSettings({ ...settings, gates: gs }); }} placeholder="홍길동" /></div>
+            </div>
+            <div><Label>담당 계정</Label>
+              <select value={g.accountId || ""} onChange={e => { const gs = [...settings.gates]; gs[i] = { ...g, accountId: e.target.value }; setSettings({ ...settings, gates: gs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                <option value="">미지정</option>
+                {(accounts || []).filter(a => a.role === "counter" || a.role === "admin" || a.role === "manager").map(a => <option key={a.id} value={a.id}>{a.name} ({a.id})</option>)}
+              </select>
+            </div>
+          </div>
+        ))}
+        <button onClick={() => setSettings({ ...settings, gates: [...(settings.gates || []), { id: "g" + Date.now(), name: "", assignee: "", accountId: "" }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 출입구 추가</button>
+      </Card>
+    </div>}
+
+    {/* 관리구역 (혼잡도 관리용) */}
     {tab === "zones" && <div>
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 구역 설정</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>구역을 추가하고 담당 계정을 지정하면, 해당 계수원이 로그인 시 자동으로 배정된 구역이 선택됩니다.</p>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 설정 (혼잡도)</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>혼잡도 보고를 위한 관리구역을 설정합니다. 담당자가 구역별 혼잡 상태를 보고합니다.</p>
         {(settings.zones || []).map((z, i) => (
           <div key={z.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: "1px solid #222" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -2292,7 +2382,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const crowdData = JSON.parse(localStorage.getItem("_crowd") || "{}");
           const curVal = crowd?.currentValue || 0;
           const cumVal = crowdData.cumulative || 0;
-          const zoneData = (settings.zones || []).map(z => { const s = (crowdData.zones || []).find(sz => sz.id === z.id); return { ...z, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
+          const zoneData = (settings.gates || []).map(z => { const s = (crowdData.zones || []).find(sz => sz.id === z.id); return { ...z, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
           return (<>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div style={{ textAlign: "center", padding: 16, borderRadius: 12, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.15)" }}>
@@ -2416,33 +2506,6 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           {settings.is24HourMode && <button onClick={() => setSettings({ ...settings, is24HourMode: false })} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>끄기</button>}
         </div>
       </Card>
-      <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🔌 기능 관리</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>사용하지 않는 기능을 끄면 해당 메뉴와 대시보드 영역이 숨겨집니다.</p>
-        {[
-          { k: "crowd", icon: "👥", label: "인파관리", desc: "인파 계수, 구역별 카운트, 누적 방문객" },
-          { k: "parking", icon: "🅿️", label: "주차관리", desc: "주차장 입출차 현황, 주차요원 배정" },
-          { k: "shuttle", icon: "🚌", label: "셔틀버스", desc: "셔틀 위치, 탑승인원, 정류장 관리" },
-          { k: "weather", icon: "🌤️", label: "기상청 연동", desc: "실시간 기상 데이터 자동 수집" },
-          { k: "sms", icon: "📱", label: "SMS 알림", desc: "경보 발생 시 문자 자동 발송" },
-          { k: "message", icon: "💬", label: "메시지/공지", desc: "내부 메시지 발송 및 공지 등록" },
-          { k: "customApi", icon: "🔌", label: "커스텀 API", desc: "외부 API 데이터 연동" },
-          { k: "congestion", icon: "🚦", label: "인파혼잡도", desc: "구역별 혼잡도 보고 (사진 포함)" },
-        ].map(f => {
-          const on = settings.features?.[f.k] !== false;
-          return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 6, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}`, transition: "all .2s" }}>
-            <div style={{ width: 40, height: 22, borderRadius: 11, background: on ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
-              <div style={{ width: 18, height: 18, borderRadius: 9, background: "#fff", position: "absolute", top: 2, left: on ? 20 : 2, transition: "all .3s" }} />
-            </div>
-            <span style={{ fontSize: 18 }}>{f.icon}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: on ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 700 }}>{f.label}</div>
-              <div style={{ color: "#445", fontSize: 14 }}>{f.desc}</div>
-            </div>
-            <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 14, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
-          </div>);
-        })}
-      </Card>
       <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>🔧 축제 기본정보</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "축제명", k: "festivalName" }, { l: "부제목", k: "festivalSubtitle" }, { l: "관리기관", k: "organization" }, { l: "연락처", k: "contactNumber" }, { l: "로고", k: "logoEmoji" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={settings[f.k]} onChange={e => setSettings({ ...settings, [f.k]: e.target.value })} /></div>))}</div></Card>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📅 축제 일자</h3>
@@ -2472,55 +2535,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>📍 위치</h3><div style={{ display: "flex", gap: 8, marginBottom: 14 }}><button onClick={autoLocate} disabled={locLoading} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: loc.mode === "auto" ? "#4CAF50" : "#2196F3", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: locLoading ? .6 : 1 }}>{locLoading ? "📡 확인 중..." : "📡 자동 위치"}</button><button onClick={() => setSettings({ ...settings, location: { ...loc, mode: "manual" } })} style={{ flex: 1, padding: "12px", borderRadius: 8, border: loc.mode === "manual" ? "1px solid #FF9800" : "1px solid #333", background: loc.mode === "manual" ? "rgba(255,152,0,0.1)" : "transparent", color: loc.mode === "manual" ? "#FF9800" : "#8892b0", fontWeight: 700, cursor: "pointer" }}>✏️ 수동</button></div><div style={{ display: "grid", gap: 10 }}><div><Label>위치명</Label><Input value={loc.name || ""} onChange={e => setSettings({ ...settings, location: { ...loc, name: e.target.value, mode: "manual" } })} /></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><div><Label>위도</Label><Input type="number" step="0.0001" value={loc.lat || ""} onChange={e => setSettings({ ...settings, location: { ...loc, lat: parseFloat(e.target.value) || 0, mode: "manual" } })} /></div><div><Label>경도</Label><Input type="number" step="0.0001" value={loc.lon || ""} onChange={e => setSettings({ ...settings, location: { ...loc, lon: parseFloat(e.target.value) || 0, mode: "manual" } })} /></div></div></div><div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.02)" }}><p style={{ color: "#445", fontSize: 14, margin: 0 }}>📍{loc.name} ({loc.lat?.toFixed(4)}, {loc.lon?.toFixed(4)}) — {loc.mode === "auto" ? "자동" : "수동"} | 격자: nx={grid.nx}, ny={grid.ny}</p></div></Card>
       <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 6px" }}>📐 순면적</h3><div style={{ marginBottom: 12 }}><Label>면적 (㎡)</Label><div style={{ display: "flex", gap: 8, alignItems: "center" }}><Input type="number" value={settings.venueArea} onChange={e => setSettings({ ...settings, venueArea: parseFloat(e.target.value) || 0 })} style={{ width: 150, fontSize: 18, fontWeight: 700 }} /><span style={{ color: "#8892b0" }}>㎡</span><span style={{ color: "#445", fontSize: 14 }}>({(settings.venueArea * .3025).toFixed(0)}평)</span></div></div><button onClick={() => { const t = calcCrowdThr(settings.venueArea); setCategories(p => p.map(c => c.id === "crowd" ? { ...c, thresholds: t } : c)); alert("✅ 인파 기준 적용"); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 인파 기준 자동 적용</button></Card>
 
-      <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📊 대시보드 표시 항목</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>대시보드에 표시할 모니터링 항목을 선택합니다.</p>
 
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🔴 주요 모니터링 항목</div>
-          {categories.filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(cat => {
-            const vis = settings.dashboardVisible?.[cat.id] !== false;
-            return <div key={cat.id} onClick={() => setSettings({ ...settings, dashboardVisible: { ...(settings.dashboardVisible || {}), [cat.id]: !vis } })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: vis ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 4, cursor: "pointer", border: `1px solid ${vis ? "rgba(76,175,80,0.15)" : "#1a1a2e"}` }}>
-              <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
-                <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: vis ? 18 : 2, transition: "all .3s" }} />
-              </div>
-              <span style={{ fontSize: 16 }}>{cat.icon}</span>
-              <span style={{ color: vis ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
-              <span style={{ color: "#445", fontSize: 14, marginLeft: "auto" }}>{cat.unit}</span>
-            </div>;
-          })}
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🌤️ 기상 참고정보</div>
-          {categories.filter(c => EXCLUDE_FROM_OVERALL.includes(c.id)).map(cat => {
-            const vis = settings.dashboardVisible?.[cat.id] !== false;
-            return <div key={cat.id} onClick={() => setSettings({ ...settings, dashboardVisible: { ...(settings.dashboardVisible || {}), [cat.id]: !vis } })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: vis ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 4, cursor: "pointer", border: `1px solid ${vis ? "rgba(76,175,80,0.15)" : "#1a1a2e"}` }}>
-              <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
-                <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: vis ? 18 : 2, transition: "all .3s" }} />
-              </div>
-              <span style={{ fontSize: 16 }}>{cat.icon}</span>
-              <span style={{ color: vis ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 600 }}>{cat.name}</span>
-              <span style={{ color: "#445", fontSize: 14, marginLeft: "auto" }}>{cat.unit}</span>
-            </div>;
-          })}
-        </div>
-
-        <div>
-          <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🅿️ 주차장</div>
-          {(() => {
-            const vis = settings.dashboardVisible?.parking !== false;
-            return <div onClick={() => setSettings({ ...settings, dashboardVisible: { ...(settings.dashboardVisible || {}), parking: !vis } })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: vis ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, cursor: "pointer", border: `1px solid ${vis ? "rgba(76,175,80,0.15)" : "#1a1a2e"}` }}>
-              <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
-                <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: vis ? 18 : 2, transition: "all .3s" }} />
-              </div>
-              <span style={{ fontSize: 16 }}>🅿️</span>
-              <span style={{ color: vis ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 600 }}>주차장 현황</span>
-              <span style={{ color: "#445", fontSize: 14, marginLeft: "auto" }}>{(settings.parkingLots || []).length}개소</span>
-            </div>;
-          })()}
-        </div>
-      </Card>
 
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>💾 설정 저장 / 불러오기</h3>
@@ -2595,6 +2610,97 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         </div>
       </Card>
     </div>}
+    {/* 대시보드 관리 */}
+    {tab === "navmgmt" && <div>
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🔌 기능 ON/OFF</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>사용하지 않는 기능을 끄면 메뉴와 대시보드에서 숨겨집니다.</p>
+        {[
+          { k: "crowd", icon: "👥", label: "인파관리" },
+          { k: "congestion", icon: "🚦", label: "인파혼잡도" },
+          { k: "parking", icon: "🅿️", label: "주차관리" },
+          { k: "shuttle", icon: "🚌", label: "셔틀버스" },
+          { k: "weather", icon: "🌤️", label: "기상청 연동" },
+          { k: "sms", icon: "📱", label: "SMS 알림" },
+          { k: "message", icon: "💬", label: "메시지/공지" },
+          { k: "customApi", icon: "🔌", label: "커스텀 API" },
+        ].map(f => {
+          const on = settings.features?.[f.k] !== false;
+          return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 5, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
+            <div style={{ width: 40, height: 22, borderRadius: 11, background: on ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
+              <div style={{ width: 18, height: 18, borderRadius: 9, background: "#fff", position: "absolute", top: 2, left: on ? 20 : 2, transition: "all .3s" }} />
+            </div>
+            <span style={{ fontSize: 18 }}>{f.icon}</span>
+            <span style={{ color: on ? "#ccd6f6" : "#556", fontSize: 14, fontWeight: 700, flex: 1 }}>{f.label}</span>
+            <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
+          </div>);
+        })}
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📱 하단 메뉴 순서</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>▲▼ 버튼으로 메뉴 순서를 변경하세요. 대시보드와 관리는 고정입니다.</p>
+        {(() => {
+          const allItems = [
+            { id: "dashboard", icon: "📊", label: "대시보드", fixed: true },
+            { id: "counter", icon: "👥", label: "인파계수", feat: "crowd" },
+            { id: "congestion", icon: "🚦", label: "혼잡도", feat: "congestion" },
+            { id: "parking", icon: "🅿️", label: "주차관리", feat: "parking" },
+            { id: "shuttle", icon: "🚌", label: "셔틀버스", feat: "shuttle" },
+            { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
+            { id: "message", icon: "📢", label: "발송", feat: "message" },
+            { id: "cms", icon: "⚙️", label: "관리", fixed: true },
+          ];
+          const order = settings.navOrder || allItems.map(i => i.id);
+          const sorted = [...allItems].sort((a, b) => {
+            const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+          });
+          const moveItem = (id, dir) => {
+            const cur = [...(settings.navOrder || allItems.map(i => i.id))];
+            const idx = cur.indexOf(id);
+            if (idx < 0) return;
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= cur.length) return;
+            // 대시보드(0)/관리(마지막) 고정
+            if (cur[newIdx] === "dashboard" || cur[newIdx] === "cms") return;
+            [cur[idx], cur[newIdx]] = [cur[newIdx], cur[idx]];
+            setSettings({ ...settings, navOrder: cur });
+          };
+          return (<div style={{ display: "grid", gap: 4 }}>
+            {sorted.map((item, idx) => {
+              const enabled = !item.feat || settings.features?.[item.feat] !== false;
+              return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: item.fixed ? "rgba(33,150,243,0.06)" : enabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, border: item.fixed ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222", opacity: enabled ? 1 : 0.4 }}>
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <span style={{ color: item.fixed ? "#2196F3" : "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{item.label}</span>
+                {item.fixed ? <span style={{ color: "#556", fontSize: 12 }}>고정</span> : <>
+                  <button onClick={() => moveItem(item.id, -1)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>▲</button>
+                  <button onClick={() => moveItem(item.id, 1)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>▼</button>
+                </>}
+                {!enabled && <span style={{ color: "#F44336", fontSize: 11 }}>OFF</span>}
+              </div>);
+            })}
+          </div>);
+        })()}
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📊 대시보드 표시 항목</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>대시보드에 표시할 모니터링 항목을 선택합니다.</p>
+        {categories.map(cat => {
+          const vis = settings.dashboardVisible?.[cat.id] !== false;
+          return <div key={cat.id} onClick={() => setSettings({ ...settings, dashboardVisible: { ...(settings.dashboardVisible || {}), [cat.id]: !vis } })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: vis ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 8, marginBottom: 4, cursor: "pointer", border: `1px solid ${vis ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
+            <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: vis ? 18 : 2, transition: "all .3s" }} />
+            </div>
+            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+            <span style={{ color: vis ? "#ccd6f6" : "#556", fontSize: 14, fontWeight: 600 }}>{cat.name}</span>
+            <span style={{ color: "#445", fontSize: 12, marginLeft: "auto" }}>{cat.unit}</span>
+          </div>;
+        })}
+      </Card>
+    </div>}
+
     {tab === "alerts" && <div>{alerts.length === 0 && <p style={{ color: "#445", textAlign: "center", padding: 20 }}>이력 없음</p>}{alerts.map((a, i) => { const li = LEVELS[a.level]; return (<div key={i} style={{ background: li.bg, borderRadius: 10, padding: 12, marginBottom: 8, border: `1px solid ${li.border}` }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 14 }}>{li.icon}{a.category}</span><span style={{ color: "#445", fontSize: 14 }}>{a.time}</span></div><pre style={{ color: "#bbb", fontSize: 13, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, fontFamily: "inherit" }}>{a.message}</pre></div>); })}{alerts.length > 0 && <button onClick={() => setAlerts([])} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>}</div>}
 
     </div></div>);
@@ -2693,6 +2799,39 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
     timer.current = setInterval(doFetch, (kma.interval || 10) * 60000);
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [active, kma.enabled, kma.serviceKey, kma.interval, categories.map(c => c.kmaCategory).join(","), refreshKey]);
+}
+
+// ─── Air Quality Fetcher (에어코리아) ────────────────────────────
+function useAirQualityFetcher(categories, setCategories, settings, setSettings, active, refreshKey) {
+  const timer = useRef(null);
+  const aq = settings.airQuality || {};
+  useEffect(() => {
+    if (timer.current) clearInterval(timer.current);
+    if (!active || !aq.enabled || !aq.serviceKey || !aq.stationName) return;
+
+    const doFetch = async () => {
+      try {
+        const url = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(aq.serviceKey)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(aq.stationName)}&dataTerm=DAILY&ver=1.0`;
+        const res = await fetch(url);
+        const json = await res.json();
+        const item = json?.response?.body?.items?.[0];
+        if (item) {
+          const pm10 = parseFloat(item.pm10Value) || 0;
+          const pm25 = parseFloat(item.pm25Value) || 0;
+          const time = new Date().toLocaleTimeString("ko-KR");
+          setCategories(p => p.map(c => {
+            if (c.id === "pm10") return { ...c, currentValue: pm10, lastUpdated: time, dataType: "실황" };
+            if (c.id === "pm25") return { ...c, currentValue: pm25, lastUpdated: time, dataType: "실황" };
+            return c;
+          }));
+          setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, lastFetch: new Date().toLocaleString("ko-KR") } }));
+        }
+      } catch (e) { console.warn("에어코리아 API 오류:", e); }
+    };
+    doFetch();
+    timer.current = setInterval(doFetch, (aq.interval || 30) * 60000);
+    return () => { if (timer.current) clearInterval(timer.current); };
+  }, [active, aq.enabled, aq.serviceKey, aq.stationName, aq.interval, refreshKey]);
 }
 
 // ─── Custom API Fetcher ──────────────────────────────────────────
@@ -3199,6 +3338,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
 
   useKmaFetcher(categories, setCategories, settings, setSettings, active, refreshKey);
+  useAirQualityFetcher(categories, setCategories, settings, setSettings, active, refreshKey);
   useCustomApiFetcher(categories, setCategories, settings, active, refreshKey);
   useHistoryRecorder(categories, setCategories, active, refreshKey);
 
@@ -3282,17 +3422,20 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
+  const navOrder = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "cms"];
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
+    ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "inbox", icon: "💬", label: unreadCount > 0 ? `수신함(${unreadCount})` : "수신함" },
     ft.message !== false && { id: "message", icon: "📢", label: "발송" },
-    ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
     { id: "cms", icon: "⚙️", label: "관리" },
   ].filter(Boolean);
-  const navs = allNavs.filter(n => allowedPages.includes(n.id));
+  const navs = allNavs
+    .filter(n => allowedPages.includes(n.id))
+    .sort((a, b) => { const ai = navOrder.indexOf(a.id); const bi = navOrder.indexOf(b.id); return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi); });
 
   // Inject account tab into CMS if admin
   const cmsExtraTabs = (session.role === "admin" || session.role === "manager")
