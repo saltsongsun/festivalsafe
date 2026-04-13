@@ -3168,7 +3168,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 onDragStart={e => e.dataTransfer.setData("navId", item.id)}
                 onDragOver={e => { e.preventDefault(); e.currentTarget.style.outline = "2px solid #2196F3"; }}
                 onDragLeave={e => { e.currentTarget.style.outline = "none"; }}
-                onDrop={e => { e.preventDefault(); e.currentTarget.style.outline = "none"; const dragId = e.dataTransfer.getData("navId"); if (dragId && dragId !== item.id) { const cur = [...(settings.navOrder || allItems.map(i => i.id))]; const di = cur.indexOf(dragId); const ti = cur.indexOf(item.id); if (di >= 0 && ti >= 0) { const [moved] = cur.splice(di, 1); cur.splice(ti, 0, moved); setSettings({ ...settings, navOrder: cur }); } } }}
+                onDrop={e => { e.preventDefault(); e.currentTarget.style.outline = "none"; const dragId = e.dataTransfer.getData("navId"); if (dragId && dragId !== item.id) { let cur = [...(settings.navOrder || allItems.map(i => i.id))]; allItems.forEach(it => { if (!cur.includes(it.id)) cur.push(it.id); }); const di = cur.indexOf(dragId); const ti = cur.indexOf(item.id); if (di >= 0 && ti >= 0) { const [moved] = cur.splice(di, 1); cur.splice(ti, 0, moved); setSettings({ ...settings, navOrder: cur }); } } }}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: enabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, border: "1px solid #222", opacity: enabled ? 1 : 0.4, cursor: "grab" }}>
                 <span style={{ fontSize: 14, color: "#556" }}>⠿</span>
                 <span style={{ fontSize: 20 }}>{item.icon}</span>
@@ -3975,7 +3975,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrder = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "cms"];
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
