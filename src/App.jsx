@@ -97,6 +97,7 @@ const DEFAULT_SETTINGS = {
   location: { lat: 0, lon: 0, name: "", mode: "auto" },
   kma: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", enabled: true, interval: 10, lastFetch: null, nxOverride: null, nyOverride: null },
   airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", stationName: "진주시", enabled: true, interval: 30, lastFetch: null },
+  dam: { enabled: true, obscd: "2018110", fbscd: "02", name: "남강댐", interval: 10, lastFetch: null },
   zones: [ { id: "z1", name: "A구역", range: "", assignee: "" } ],
   gates: [ { id: "g1", name: "출입구1", assignee: "", accountId: "" } ],
   workers: [],
@@ -2094,6 +2095,56 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           • <strong>인증키:</strong> 공공데이터포털 → 한국환경공단_에어코리아_대기오염정보 활용신청
         </p>
       </Card>
+
+      {/* 🌊 남강댐 방류현황 */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🌊 댐 방류현황</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 16px" }}>낙동강홍수통제소 → 댐 실시간 방류량</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Label style={{ minWidth: 60 }}>활성화</Label>
+            <div onClick={() => setSettings(prev => ({ ...prev, dam: { ...prev.dam, enabled: !(prev.dam?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.dam?.enabled ? "#4CAF50" : "#333", position: "relative", cursor: "pointer" }}>
+              <div style={{ width: 20, height: 20, borderRadius: 10, background: "#fff", position: "absolute", top: 2, left: settings.dam?.enabled ? 22 : 2, transition: "all .3s" }} />
+            </div>
+            <span style={{ color: settings.dam?.enabled ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{settings.dam?.enabled ? "ON" : "OFF"}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>댐 이름</Label><Input value={settings.dam?.name || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, name: e.target.value } }))} placeholder="남강댐" /></div>
+            <div><Label>관측소 코드</Label><Input value={settings.dam?.obscd || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, obscd: e.target.value } }))} placeholder="2018110" /></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>유역 코드</Label><Input value={settings.dam?.fbscd || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, fbscd: e.target.value } }))} placeholder="02" /></div>
+            <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.dam?.interval || 10} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, interval: parseInt(e.target.value) || 10 } }))} /></div>
+          </div>
+          {settings.dam?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.dam.lastFetch}</p>}
+          <button onClick={async () => {
+            try {
+              const dam = settings.dam || {};
+              const url = `/api/dam-data?obscd=${dam.obscd || "2018110"}&fbscd=${dam.fbscd || "02"}`;
+              const res = await fetch(url);
+              const json = await res.json();
+              if (json.success) {
+                const discharge = json.totalDischarge || json.discharge || 0;
+                setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
+                setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR") } }));
+                alert(`✅ ${dam.name || "남강댐"} 방류현황\n\n🌊 총방류량: ${json.totalDischarge || "-"} ㎥/s\n💧 방류량: ${json.discharge || "-"} ㎥/s\n📏 수위: ${json.waterLevel || "-"} m\n📊 유입량: ${json.inflow || "-"} ㎥/s\n📈 저수율: ${json.storageRate || "-"} %\n\n대시보드에 반영되었습니다.`);
+              } else {
+                alert(`❌ 데이터 수신 실패\n\n${json.htmlPreview || json.error || "관측소 코드를 확인하세요."}`);
+              }
+            } catch (e) {
+              alert(`❌ API 호출 실패: ${e.message}\n\nVercel 배포 환경에서만 동작합니다.\n(api/dam-data.js 서버리스 함수 필요)`);
+            }
+          }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🌊 댐 방류량 테스트</button>
+        </div>
+      </Card>
+      <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
+        <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+          ℹ️ <strong>데이터 출처:</strong> 낙동강홍수통제소 (nakdongriver.go.kr)<br />
+          • <strong>남강댐:</strong> 유역코드 02, 관측소코드 2018110<br />
+          • <strong>수집항목:</strong> 총방류량, 수위, 유입량, 저수율<br />
+          • Vercel 서버리스 프록시(/api/dam-data)를 통해 수집
+        </p>
+      </Card>
     </div>}
 
     {/* ── Custom API Config ── */}
@@ -2862,6 +2913,33 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
   }, [active, aq.enabled, aq.serviceKey, aq.stationName, aq.interval, refreshKey]);
 }
 
+// ─── Dam Discharge Fetcher (댐 방류량) ───────────────────────────
+function useDamFetcher(categories, setCategories, settings, setSettings, active, refreshKey) {
+  const timer = useRef(null);
+  const dam = settings.dam || {};
+  useEffect(() => {
+    if (timer.current) clearInterval(timer.current);
+    if (!active || !dam.enabled) return;
+
+    const doFetch = async () => {
+      try {
+        const url = `/api/dam-data?obscd=${dam.obscd || "2018110"}&fbscd=${dam.fbscd || "02"}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.success) {
+          const discharge = json.totalDischarge || json.discharge || 0;
+          const time = new Date().toLocaleTimeString("ko-KR");
+          setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: time, dataType: "실황" } : c));
+          setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR"), lastData: json } }));
+        }
+      } catch (e) { console.warn("댐 방류량 API 오류:", e); }
+    };
+    doFetch();
+    timer.current = setInterval(doFetch, (dam.interval || 10) * 60000);
+    return () => { if (timer.current) clearInterval(timer.current); };
+  }, [active, dam.enabled, dam.obscd, dam.interval, refreshKey]);
+}
+
 // ─── Custom API Fetcher ──────────────────────────────────────────
 function useCustomApiFetcher(categories, setCategories, settings, active, refreshKey) {
   const timers = useRef({});
@@ -3367,6 +3445,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   useKmaFetcher(categories, setCategories, settings, setSettings, active, refreshKey);
   useAirQualityFetcher(categories, setCategories, settings, setSettings, active, refreshKey);
+  useDamFetcher(categories, setCategories, settings, setSettings, active, refreshKey);
   useCustomApiFetcher(categories, setCategories, settings, active, refreshKey);
   useHistoryRecorder(categories, setCategories, active, refreshKey);
 
