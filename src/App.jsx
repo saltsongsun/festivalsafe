@@ -1650,6 +1650,11 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   const [mode, setMode] = useState("festival");
   const [reqTarget, setReqTarget] = useState("");
   const [reqMsg, setReqMsg] = useState("");
+  const [pgDateSel, setPgDateSel] = useState(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return (settings.festivalDates || []).includes(today) ? today : (settings.festivalDates || [])[0] || today;
+  });
+  const [pgCatOpen, setPgCatOpen] = useState({ always: false, O: false, P: true, E: false, S: false });
   const [zoneOpen, setZoneOpen] = useState(() => {
     const open = {};
     (settings.zones || []).forEach(z => { open[z.id] = z.accountId === session?.id; });
@@ -1802,33 +1807,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
       {/* 축제관리 모드 */}
       {mode === "festival" && <>
-        {/* 프로그램 일정 */}
-        {(settings.programs || []).length > 0 && (() => {
-          const now3 = new Date(); const nowMin3 = now3.getHours()*60+now3.getMinutes();
-          const todayPgs = (settings.programs||[]).filter(p => p.pgStatus !== "ended" && p.date !== "always");
-          const currentPgs = todayPgs.filter(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; });
-          const nextPgs = todayPgs.filter(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); return sh*60+sm > nowMin3 && !currentPgs.includes(p); }).sort((a,b) => (a.time||"").localeCompare(b.time||"")).slice(0, 3);
-          const PGCAT = { O: { l: "공식", c: "#2196F3" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#4CAF50" }, S: { l: "부대", c: "#FF9800" } };
-          return (<div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.15)", marginBottom: 12 }}>
-            <div style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🎭 프로그램 현황 <span style={{ color: "#556", fontSize: 12, fontWeight: 400 }}>진행 {currentPgs.length} · 예정 {nextPgs.length}</span></div>
-            {currentPgs.length > 0 && currentPgs.map(p => { const pc = PGCAT[p.category] || { l: "", c: "#556" }; return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(76,175,80,0.06)", marginBottom: 3 }}>
-                <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>🟢</span>
-                <span style={{ padding: "1px 6px", borderRadius: 4, background: `${pc.c}15`, color: pc.c, fontSize: 11 }}>{pc.l}</span>
-                <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
-                <span style={{ color: "#556", fontSize: 11 }}>{p.time}~{p.endTime}</span>
-                {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
-              </div>); })}
-            {currentPgs.length === 0 && <div style={{ color: "#556", fontSize: 12, marginBottom: 4 }}>현재 진행중 프로그램 없음</div>}
-            {nextPgs.length > 0 && <div style={{ marginTop: 4 }}>
-              {nextPgs.map(p => (<div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", fontSize: 12 }}>
-                <span style={{ color: "#556" }}>⏭</span>
-                <span style={{ color: "#8892b0", flex: 1 }}>{p.title}</span>
-                <span style={{ color: "#556" }}>{p.time}~ {p.location}</span>
-              </div>))}
-            </div>}
-          </div>);
-        })()}
+        {/* 구역 관리 */}
         {normalZones.map(zone => {
           const sites = workSites.filter(s => s.zoneId === zone.id);
           const cg = congestionData.find(c => c.zoneId === zone.id);
@@ -1848,7 +1827,112 @@ function FestivalStatusPage({ settings, setSettings, session }) {
             {open && sites.length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 12, textAlign: "center" }}>근무지 없음</div>}
           </div>);
         })}
-        {normalZones.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#556" }}>일반 관리구역이 없습니다.</div>}
+        {normalZones.length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556", fontSize: 13 }}>일반 관리구역이 없습니다.</div>}
+
+        {/* 프로그램 현황 */}
+        {(settings.programs || []).length > 0 && (() => {
+          const now3 = new Date();
+          const nowMin3 = now3.getHours() * 60 + now3.getMinutes();
+          const todayStr3 = now3.toISOString().slice(0, 10);
+          const fDates = settings.festivalDates || [];
+          const dayNames = ["일","월","화","수","목","금","토"];
+          const PGCAT = { O: { l: "공식", c: "#2196F3", icon: "🔷" }, P: { l: "공연", c: "#E91E63", icon: "🎵" }, E: { l: "체험", c: "#4CAF50", icon: "🎨" }, S: { l: "부대", c: "#FF9800", icon: "🎪" } };
+
+          const allPgs = (settings.programs || []).filter(p => p.pgStatus !== "ended");
+          const dayPgs = allPgs.filter(p => p.date === pgDateSel || p.date === "always");
+          const isToday3 = pgDateSel === todayStr3;
+
+          // 상시 프로그램: 축제 운영시간 전체 (예: 11:00~21:00, 13:00~21:00)
+          const opStart = settings.operatingStart || "08:00";
+          const opEnd = settings.operatingEnd || "22:00";
+          const [osH] = opStart.split(":").map(Number);
+          const [oeH] = opEnd.split(":").map(Number);
+          const alwaysPgs = dayPgs.filter(p => {
+            if (p.date === "always") return true;
+            const [sh] = (p.time || "00:00").split(":").map(Number);
+            const [eh] = (p.endTime || "23:59").split(":").map(Number);
+            return (eh - sh) >= 6; // 6시간 이상 = 상시로 분류
+          });
+          const timePgs = dayPgs.filter(p => !alwaysPgs.includes(p));
+
+          // 카테고리별 그룹
+          const catGroups = {};
+          timePgs.forEach(p => {
+            const k = p.category || "S";
+            if (!catGroups[k]) catGroups[k] = [];
+            catGroups[k].push(p);
+          });
+          Object.values(catGroups).forEach(arr => arr.sort((a, b) => (a.time || "").localeCompare(b.time || "")));
+
+          // 현재 진행중 카운트
+          const currentCount = dayPgs.filter(p => {
+            if (!isToday3) return false;
+            const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+            const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+            return nowMin3 >= sh * 60 + sm && nowMin3 <= eh * 60 + em;
+          }).length;
+
+          return (<div style={{ marginTop: 14 }}>
+            <div style={{ color: "#CE93D8", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🎭 프로그램 현황 {isToday3 && currentCount > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>🟢 진행 {currentCount}</span>}</div>
+
+            {/* 일자 선택 */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {fDates.map((d, i) => {
+                const dt = new Date(d);
+                const isToday = d === todayStr3;
+                const active = pgDateSel === d;
+                return (<button key={d} onClick={() => setPgDateSel(d)} style={{ padding: "8px 14px", borderRadius: 20, border: active ? "2px solid #9C27B0" : isToday ? "1.5px solid #4CAF50" : "1px solid #333", background: active ? "rgba(156,39,176,0.15)" : "transparent", color: active ? "#CE93D8" : isToday ? "#4CAF50" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
+                </button>);
+              })}
+            </div>
+
+            {/* 상시 프로그램 아코디언 */}
+            {alwaysPgs.length > 0 && <div style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(0,150,136,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+              <div onClick={() => setPgCatOpen(p => ({ ...p, always: !p.always }))} style={{ padding: "12px 14px", background: "rgba(0,150,136,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <span style={{ color: "#009688", fontSize: 14 }}>{pgCatOpen.always ? "▼" : "▶"}</span>
+                <span style={{ color: "#009688", fontSize: 14, fontWeight: 700 }}>🔄 상시 프로그램</span>
+                <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{alwaysPgs.length}개</span>
+              </div>
+              {pgCatOpen.always && alwaysPgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
+                const pc = PGCAT[p.category] || { l: "", c: "#556", icon: "" };
+                const isNow3 = isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
+                return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8 }}>
+                  {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
+                  <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
+                  <span style={{ color: "#556", fontSize: 11 }}>{p.time}~{p.endTime}</span>
+                  {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
+                </div>);
+              })}
+            </div>}
+
+            {/* 카테고리별 아코디언 */}
+            {["O", "P", "E", "S"].filter(k => catGroups[k]?.length > 0).map(k => {
+              const cat = PGCAT[k];
+              const items = catGroups[k];
+              const catOpen = pgCatOpen[k];
+              return (<div key={k} style={{ marginBottom: 8, borderRadius: 12, border: `1px solid ${cat.c}22`, overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+                <div onClick={() => setPgCatOpen(p => ({ ...p, [k]: !p[k] }))} style={{ padding: "12px 14px", background: `${cat.c}08`, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <span style={{ color: cat.c, fontSize: 14 }}>{catOpen ? "▼" : "▶"}</span>
+                  <span style={{ color: cat.c, fontSize: 14, fontWeight: 700 }}>{cat.icon} {cat.l}</span>
+                  <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{items.length}개</span>
+                </div>
+                {catOpen && items.map(p => {
+                  const isNow3 = isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
+                  const isPast3 = isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })();
+                  return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.4 : 1 }}>
+                    {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
+                    <span style={{ color: "#8892b0", fontSize: 12, fontFamily: "monospace", minWidth: 45 }}>{p.time}</span>
+                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
+                    {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
+                  </div>);
+                })}
+              </div>);
+            })}
+
+            {dayPgs.length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556", fontSize: 13 }}>해당 일자 프로그램 없음</div>}
+          </div>);
+        })()}
       </>}
 
       {/* 안전관리 모드 */}
@@ -3745,7 +3829,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       {/* 체크리스트 목록 */}
       {(settings.checklists || []).map((cl, ci) => {
         const enabledItems = cl.items.filter(i => i.enabled !== false);
-        const done = enabledItems.filter(i => i.checked).length;
+        const done = enabledItems.filter(i => i.checked === "done" || i.checked === true).length;
+        const fixCount = enabledItems.filter(i => i.checked === "fix").length;
         const total = enabledItems.length;
         const pct = total > 0 ? Math.round(done / total * 100) : 0;
         const catColors = { plan: "#9C27B0", pre: "#2196F3", during: "#4CAF50", post: "#FF9800", emergency: "#F44336" };
@@ -3756,28 +3841,48 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <span style={{ padding: "4px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 13, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
             <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
             <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 16, fontWeight: 800 }}>{done}/{total}</span>
+            {fixCount > 0 && <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700 }}>🔧{fixCount}</span>}
             <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", marginBottom: 12 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 3, transition: "width .3s" }} /></div>
           {cl.items.map((item, ii) => {
             const isOff = item.enabled === false;
-            return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px", borderRadius: 10, background: isOff ? "rgba(255,255,255,0.01)" : item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : item.checked ? "rgba(76,175,80,0.15)" : "#222"}`, marginBottom: 5, opacity: isOff ? 0.4 : 1 }}>
-              {/* ON/OFF */}
-              <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, enabled: !isOff }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); }} style={{ width: 32, height: 18, borderRadius: 9, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 7, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 16, transition: "all .3s" }} />
+            const status = item.checked === "done" ? "done" : item.checked === "fix" ? "fix" : item.checked === true ? "done" : item.checked ? item.checked : null;
+            const stColor = status === "done" ? "#4CAF50" : status === "fix" ? "#FF9800" : null;
+            const setItemStatus = (st) => {
+              const cls = JSON.parse(JSON.stringify(settings.checklists || []));
+              cls[ci].items[ii] = { ...cls[ci].items[ii], checked: status === st ? false : st, checkedBy: status === st ? "" : (session?.name || ""), checkedAt: status === st ? "" : new Date().toLocaleString("ko-KR") };
+              setSettings(prev => ({ ...prev, checklists: cls }));
+              if (status !== st) setSettings(prev => ({ ...prev, timeline: [...(prev.timeline || []), { id: "tl_" + Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: (st === "done" ? "✅ " : "🔧 ") + cl.title + ' - "' + item.text + '"', actor: session?.name }] }));
+            };
+            const toggleEnabled = () => {
+              const cls = JSON.parse(JSON.stringify(settings.checklists || []));
+              cls[ci].items[ii] = { ...cls[ci].items[ii], enabled: isOff };
+              setSettings(prev => ({ ...prev, checklists: cls }));
+            };
+            return (<div key={item.id} style={{ padding: "12px", borderRadius: 10, background: isOff ? "rgba(255,255,255,0.01)" : status === "done" ? "rgba(76,175,80,0.04)" : status === "fix" ? "rgba(255,152,0,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : status === "done" ? "rgba(76,175,80,0.2)" : status === "fix" ? "rgba(255,152,0,0.2)" : "#222"}`, marginBottom: 5, opacity: isOff ? 0.35 : 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: !isOff && !status ? 8 : 0 }}>
+                {/* ON/OFF 토글 */}
+                <div onClick={toggleEnabled} style={{ width: 32, height: 18, borderRadius: 9, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: 7, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 16, transition: "all .3s" }} />
+                </div>
+                {/* 텍스트 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: isOff ? "#445" : stColor || "#ccd6f6", fontSize: 14, fontWeight: 600, textDecoration: isOff ? "line-through" : "none" }}>{item.text}</div>
+                  {item.checkedBy && <div style={{ color: "#556", fontSize: 12 }}>👤 {item.checkedBy} · {item.checkedAt} {status === "fix" ? "· 🔧보완필요" : ""}</div>}
+                </div>
+                {/* 상태 뱃지 */}
+                {status === "done" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>완료</span>}
+                {status === "fix" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>보완</span>}
+                {/* 수정/삭제 */}
+                <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+                <button onClick={() => { if (confirm("삭제?")) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items.splice(ii, 1); setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
               </div>
-              {/* 체크 */}
-              {!isOff && <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name||"") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: "✅ " + cl.title + " - \"" + item.text + "\"", actor: session?.name }] })); } }} style={{ width: 24, height: 24, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>{item.checked && <span style={{ color: "#fff", fontSize: 16 }}>✓</span>}</div>}
-              {/* 텍스트 */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: isOff ? "#445" : item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, fontWeight: 600, textDecoration: isOff ? "line-through" : "none" }}>{item.text}</div>
-                {item.checkedBy && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>👤 {item.checkedBy} · {item.checkedAt}</div>}
-              </div>
-              {/* 수정/삭제 */}
-              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = [...(settings.checklists||[])]; cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: [...cls] })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
-                <button onClick={() => { if (confirm("삭제?")) { const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: cls[ci].items.filter((_,j)=>j!==ii) }; setSettings(prev => ({ ...prev, checklists: [...cls] })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
-              </div>
+              {/* 완료/보완 버튼 */}
+              {!isOff && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <button onClick={() => setItemStatus("done")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "done" ? "2px solid #4CAF50" : "1px solid #333", background: status === "done" ? "rgba(76,175,80,0.1)" : "transparent", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 완료</button>
+                <button onClick={() => setItemStatus("fix")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "fix" ? "2px solid #FF9800" : "1px solid #333", background: status === "fix" ? "rgba(255,152,0,0.1)" : "transparent", color: "#FF9800", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔧 보완</button>
+              </div>}
             </div>);
           })}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
