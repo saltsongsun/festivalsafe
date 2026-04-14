@@ -830,7 +830,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ color: "#8892b0", fontSize: 12 }}>📅 {fmtDate(now)}</span>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>{fmtTime(now)}</span>
-        {settings.is24HourMode && <span style={{ padding: "1px 6px", borderRadius: 10, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 10, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
+        {settings.is24HourMode && <span style={{ padding: "1px 6px", borderRadius: 10, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
         {loc.name && <span style={{ color: "#445", fontSize: 11 }}>📍{loc.name}</span>}
         {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 10 }}>🌤️LIVE</span>}
         <button onClick={handleRefresh} disabled={spinning} style={{ padding: "4px 12px", borderRadius: 16, border: "1px solid rgba(33,150,243,0.2)", background: "transparent", color: "#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
@@ -909,7 +909,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
                   <span style={{ color: "#4CAF50", fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>{g.count}</span>
                   <span style={{ color: "#556", fontSize: 10 }}>체류</span>
-                  <span style={{ color: "#556", fontSize: 10, marginLeft: "auto" }}>누적 {g.cumulative}</span>
+                  <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>누적 {g.cumulative}</span>
                 </div>
               </div>
             ))}
@@ -939,7 +939,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {c.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => setViewPhoto(p)}>
               <img src={p.data} alt="" style={{ width: 100, height: 75, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
-              <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+              <div style={{ color: "#556", fontSize: 11, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
           </div>}
         </div>);
@@ -1647,12 +1647,12 @@ function FestivalStatusPage({ settings, setSettings, session }) {
       </div>
       {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
         {Object.entries(statusMap).map(([k, v]) => (
-          <button key={k} onClick={() => { setStatus(site.id, k); if (k !== "active" && k !== "break") setCong(site.id, null); }} style={{ flex: 1, padding: "7px 2px", borderRadius: 6, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+          <button key={k} onClick={() => { setStatus(site.id, k); if (k !== "active" && k !== "break") setCong(site.id, null); }} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
       {canEdit && isRunning && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
         {Object.entries(SITE_CONG).map(([k, v]) => (
-          <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "5px 2px", borderRadius: 6, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+          <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
       {(site.workers || []).map(w => (
@@ -2077,7 +2077,7 @@ function CongestionPage({ settings, setSettings, session }) {
           {cur.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {cur.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => { setViewPhoto(p); setViewPhotoZone(zone.id); }}>
               <img src={p.data} alt="" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
-              <div style={{ color: "#556", fontSize: 10, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+              <div style={{ color: "#556", fontSize: 11, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
           </div>}
         </div>}
@@ -2253,7 +2253,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
           const unread = getUnread(ch.id);
           return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#2196F3" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {ch.label}
-            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
         })}
         {dmAccounts.map(a => {
@@ -2261,7 +2261,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
           const rl = ROLES[a.role] || {};
           return (<button key={a.id} onClick={() => setChannel(a.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === a.id ? `2px solid ${rl.color || "#556"}` : "1px solid #333", background: channel === a.id ? `${rl.color || "#556"}15` : "transparent", color: channel === a.id ? (rl.color || "#ccd6f6") : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {a.name}
-            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
         })}
       </div>
@@ -2407,8 +2407,8 @@ function OrgChartTab({ settings, setSettings }) {
           {node.memo && <span style={{ color: "#556", fontSize: 12 }}>{node.memo}</span>}
           {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
           <div style={{ display: "flex", gap: 3, flexShrink: 0, marginLeft: "auto" }}>
-            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>▲</button>
-            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>▼</button>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▲</button>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▼</button>
             <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
             <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
@@ -3593,18 +3593,53 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
     {/* 체크리스트 */}
     {tab === "checklist" && <div>
-      {/* 안전관리 매뉴얼 */}
-      <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 24 }}>📖</span>
+      {/* 매뉴얼 & 자동생성 */}
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: 28 }}>📖</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#2196F3", fontSize: 15, fontWeight: 700 }}>지역축제장 안전관리 매뉴얼</div>
-            <div style={{ color: "#556", fontSize: 12 }}>행정안전부 · 2021</div>
+            <div style={{ color: "#2196F3", fontSize: 16, fontWeight: 700 }}>지역축제장 안전관리 매뉴얼</div>
+            <div style={{ color: "#556", fontSize: 13 }}>행정안전부 2021 · 5단계 46항목</div>
           </div>
-          <button onClick={() => window.open("/safety-manual.pdf", "_blank")} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📖 매뉴얼 보기</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button onClick={() => window.open("/safety-manual.pdf", "_blank")} style={{ padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📖 매뉴얼 보기</button>
+          <button onClick={() => {
+            if (!confirm("매뉴얼 기반 체크리스트를 자동 생성합니다.\n기존 체크리스트가 초기화됩니다.")) return;
+            const def = [
+              { id: "cl_plan", title: "축제 계획 단계", category: "plan", items: [
+                "안전관리계획 수립 및 심의 완료","행사장 위치 위험요인 검토","비상 대피경로 및 대피장소 확보",
+                "안전관리 조직 구성 (총괄/부문별)","유관기관 비상연락체계 구축","안전관리비 확보 (전체비용 1% 이상)",
+                "보험가입 (참가자/관람객/진행자)","안전관리인력 배치계획 수립","의료지원 계획 수립","교통 및 주차 대책 수립"
+              ].map((t,i) => ({ id: "p"+i, text: t, checked: false, enabled: true })) },
+              { id: "cl_pre", title: "축제 시작 전 (개장 전)", category: "pre", items: [
+                "무대/구조물 안전점검 완료","전기시설 안전점검 (누전차단기 등)","가스시설 안전점검",
+                "소화기/소방시설 비치 확인","비상방송 시스템 테스트","대피경로 안내판 설치 확인",
+                "안전요원 배치 확인","의료진/구급장비 배치 확인","출입구 통제 시설 확인",
+                "CCTV/통신장비 작동 확인","기상상황 확인 (폭우/강풍/폭염)","화장실/편의시설 점검",
+                "비상차량 진입로 확보","안전관리요원 무전기/확성기 지급"
+              ].map((t,i) => ({ id: "b"+i, text: t, checked: false, enabled: true })) },
+              { id: "cl_dur", title: "축제 진행 중", category: "during", items: [
+                "출입구 통제 인력 배치 확인","관람객 밀집도 수시 확인","안전관리요원 순찰 실시",
+                "기상변화 모니터링","음향/조명 장비 상태 확인","비상대피 안내방송 준비",
+                "화기취급 구역 안전관리","응급환자 발생 대비 의료진 대기","쓰레기 수거/위생 상태","주차장/교통 상황 점검"
+              ].map((t,i) => ({ id: "d"+i, text: t, checked: false, enabled: true })) },
+              { id: "cl_post", title: "축제 종료 시", category: "post", items: [
+                "관람객 안전 퇴장 유도 완료","전기/가스 차단 확인","시설물 파손 여부 점검",
+                "분실물 수거","안전관리 문제점 분석 기록","주차장 차량 소통 안전 관리"
+              ].map((t,i) => ({ id: "e"+i, text: t, checked: false, enabled: true })) },
+              { id: "cl_emer", title: "사고 발생 시 대응", category: "emergency", items: [
+                "119/112 신고","관람객 대피 유도","사고현장 통제",
+                "응급처치 실시","상급기관 보고","사고 수습 및 복구"
+              ].map((t,i) => ({ id: "em"+i, text: t, checked: false, enabled: true })) },
+            ];
+            setSettings(prev => ({ ...prev, checklists: def }));
+            alert("✅ 5개 카테고리, 46개 항목이 생성되었습니다.");
+          }} style={{ padding: "14px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 자동 생성</button>
         </div>
       </Card>
 
+      {/* 체크리스트 목록 */}
       {(settings.checklists || []).map((cl, ci) => {
         const enabledItems = cl.items.filter(i => i.enabled !== false);
         const done = enabledItems.filter(i => i.checked).length;
@@ -3615,48 +3650,52 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         const catColor = catColors[cl.category] || "#8892b0";
         return (<Card key={cl.id}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ padding: "3px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 12, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
-            <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: 0, flex: 1 }}>{cl.title}</h3>
-            <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 15, fontWeight: 800 }}>{done}/{total}</span>
-            <button onClick={() => { if (confirm(`"${cl.title}" 체크리스트를 삭제하시겠습니까?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>🗑</button>
+            <span style={{ padding: "4px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 13, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
+            <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
+            <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 16, fontWeight: 800 }}>{done}/{total}</span>
+            <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
-          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", marginBottom: 10 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 2, transition: "width .3s" }} /></div>
+          <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", marginBottom: 12 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 3, transition: "width .3s" }} /></div>
           {cl.items.map((item, ii) => {
             const isOff = item.enabled === false;
-            return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: isOff ? "rgba(255,255,255,0.01)" : item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : item.checked ? "rgba(76,175,80,0.12)" : "#222"}`, marginBottom: 4, opacity: isOff ? 0.4 : 1 }}>
-              {/* ON/OFF 토글 */}
-              <div onClick={(e) => { e.stopPropagation(); const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, enabled: isOff ? true : false }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); }} style={{ width: 28, height: 16, borderRadius: 8, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 6, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 14, transition: "all .3s" }} />
+            return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px", borderRadius: 10, background: isOff ? "rgba(255,255,255,0.01)" : item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : item.checked ? "rgba(76,175,80,0.15)" : "#222"}`, marginBottom: 5, opacity: isOff ? 0.4 : 1 }}>
+              {/* ON/OFF */}
+              <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, enabled: !isOff }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); }} style={{ width: 32, height: 18, borderRadius: 9, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 7, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 16, transition: "all .3s" }} />
               </div>
-              {/* 체크박스 */}
-              {!isOff && <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name||"") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: `✅ ${cl.title} - "${item.text}"`, actor: session?.name }] })); } }} style={{ width: 22, height: 22, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>{item.checked && <span style={{ color: "#fff", fontSize: 14 }}>✓</span>}</div>}
+              {/* 체크 */}
+              {!isOff && <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name||"") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: "✅ " + cl.title + " - \"" + item.text + "\"", actor: session?.name }] })); } }} style={{ width: 24, height: 24, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>{item.checked && <span style={{ color: "#fff", fontSize: 16 }}>✓</span>}</div>}
+              {/* 텍스트 */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: isOff ? "#445" : item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, textDecoration: item.checked ? "line-through" : isOff ? "line-through" : "none" }}>{item.text}</div>
-                {item.checkedBy && <div style={{ color: "#556", fontSize: 11 }}>{item.checkedBy} · {item.checkedAt}</div>}
+                <div style={{ color: isOff ? "#445" : item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, fontWeight: 600, textDecoration: isOff ? "line-through" : "none" }}>{item.text}</div>
+                {item.checkedBy && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>👤 {item.checkedBy} · {item.checkedAt}</div>}
               </div>
-              <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-                <button onClick={(e) => { e.stopPropagation(); const newText = prompt("항목 수정:", item.text); if (newText && newText !== item.text) { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, text: newText }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "2px 5px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>✏️</button>
-                <button onClick={(e) => { e.stopPropagation(); if (confirm(`"${item.text}" 삭제?`)) { const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: cls[ci].items.filter((_,j) => j !== ii) }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "2px 5px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>🗑</button>
+              {/* 수정/삭제 */}
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = [...(settings.checklists||[])]; cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: [...cls] })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
+                <button onClick={() => { if (confirm("삭제?")) { const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: cls[ci].items.filter((_,j)=>j!==ii) }; setSettings(prev => ({ ...prev, checklists: [...cls] })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
               </div>
             </div>);
           })}
-          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <Input id={`nci_${cl.id}`} placeholder="점검항목 추가" style={{ flex: 1 }} />
-            <button onClick={() => { const inp = document.getElementById(`nci_${cl.id}`); if (!inp?.value) return; const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: [...cls[ci].items, { id: "ci_"+Date.now(), text: inp.value, checked: false, enabled: true }] }; setSettings(prev => ({ ...prev, checklists: cls })); inp.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: catColor, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+</button>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <Input id={`nci_${cl.id}`} placeholder="점검항목 추가..." style={{ flex: 1, fontSize: 14 }} />
+            <button onClick={() => { const inp = document.getElementById(`nci_${cl.id}`); if (!inp?.value) return; const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: [...cls[ci].items, { id: "ci_"+Date.now(), text: inp.value, checked: false, enabled: true }] }; setSettings(prev => ({ ...prev, checklists: [...cls] })); inp.value = ""; }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: catColor, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
           </div>
         </Card>);
       })}
+
+      {/* 체크리스트 추가 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>➕ 체크리스트 추가</h3>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>➕ 새 체크리스트</h3>
         <div style={{ display: "flex", gap: 8 }}>
-          <Input id="new_cl_title" placeholder="제목" style={{ flex: 1 }} />
-          <select id="new_cl_cat" style={{ padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+          <Input id="new_cl_title" placeholder="체크리스트 제목" style={{ flex: 1, fontSize: 14 }} />
+          <select id="new_cl_cat" style={{ padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
             <option value="plan">계획</option><option value="pre">시작 전</option><option value="during">진행 중</option><option value="post">종료</option><option value="emergency">사고대응</option>
           </select>
-          <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists||[]), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+          <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists||[]), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button>
         </div>
       </Card>
-      <button onClick={() => { if (confirm("체크 초기화? (항목은 유지)")) setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 체크 초기화 (항목 유지)</button>
+      <button onClick={() => { if (confirm("모든 체크 초기화? (항목 유지)")) setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 14, cursor: "pointer", marginBottom: 8 }}>🔄 체크 초기화 (항목 유지)</button>
     </div>}
 
 
