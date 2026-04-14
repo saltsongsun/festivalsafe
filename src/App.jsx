@@ -1006,27 +1006,64 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>); })}
     </div>}
 
-    {/* 주차/셔틀 */}
-    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "10px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 6 }}>
-      {(settings.parkingLots || []).map(lot => { const pct = lot.capacity > 0 ? ((lot.current||0)/lot.capacity*100) : 0; const color = pct>=100?"#F44336":pct>=90?"#FF9800":pct>=70?"#FFC107":"#4CAF50"; return (
-        <div key={lot.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "10px 12px", border: `1px solid ${color}33` }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>🅿️ {lot.name}</span>
-            <span style={{ color, fontSize: 15, fontWeight: 800, fontFamily: "monospace" }}>{lot.current||0}/{lot.capacity}</span>
-          </div>
-          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}><div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: color, borderRadius: 2 }} /></div>
-        </div>); })}
+    {/* 주차장 */}
+    {settings.features?.parking !== false && (settings.parkingLots || []).length > 0 && settings.dashboardVisible?.parking !== false && <div style={{ maxWidth: 1100, margin: "12px auto 0" }}>
+      <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8, paddingLeft: 4 }}>🅿️ 주차장 현황</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+        {(settings.parkingLots || []).map(lot => {
+          const pct = lot.capacity > 0 ? Math.round((lot.current||0)/lot.capacity*100) : 0;
+          const color = pct>=100?"#F44336":pct>=90?"#FF9800":pct>=70?"#FFC107":"#4CAF50";
+          const label = pct>=100?"만차":pct>=90?"혼잡":pct>=70?"보통":"여유";
+          return (<div key={lot.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${color}33` }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontSize: 20, marginRight: 8 }}>🅿️</span>
+              <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{lot.name}</span>
+              <span style={{ padding: "4px 10px", borderRadius: 8, background: `${color}15`, color, fontSize: 13, fontWeight: 700 }}>{label}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
+              <span style={{ color, fontSize: 28, fontWeight: 900, fontFamily: "monospace" }}>{lot.current||0}</span>
+              <span style={{ color: "#556", fontSize: 16 }}>/ {lot.capacity}</span>
+              <span style={{ color: "#556", fontSize: 14, marginLeft: "auto" }}>{pct}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)" }}>
+              <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: color, borderRadius: 4, transition: "width .5s" }} />
+            </div>
+          </div>);
+        })}
+      </div>
     </div>}
-    {settings.features?.shuttle !== false && (settings.shuttleBuses || []).length > 0 && <div style={{ maxWidth: 1100, margin: "6px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 6 }}>
-      {(settings.shuttleBuses || []).map(bus => { const sc = bus.status==="running"?"#4CAF50":"#FF9800"; const cap=bus.capacity||45; const pax=bus.passengers||0; return (
-        <div key={bus.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: 10, padding: "10px 12px", border: `1px solid ${sc}33` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 14 }}>🚌</span>
-            <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{bus.name}</span>
-            <span style={{ color: sc, fontSize: 11, fontWeight: 700 }}>●{bus.status==="running"?"운행":"대기"}</span>
-            <span style={{ color: pax>=cap?"#F44336":"#4CAF50", fontSize: 12, fontWeight: 800, fontFamily: "monospace" }}>👥{pax}/{cap}</span>
-          </div>
-        </div>); })}
+
+    {/* 셔틀버스 */}
+    {settings.features?.shuttle !== false && (settings.shuttleBuses || []).length > 0 && <div style={{ maxWidth: 1100, margin: "12px auto 0" }}>
+      <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8, paddingLeft: 4 }}>🚌 셔틀버스 현황</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+        {(settings.shuttleBuses || []).map(bus => {
+          const isRun = bus.status === "running";
+          const cap = bus.capacity || 45;
+          const pax = bus.passengers || 0;
+          const pct = Math.round(pax/cap*100);
+          return (<div key={bus.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${isRun ? "#4CAF50" : "#FF9800"}33` }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontSize: 20, marginRight: 8 }}>🚌</span>
+              <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{bus.name}</span>
+              <span style={{ padding: "4px 10px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#4CAF50" : "#FF9800", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <span style={{ fontSize: 16 }}>👥</span>
+                  <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontFamily: "monospace" }}>{pax}</span>
+                  <span style={{ color: "#556", fontSize: 14 }}>/ {cap}명</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", marginTop: 6 }}>
+                  <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#F44336" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
+                </div>
+              </div>
+              {bus.route && <div style={{ color: "#556", fontSize: 12, textAlign: "right" }}>🛣️ {bus.route}</div>}
+            </div>
+          </div>);
+        })}
+      </div>
     </div>}
 
     {/* 범례 */}
