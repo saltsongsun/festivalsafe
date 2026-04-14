@@ -1816,79 +1816,98 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 function ProgramPage({ settings }) {
   const programs = (settings.programs || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   const dates = settings.festivalDates || [];
-  const [selDate, setSelDate] = useState(dates[0] || new Date().toISOString().slice(0, 10));
+  const [selDate, setSelDate] = useState("all");
   const [selCat, setSelCat] = useState("all");
-  const CATS = { all: "전체", P: "공연", E: "체험", S: "부대" };
-  const CAT_COLORS = { P: "#E91E63", E: "#4CAF50", S: "#FF9800" };
+  const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#2196F3" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#4CAF50" }, S: { label: "부대", color: "#FF9800" } };
 
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const isToday = selDate === now.toISOString().slice(0, 10);
+  const todayStr = now.toISOString().slice(0, 10);
 
   const filtered = programs.filter(p => {
-    if (p.date && p.date !== selDate) return false;
-    if (!p.date && dates.length > 0 && selDate !== dates[0]) return false;
+    if (selDate !== "all") {
+      if (selDate === "always") return p.date === "always";
+      if (p.date !== selDate && p.date !== "always") return false;
+    }
     if (selCat !== "all" && p.category !== selCat) return false;
     return true;
   });
 
+  const timeGroups = {};
+  filtered.forEach(pg => {
+    const h = (pg.time || "00:00").split(":")[0];
+    const key = pg.date === "always" ? "상시" : h + "시";
+    if (!timeGroups[key]) timeGroups[key] = [];
+    timeGroups[key].push(pg);
+  });
+
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "20px 16px 80px" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🎭 축제 프로그램</h2>
-      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{settings.festivalName || "축제"}</p>
+      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎭 축제 프로그램</h2>
+      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
 
       {/* 일자 선택 */}
-      {dates.length > 0 && <div style={{ display: "flex", gap: 6, marginBottom: 10, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
+        <button onClick={() => setSelDate("all")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "all" ? "2px solid #9C27B0" : "1px solid #333", background: selDate === "all" ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === "all" ? "#CE93D8" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체</button>
         {dates.map((d, i) => {
-          const dt = new Date(d);
-          const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-          const label = `${dt.getMonth() + 1}/${dt.getDate()} (${dayNames[dt.getDay()]})`;
-          const active = selDate === d;
-          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "10px 16px", borderRadius: 10, border: active ? "2px solid #9C27B0" : "1px solid #333", background: active ? "rgba(156,39,176,0.15)" : "transparent", color: active ? "#CE93D8" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {i === 0 ? "첫째 날" : i === dates.length - 1 ? "마지막 날" : `${i + 1}일차`}<br /><span style={{ fontSize: 12 }}>{label}</span>
+          const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
+          const isToday = d === todayStr;
+          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === d ? "2px solid #9C27B0" : isToday ? "1px solid #4CAF50" : "1px solid #333", background: selDate === d ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === d ? "#CE93D8" : isToday ? "#4CAF50" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
           </button>);
         })}
-      </div>}
+        <button onClick={() => setSelDate("always")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "always" ? "2px solid #009688" : "1px solid #333", background: selDate === "always" ? "rgba(0,150,136,0.15)" : "transparent", color: selDate === "always" ? "#009688" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>상시</button>
+      </div>
 
-      {/* 카테고리 필터 */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+      {/* 카테고리 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
         {Object.entries(CATS).map(([k, v]) => (
-          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? "2px solid #9C27B0" : "1px solid #333", background: selCat === k ? "rgba(156,39,176,0.1)" : "transparent", color: selCat === k ? "#CE93D8" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{v}</button>
+          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? `2px solid ${v.color}` : "1px solid #333", background: selCat === k ? `${v.color}15` : "transparent", color: selCat === k ? v.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{v.label} {k !== "all" ? filtered.filter(p => k === "all" || p.category === k).length : ""}</button>
         ))}
       </div>
 
       {/* 프로그램 목록 */}
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>등록된 프로그램이 없습니다.</div>}
-      {filtered.map(pg => {
-        const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
-        const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
-        const isNow = isToday && nowMin >= sh * 60 + sm && nowMin <= eh * 60 + em;
-        const isPast = isToday && nowMin > eh * 60 + em;
-        const catColor = CAT_COLORS[pg.category] || "#8892b0";
-        const catLabel = CATS[pg.category] || pg.category || "";
-
-        return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 12, background: isNow ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.03)", border: isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.5 : 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ textAlign: "center", minWidth: 60 }}>
-              <div style={{ color: isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
-              <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime || "--:--"}</div>
-            </div>
-            <div style={{ width: 3, height: 40, background: isNow ? "#4CAF50" : catColor, borderRadius: 2 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                {isNow && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>진행중</span>}
-                {catLabel && <span style={{ padding: "1px 6px", borderRadius: 4, background: `${catColor}15`, color: catColor, fontSize: 11, fontWeight: 700 }}>{catLabel}</span>}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>해당 조건의 프로그램이 없습니다.</div>}
+      {Object.entries(timeGroups).map(([timeKey, items]) => (
+        <div key={timeKey} style={{ marginBottom: 12 }}>
+          <div style={{ color: "#556", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>{timeKey === "상시" ? "🔄 상시 프로그램" : `⏰ ${timeKey}`}</div>
+          {items.map(pg => {
+            const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
+            const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
+            const isNow = (selDate === todayStr || selDate === "all") && pg.date !== "always" && nowMin >= sh*60+sm && nowMin <= eh*60+em;
+            const isPast = selDate === todayStr && pg.date !== "always" && nowMin > eh*60+em;
+            const cat = CATS[pg.category] || CATS.all;
+            return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.4 : 1 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ textAlign: "center", minWidth: 54, paddingTop: 2 }}>
+                  {pg.date === "always" ? <div style={{ color: "#009688", fontSize: 13, fontWeight: 800 }}>상시</div> : <>
+                    <div style={{ color: isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
+                    <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime}</div>
+                  </>}
+                </div>
+                <div style={{ width: 3, minHeight: 40, background: isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                    {isNow && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
+                    <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 11, fontWeight: 700 }}>{cat.label}</span>
+                  </div>
+                  <div style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{pg.title}</div>
+                  {pg.location && <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>📍 {pg.location}</div>}
+                  {pg.description && <div style={{ color: "#556", fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>{pg.description}</div>}
+                  {pg.manager && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <span style={{ color: "#556", fontSize: 12 }}>👤 {pg.manager}</span>
+                    {pg.managerPhone && <a href={`tel:${pg.managerPhone.replace(/-/g,"")}`} style={{ color: "#4CAF50", fontSize: 12, textDecoration: "none" }}>📞 {pg.managerPhone}</a>}
+                  </div>}
+                </div>
               </div>
-              <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{pg.title}</div>
-              {pg.location && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>📍 {pg.location}</div>}
-              {pg.memo && <div style={{ color: "#556", fontSize: 12 }}>{pg.memo}</div>}
-            </div>
-          </div>
-        </div>);
-      })}
+            </div>);
+          })}
+        </div>
+      ))}
     </div>
   </div>);
 }
+
 
 // ─── Congestion Page (인파혼잡도) ─────────────────────────────────
 function CongestionPage({ settings, setSettings, session }) {
@@ -3517,98 +3536,132 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
     {/* 프로그램/일정 */}
     {tab === "programs" && <div>
-      {/* 엑셀 양식 다운로드 / 업로드 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📥 엑셀로 일괄 등록</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>양식을 다운로드 → 작성 → 업로드하면 자동 적용됩니다.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📥 엑셀 일괄 등록</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 12px" }}>양식 다운로드 → 작성 → 업로드</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <button onClick={() => {
             const sample = [
-              { 날짜: "2026-05-02", 시작시간: "09:00", 종료시간: "10:00", 프로그램명: "개막식", 장소: "주무대", 구분: "공연", 비고: "" },
-              { 날짜: "2026-05-02", 시작시간: "10:30", 종료시간: "11:30", 프로그램명: "풍물놀이", 장소: "주무대", 구분: "공연", 비고: "" },
-              { 날짜: "2026-05-02", 시작시간: "13:00", 종료시간: "21:00", 프로그램명: "전통체험", 장소: "진주성", 구분: "체험", 비고: "" },
-              { 날짜: "2026-05-03", 시작시간: "14:00", 종료시간: "15:30", 프로그램명: "가수 공연", 장소: "주무대", 구분: "공연", 비고: "" },
+              { 날짜: "2026-05-02", 시작시간: "09:00", 종료시간: "10:00", 프로그램명: "개막식", 장소: "주무대", 구분: "공식", 담당자: "홍길동", 연락처: "010-1234-5678", 내용: "개막 행사", 상시여부: "" },
+              { 날짜: "2026-05-02", 시작시간: "13:00", 종료시간: "21:00", 프로그램명: "전통체험", 장소: "진주성", 구분: "체험", 담당자: "", 연락처: "", 내용: "", 상시여부: "Y" },
             ];
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.json_to_sheet(sample);
-            ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 8 }, { wch: 15 }];
+            ws["!cols"] = [{wch:12},{wch:10},{wch:10},{wch:25},{wch:15},{wch:8},{wch:10},{wch:15},{wch:30},{wch:8}];
             XLSX.utils.book_append_sheet(wb, ws, "프로그램");
             XLSX.writeFile(wb, "축제프로그램_양식.xlsx");
-          }} style={{ padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 양식 다운로드</button>
-          <label style={{ padding: "14px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+          }} style={{ padding: "12px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 양식 다운로드</button>
+          <label style={{ padding: "12px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
             📤 엑셀 업로드
             <input type="file" accept=".xlsx,.xls,.csv" onChange={e => {
-              const file = e.target.files?.[0];
-              if (!file) return;
+              const file = e.target.files?.[0]; if (!file) return;
               const reader = new FileReader();
               reader.onload = (evt) => {
                 try {
                   const wb = XLSX.read(evt.target.result, { type: "binary" });
-                  const ws = wb.Sheets[wb.SheetNames[0]];
-                  const rows = XLSX.utils.sheet_to_json(ws);
-                  const programs = rows.filter(r => r["프로그램명"] || r["시작시간"]).map((r, i) => ({
-                    id: "pg_" + Date.now() + "_" + i,
-                    title: r["프로그램명"] || r["프로그램"] || r["제목"] || r["title"] || "",
-                    date: r["날짜"] || r["date"] || "",
-                    time: String(r["시작시간"] || r["시작"] || r["start"] || "").replace(/\./g, ":").slice(0, 5),
-                    endTime: String(r["종료시간"] || r["종료"] || r["end"] || "").replace(/\./g, ":").slice(0, 5),
-                    location: r["장소"] || r["location"] || "",
-                    category: ({"공연":"P","체험":"E","부대":"S","부대행사":"S"})[r["구분"]] || r["구분"] || "",
-                    memo: r["비고"] || r["memo"] || "",
+                  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                  const catMap = {"공식":"O","공연":"P","체험":"E","부대":"S","부대행사":"S"};
+                  const progs = rows.filter(r => r["프로그램명"]).map((r, i) => ({
+                    id: "pg_u" + Date.now() + "_" + i,
+                    title: r["프로그램명"] || "", date: r["상시여부"] === "Y" ? "always" : (r["날짜"] || ""),
+                    time: String(r["시작시간"]||"").slice(0,5), endTime: String(r["종료시간"]||"").slice(0,5),
+                    location: r["장소"] || "", category: catMap[r["구분"]] || r["구분"] || "",
+                    manager: r["담당자"] || "", managerPhone: r["연락처"] || "", description: r["내용"] || "",
                   }));
-                  if (programs.length === 0) { alert("프로그램 데이터를 찾을 수 없습니다.\n'프로그램명', '시작시간', '종료시간', '장소' 열이 필요합니다."); return; }
-                  setSettings(prev => ({ ...prev, programs }));
-                  alert(`✅ ${programs.length}개 프로그램이 등록되었습니다.`);
-                } catch (err) { alert("❌ 파일 읽기 실패: " + err.message); }
+                  if (!progs.length) { alert("데이터 없음"); return; }
+                  setSettings(prev => ({ ...prev, programs: progs }));
+                  alert(`✅ ${progs.length}개 프로그램 등록`);
+                } catch (err) { alert("❌ " + err.message); }
               };
-              reader.readAsBinaryString(file);
-              e.target.value = "";
+              reader.readAsBinaryString(file); e.target.value = "";
             }} style={{ display: "none" }} />
           </label>
         </div>
-        <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)", margin: 0 }}>
-          <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
-            ℹ️ 엑셀 열: <strong>날짜</strong>(2026-05-02) · <strong>시작시간</strong> · <strong>종료시간</strong> · <strong>프로그램명</strong> · <strong>장소</strong> · <strong>구분</strong>(공연/체험/부대) · 비고<br />
-            • 시간 형식: 09:00, 14:30 (24시간)<br />
-            • 업로드 시 기존 프로그램은 교체됩니다
-          </p>
-        </Card>
       </Card>
 
-      {/* 프로그램 목록 */}
+      {/* 수동 추가 */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>➕ 프로그램 수동 추가</h3>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div><Label>프로그램명 *</Label><Input id="pg-title" placeholder="개막식, 풍물놀이 등" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>구분 *</Label><select id="pg-cat" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+              <option value="O">🔷 공식</option><option value="P">🎵 공연</option><option value="E">🎨 체험</option><option value="S">🎪 부대</option>
+            </select></div>
+            <div><Label>일자</Label><select id="pg-date" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+              {(settings.festivalDates || []).map(d => { const dt = new Date(d); return <option key={d} value={d}>{dt.getMonth()+1}/{dt.getDate()}</option>; })}
+              <option value="always">🔄 상시 (매일)</option>
+            </select></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>시작시간</Label><Input type="time" id="pg-time" /></div>
+            <div><Label>종료시간</Label><Input type="time" id="pg-end" /></div>
+          </div>
+          <div><Label>장소</Label><Input id="pg-loc" placeholder="진주성 특설무대" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>담당자</Label><Input id="pg-mgr" placeholder="이름" /></div>
+            <div><Label>연락처</Label><Input id="pg-phone" placeholder="010-0000-0000" /></div>
+          </div>
+          <div><Label>프로그램 내용</Label><textarea id="pg-desc" placeholder="프로그램 상세 내용" rows={2} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} /></div>
+          <button onClick={() => {
+            const title = document.getElementById("pg-title")?.value;
+            if (!title) { alert("프로그램명을 입력하세요."); return; }
+            const pg = {
+              id: "pg_" + Date.now(), title,
+              category: document.getElementById("pg-cat")?.value || "S",
+              date: document.getElementById("pg-date")?.value || (settings.festivalDates || [])[0] || "",
+              time: document.getElementById("pg-time")?.value || "",
+              endTime: document.getElementById("pg-end")?.value || "",
+              location: document.getElementById("pg-loc")?.value || "",
+              manager: document.getElementById("pg-mgr")?.value || "",
+              managerPhone: document.getElementById("pg-phone")?.value || "",
+              description: document.getElementById("pg-desc")?.value || "",
+            };
+            setSettings(prev => ({ ...prev, programs: [...(prev.programs || []), pg] }));
+            document.getElementById("pg-title").value = "";
+            document.getElementById("pg-loc").value = "";
+            document.getElementById("pg-mgr").value = "";
+            document.getElementById("pg-phone").value = "";
+            document.getElementById("pg-desc").value = "";
+            alert("✅ " + title + " 추가 완료");
+          }} style={{ padding: "14px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🎭 프로그램 추가</button>
+        </div>
+      </Card>
+
+      {/* 등록된 프로그램 목록 */}
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>🎭 프로그램 목록 ({(settings.programs||[]).length}개)</h3>
+          <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>📋 등록 목록 ({(settings.programs||[]).length}개)</h3>
           <button onClick={() => {
-            if ((settings.programs||[]).length === 0) return;
-            const wb = XLSX.utils.book_new();
-            const data = (settings.programs||[]).map(p => ({ 날짜: p.date || "", 시작시간: p.time, 종료시간: p.endTime, 프로그램명: p.title, 장소: p.location, 구분: ({"P":"공연","E":"체험","S":"부대"})[p.category] || "", 비고: p.memo || "" }));
-            const ws = XLSX.utils.json_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, "프로그램");
+            if (!(settings.programs||[]).length) return;
+            const catMap = {"O":"공식","P":"공연","E":"체험","S":"부대"};
+            const data = (settings.programs||[]).map(p => ({ 날짜: p.date === "always" ? "상시" : p.date, 시작시간: p.time, 종료시간: p.endTime, 프로그램명: p.title, 장소: p.location, 구분: catMap[p.category]||"", 담당자: p.manager||"", 연락처: p.managerPhone||"", 내용: p.description||"" }));
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "프로그램");
             XLSX.writeFile(wb, `프로그램_${settings.festivalName||"축제"}.xlsx`);
-          }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥 현재 목록 내보내기</button>
+          }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥 내보내기</button>
         </div>
-        {(settings.programs || []).sort((a,b) => (a.time||"").localeCompare(b.time||"")).map((pg, pi) => {
-          const now2 = new Date(); const [sh,sm] = (pg.time||"00:00").split(":").map(Number); const [eh,em] = (pg.endTime||"23:59").split(":").map(Number);
-          const isNow = now2.getHours()*60+now2.getMinutes() >= sh*60+sm && now2.getHours()*60+now2.getMinutes() <= eh*60+em;
-          const idx = (settings.programs||[]).indexOf(pg);
-          return (<div key={pg.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", border: isNow ? "1px solid rgba(76,175,80,0.2)" : "1px solid #222", marginBottom: 4 }}>
-            {isNow && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>🟢</span>}
-            <span style={{ color: "#8892b0", fontSize: 14, fontFamily: "monospace", minWidth: 100 }}>{pg.time||"--:--"}~{pg.endTime||"--:--"}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{pg.title || "프로그램명 없음"}</div>
-              {pg.location && <div style={{ color: "#556", fontSize: 12 }}>📍 {pg.location}</div>}
+        {(settings.programs || []).sort((a,b) => (a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||"")).map((pg, idx) => {
+          const catMap = { O: { l: "공식", c: "#2196F3" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#4CAF50" }, S: { l: "부대", c: "#FF9800" } };
+          const cat = catMap[pg.category] || { l: pg.category, c: "#556" };
+          const dateLabel = pg.date === "always" ? "🔄상시" : pg.date ? new Date(pg.date).getMonth()+1 + "/" + new Date(pg.date).getDate() : "";
+          return (<div key={pg.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
+            <div style={{ minWidth: 44, textAlign: "center" }}>
+              <div style={{ color: "#8892b0", fontSize: 11 }}>{dateLabel}</div>
+              <div style={{ color: "#ccd6f6", fontSize: 12, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
             </div>
-            <button onClick={() => setSettings(prev => ({ ...prev, programs: prev.programs.filter((_,i) => i !== idx) }))} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <span style={{ padding: "2px 6px", borderRadius: 4, background: `${cat.c}15`, color: cat.c, fontSize: 11, fontWeight: 700 }}>{cat.l}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pg.title}</div>
+              {pg.location && <div style={{ color: "#556", fontSize: 11 }}>📍{pg.location}</div>}
+            </div>
+            <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
           </div>);
         })}
-        {(settings.programs||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>프로그램이 없습니다. 엑셀을 업로드하거나 수동으로 추가하세요.</div>}
-        <button onClick={() => setSettings(prev => ({ ...prev, programs: [...(prev.programs||[]), { id: "pg_"+Date.now(), title: "", time: "", endTime: "", location: "", memo: "" }] }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer", marginTop: 6 }}>+ 수동 추가</button>
       </Card>
-      <button onClick={() => { if (confirm("프로그램 목록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
+      <button onClick={() => { if (confirm("프로그램 전체 초기화?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
     </div>}
 
-    {/* 의료/응급 기록 */}
+
     {tab === "medical" && <div>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>🏥 응급환자 기록</h3>
