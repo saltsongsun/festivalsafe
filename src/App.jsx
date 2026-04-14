@@ -1838,7 +1838,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
           const dayNames = ["일","월","화","수","목","금","토"];
           const PGCAT = { O: { l: "공식", c: "#2196F3", icon: "🔷" }, P: { l: "공연", c: "#E91E63", icon: "🎵" }, E: { l: "체험", c: "#4CAF50", icon: "🎨" }, S: { l: "부대", c: "#FF9800", icon: "🎪" } };
 
-          const allPgs = (settings.programs || []).filter(p => p.pgStatus !== "ended");
+          const allPgs = (settings.programs || []);
           const dayPgs = allPgs.filter(p => p.date === pgDateSel || p.date === "always");
           const isToday3 = pgDateSel === todayStr3;
 
@@ -1896,10 +1896,14 @@ function FestivalStatusPage({ settings, setSettings, session }) {
               </div>
               {pgCatOpen.always && alwaysPgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
                 const pc = PGCAT[p.category] || { l: "", c: "#556", icon: "" };
-                const isNow3 = isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
-                return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8 }}>
+                const isEnded3 = p.pgStatus === "ended";
+                const isNow3 = !isEnded3 && isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
+                const isTimePast3 = !isEnded3 && isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })();
+                const inactive3 = isEnded3 || isTimePast3;
+                return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8, opacity: inactive3 ? 0.3 : 1, filter: inactive3 ? "grayscale(0.8)" : "none" }}>
                   {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
-                  <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
+                  {inactive3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
+                  <span style={{ color: inactive3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
                   <span style={{ color: "#556", fontSize: 11 }}>{p.time}~{p.endTime}</span>
                   {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
                 </div>);
@@ -1918,12 +1922,14 @@ function FestivalStatusPage({ settings, setSettings, session }) {
                   <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{items.length}개</span>
                 </div>
                 {catOpen && items.map(p => {
-                  const isNow3 = isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
-                  const isPast3 = isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })();
-                  return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.4 : 1 }}>
+                  const isEnded3 = p.pgStatus === "ended";
+                  const isNow3 = !isEnded3 && isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
+                  const isPast3 = isEnded3 || (isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })());
+                  return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.3 : 1, filter: isPast3 ? "grayscale(0.8)" : "none" }}>
                     {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
+                    {isPast3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
                     <span style={{ color: "#8892b0", fontSize: 12, fontFamily: "monospace", minWidth: 45 }}>{p.time}</span>
-                    <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
+                    <span style={{ color: isPast3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
                     {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
                   </div>);
                 })}
@@ -2124,8 +2130,8 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
             const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
             const pgDate = pg.date && pg.date !== "always" ? new Date(pg.date) : null;
             const dateLabel = pgDate ? `${pgDate.getMonth()+1}/${pgDate.getDate()}` : "";
-            const isNow = pg.date !== "always" && (pg.date === todayStr || (selDate === "all" && pg.date === todayStr)) && nowMin >= sh*60+sm && nowMin <= eh*60+em && pg.pgStatus !== "ended";
-            const isPast = (pg.pgStatus === "ended") || (pg.date === todayStr && pg.date !== "always" && nowMin > eh*60+em);
+            const isNow = pg.pgStatus !== "ended" && pg.date !== "always" && pg.date === todayStr && nowMin >= sh*60+sm && nowMin <= eh*60+em;
+            const isPast = (pg.pgStatus === "ended") || (pg.date === todayStr && nowMin > eh*60+em) || (pg.date && pg.date !== "always" && pg.date < todayStr);
             const isDelayed = pg.pgStatus === "delayed";
             const cat = CATS[pg.category] || CATS.all;
             const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
@@ -2175,13 +2181,16 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
         </div>
         {alwaysOpen && alwaysPgs.sort((a,b) => (a.time||"").localeCompare(b.time||"")).map(pg => {
           const cat = CATS[pg.category] || CATS.all;
-          const isNow = todayStr === (pg.date === "always" ? todayStr : pg.date) && (() => { const [sh,sm]=(pg.time||"00:00").split(":").map(Number); const [eh,em]=(pg.endTime||"23:59").split(":").map(Number); return nowMin>=sh*60+sm && nowMin<=eh*60+em; })();
+          const isNow = pg.pgStatus !== "ended" && (() => { const [sh,sm]=(pg.time||"00:00").split(":").map(Number); const [eh,em]=(pg.endTime||"23:59").split(":").map(Number); return nowMin>=sh*60+sm && nowMin<=eh*60+em; })();
           const isEnded = pg.pgStatus === "ended";
-          return (<div key={pg.id} style={{ padding: "10px 16px", borderTop: "1px solid rgba(0,150,136,0.1)", display: "flex", alignItems: "center", gap: 8, opacity: isEnded ? 0.35 : 1 }}>
-            {isNow && !isEnded && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
-            {isEnded && <span style={{ color: "#F44336", fontSize: 11, fontWeight: 700 }}>종료</span>}
+          const isTimePast = !isEnded && todayStr === (pg.date === "always" ? todayStr : pg.date) && (() => { const [eh,em]=(pg.endTime||"23:59").split(":").map(Number); return nowMin>eh*60+em; })();
+          const inactive = isEnded || isTimePast;
+          return (<div key={pg.id} style={{ padding: "10px 16px", borderTop: "1px solid rgba(0,150,136,0.1)", display: "flex", alignItems: "center", gap: 8, opacity: inactive ? 0.3 : 1, filter: inactive ? "grayscale(0.8)" : "none" }}>
+            {isNow && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
+            {isEnded && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(244,67,54,0.15)", color: "#F44336", fontSize: 11, fontWeight: 700 }}>종료</span>}
+            {isTimePast && !isEnded && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 11, fontWeight: 700 }}>종료</span>}
             <span style={{ padding: "2px 6px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 11, fontWeight: 700 }}>{cat.label}</span>
-            <span style={{ color: isEnded ? "#445" : "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1, textDecoration: isEnded ? "line-through" : "none" }}>{pg.title}</span>
+            <span style={{ color: inactive ? "#445" : "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1, textDecoration: isEnded ? "line-through" : "none" }}>{pg.title}</span>
             <span style={{ color: "#556", fontSize: 12 }}>{pg.time}~{pg.endTime}</span>
             {pg.location && <span style={{ color: "#445", fontSize: 11 }}>📍{pg.location}</span>}
           </div>);
