@@ -487,10 +487,10 @@ function DashboardOrgChart({ settings, show, onToggle }) {
     const isOrg = node.type === "org";
 
     if (!isOrg) {
-      return (<div key={node.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, marginBottom: 2 }}>
+      return (<div key={node.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, marginBottom: 4 }}>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
         {node.position && <span style={{ color: "#4CAF50", fontSize: 12 }}>{node.position}</span>}
-        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "5px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
+        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
       </div>);
     }
 
@@ -500,7 +500,7 @@ function DashboardOrgChart({ settings, show, onToggle }) {
           <span style={{ fontSize: 14 }}>🏢</span>
           <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 800, flex: 1 }}>{node.name}</span>
           {node.position && <span style={{ color: "#2196F3", fontSize: 12 }}>{node.position}</span>}
-          <span style={{ color: "#556", fontSize: 11 }}>{childPersons.length}명</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{childPersons.length}명</span>
         </div>
         {childPersons.length > 0 && <div style={{ padding: "4px 10px 6px" }}>
           {childPersons.map(p => renderNode(p, 0))}
@@ -610,7 +610,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <div style={{ fontSize: 42, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{selected.currentValue.toLocaleString()}<span style={{ fontSize: 16, color: "#8892b0", marginLeft: 4 }}>{selected.unit}</span></div>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4, alignItems: "center" }}>
                 <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</span>
-                {selected.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 20, background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", border: `1px solid ${selected.actionStatus === "handling" ? "rgba(255,152,0,0.3)" : "rgba(76,175,80,0.3)"}`, color: selected.actionStatus === "handling" ? "#FF9800" : "#4CAF50", fontSize: 13, fontWeight: 700 }}>{selected.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>}
+                {selected.actionStatus && <span style={{ padding: "6px 12px", borderRadius: 20, background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", border: `1px solid ${selected.actionStatus === "handling" ? "rgba(255,152,0,0.3)" : "rgba(76,175,80,0.3)"}`, color: selected.actionStatus === "handling" ? "#FF9800" : "#4CAF50", fontSize: 13, fontWeight: 700 }}>{selected.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>}
               </div>
             </div>
           </div>
@@ -756,7 +756,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
           {/* 기준값 표시 */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginBottom: 16 }}>
-            {Object.entries(LEVELS).map(([lk, lvi]) => (<div key={lk} style={{ padding: "6px 8px", borderRadius: 8, background: lk === lv ? lvi.bg : "rgba(255,255,255,0.02)", border: `1px solid ${lk === lv ? lvi.border : "#1a1a2e"}`, textAlign: "center" }}>
+            {Object.entries(LEVELS).map(([lk, lvi]) => (<div key={lk} style={{ padding: "8px 10px", borderRadius: 8, background: lk === lv ? lvi.bg : "rgba(255,255,255,0.02)", border: `1px solid ${lk === lv ? lvi.border : "#1a1a2e"}`, textAlign: "center" }}>
               <div style={{ color: lvi.color, fontSize: 14, fontWeight: 700 }}>{lvi.label}</div>
               <div style={{ color: lk === lv ? "#fff" : "#556", fontSize: 13, fontFamily: "monospace", marginTop: 2 }}>{selected.thresholds[lk]?.[0]}~{selected.thresholds[lk]?.[1] === Infinity ? "∞" : selected.thresholds[lk]?.[1]}</div>
             </div>))}
@@ -821,19 +821,19 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
     {/* 컴팩트 헤더 */}
     <div style={{ textAlign: "center", marginBottom: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 28 }}>{settings.logoEmoji}</span>
         <div>
           <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: 0 }}>{settings.festivalName || "축제 안전관리"}</h1>
-          <p style={{ color: "#556", fontSize: 11, margin: 0 }}>{settings.festivalSubtitle}</p>
+          <p style={{ color: "#556", fontSize: 12, margin: 0 }}>{settings.festivalSubtitle}</p>
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ color: "#8892b0", fontSize: 12 }}>📅 {fmtDate(now)}</span>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>{fmtTime(now)}</span>
-        {settings.is24HourMode && <span style={{ padding: "1px 6px", borderRadius: 10, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
-        {loc.name && <span style={{ color: "#445", fontSize: 11 }}>📍{loc.name}</span>}
-        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 10 }}>🌤️LIVE</span>}
+        {settings.is24HourMode && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>24H</span>}
+        {loc.name && <span style={{ color: "#445", fontSize: 12 }}>📍{loc.name}</span>}
+        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 12 }}>🌤️LIVE</span>}
         <button onClick={handleRefresh} disabled={spinning} style={{ padding: "4px 12px", borderRadius: 16, border: "1px solid rgba(33,150,243,0.2)", background: "transparent", color: "#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
           <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none" }}>🔄</span> {spinning ? "..." : "최신화"}
         </button>
@@ -864,7 +864,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         <div key={n.id} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 14 }}>📢</span>
           <span style={{ color: "#ccd6f6", fontSize: 12, fontWeight: 600, flex: 1 }}>{n.content}</span>
-          {(userRole === "admin" || userRole === "manager" || userRole === "sysadmin") && <button onClick={() => onDeleteNotice?.(n.id)} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 12, cursor: "pointer" }}>✕</button>}
+          {(userRole === "admin" || userRole === "manager" || userRole === "sysadmin") && <button onClick={() => onDeleteNotice?.(n.id)} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 12, cursor: "pointer" }}>✕</button>}
         </div>
       ))}
     </div>}
@@ -892,7 +892,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 24 }}>{cat.icon}</span>
             <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 20 }}>체류 인원</span>
-            {cat.actionStatus && <span style={{ padding: "2px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700, marginLeft: "auto" }}>🔧조치중</span>}
+            {cat.actionStatus && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700, marginLeft: "auto" }}>🔧조치중</span>}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
@@ -905,18 +905,18 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ textAlign: "right", paddingBottom: 4 }}>
               <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
               <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: "#2196F3", lineHeight: 1 }}>{cumVal.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>명</div>
+              <div style={{ fontSize: 12, color: "#556", marginTop: 2 }}>명</div>
             </div>
           </div>
           {/* 출입구별 현황 */}
           {gateData.filter(g => g.name).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 6, marginBottom: 8 }}>
             {gateData.filter(g => g.name).map(g => (
               <div key={g.id} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222" }}>
-                <div style={{ color: "#8892b0", fontSize: 11 }}>🚪 {g.name}</div>
+                <div style={{ color: "#8892b0", fontSize: 12 }}>🚪 {g.name}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
                   <span style={{ color: "#4CAF50", fontSize: 18, fontWeight: 800, fontFamily: "monospace" }}>{g.count}</span>
-                  <span style={{ color: "#556", fontSize: 10 }}>체류</span>
-                  <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>누적 {g.cumulative}</span>
+                  <span style={{ color: "#556", fontSize: 12 }}>체류</span>
+                  <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>누적 {g.cumulative}</span>
                 </div>
               </div>
             ))}
@@ -946,7 +946,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {c.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => setViewPhoto(p)}>
               <img src={p.data} alt="" style={{ width: 100, height: 75, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
-              <div style={{ color: "#556", fontSize: 11, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+              <div style={{ color: "#556", fontSize: 12, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
           </div>}
         </div>);
@@ -977,7 +977,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               {nextFc && <div style={{ textAlign: "right", paddingBottom: 4 }}>
                 <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📋 예보</div>
                 <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#8892b0", lineHeight: 1 }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}{nextFc.value}</div>
-                <div style={{ fontSize: 11, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
+                <div style={{ fontSize: 12, color: "#556", marginTop: 2 }}>{nextFc.time}</div>
               </div>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
@@ -1008,7 +1008,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                 {nextFc && <span style={{ fontSize: 18, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
               </div>
             </div>
-            <span style={{ padding: "4px 10px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.label}</span>
+            <span style={{ padding: "6px 12px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.label}</span>
           </div>
         </div>); })}
     </div>}
@@ -1025,7 +1025,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 20, marginRight: 8 }}>🅿️</span>
               <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{lot.name}</span>
-              <span style={{ padding: "4px 10px", borderRadius: 8, background: `${color}15`, color, fontSize: 13, fontWeight: 700 }}>{label}</span>
+              <span style={{ padding: "6px 12px", borderRadius: 8, background: `${color}15`, color, fontSize: 13, fontWeight: 700 }}>{label}</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
               <span style={{ color, fontSize: 28, fontWeight: 900, fontFamily: "monospace" }}>{lot.current||0}</span>
@@ -1055,7 +1055,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 20, marginRight: 8 }}>🚌</span>
               <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{bus.name}</span>
-              <span style={{ padding: "4px 10px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#4CAF50" : "#FF9800", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
+              <span style={{ padding: "6px 12px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#4CAF50" : "#FF9800", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
               <span style={{ fontSize: 16 }}>👥</span>
@@ -1079,7 +1079,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <div style={{ width: isCur ? 20 : 12, height: isCur ? 20 : 12, borderRadius: "50%", background: isCur ? "#00BCD4" : isPassed ? "#00BCD4" : "#333", border: isCur ? "3px solid #00E5FF" : isNext ? "2px solid #00BCD4" : "2px solid #444", margin: `${isCur ? 0 : 4}px auto`, transition: "all .3s", boxShadow: isCur ? "0 0 8px rgba(0,188,212,0.5)" : "none" }}>
                       {isCur && <span style={{ position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 14 }}>📍</span>}
                     </div>
-                    <div style={{ color: isCur ? "#00E5FF" : isPassed ? "#00BCD4" : "#556", fontSize: 11, fontWeight: isCur ? 800 : 600, marginTop: 6, lineHeight: 1.2 }}>{stop.name}</div>
+                    <div style={{ color: isCur ? "#00E5FF" : isPassed ? "#00BCD4" : "#556", fontSize: 12, fontWeight: isCur ? 800 : 600, marginTop: 6, lineHeight: 1.2 }}>{stop.name}</div>
                   </div>);
                 })}
               </div>
@@ -1093,20 +1093,20 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     {/* 범례 */}
     {/* 범례 */}
     <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "flex", justifyContent: "center", gap: 10 }}>
-      {Object.entries(LEVELS).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: v.color }} /><span style={{ color: "#556", fontSize: 11 }}>{v.label}</span></div>))}
+      {Object.entries(LEVELS).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: v.color }} /><span style={{ color: "#556", fontSize: 12 }}>{v.label}</span></div>))}
     </div>
     {alerts && alerts.length > 0 && (
       <div style={{ maxWidth: 1100, margin: "20px auto 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <h3 style={{ color: "#8892b0", fontSize: 13, fontWeight: 700, margin: 0 }}>🔔 최근 알림</h3>
-          <button onClick={() => onDeleteAlert?.("all")} style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>
+          <button onClick={() => onDeleteAlert?.("all")} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>
         </div>
         {alerts.slice(0, 5).map((a, i) => { const ali = LEVELS[a.level]; return (
           <div key={i} style={{ background: ali.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${ali.border}`, marginBottom: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ color: ali.color, fontWeight: 700, fontSize: 14 }}>{ali.icon} {a.category}</span>
             <span style={{ color: "#888", fontSize: 14, flex: 1 }}>{a.message.split("\n")[2] || ""}</span>
             <span style={{ color: "#445", fontSize: 13 }}>{a.time}</span>
-            <button onClick={(e) => { e.stopPropagation(); onDeleteAlert?.(i); }} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 14, cursor: "pointer", lineHeight: 1 }}>✕</button>
+            <button onClick={(e) => { e.stopPropagation(); onDeleteAlert?.(i); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "rgba(255,255,255,0.08)", color: "#888", fontSize: 14, cursor: "pointer", lineHeight: 1 }}>✕</button>
           </div>); })}
       </div>)}
 
@@ -1141,7 +1141,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
           {/* 진행중 항목 */}
           {handling.map(cat => (
-            <div key={cat.id} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 2 }}>
+            <div key={cat.id} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
               <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(255,152,0,0.05)", border: "1px solid rgba(255,152,0,0.1)", borderRadius: "4px 0 0 4px" }}>
                 <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{cat.icon}{cat.name}</span>
                 <span style={{ color: "#ddd", fontSize: 14 }}>{cat.actionReport?.content || "지시 대기"}</span>
@@ -1156,7 +1156,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
           {/* 완료 항목 */}
           {completed.map((r, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 2 }}>
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
               <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(255,255,255,0.02)", border: "1px solid #1a1a2e", borderRadius: "4px 0 0 4px" }}>
                 <span style={{ color: "#999", fontSize: 13 }}>{r.icon}{r.name}</span>
                 <span style={{ color: "#888", fontSize: 14 }}>{r.instruction || "-"}</span>
@@ -1338,13 +1338,13 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     <div style={{ width: "100%", maxWidth: 400, background: li.bg, border: `2px solid ${li.border}`, borderRadius: 20, padding: 20, textAlign: "center", marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "center", gap: 30, marginBottom: 8 }}>
         <div>
-          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>🏃 체류 인원</div>
+          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>🏃 체류 인원</div>
           <div style={{ fontSize: 40, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{curTotal.toLocaleString()}</div>
           <div style={{ color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</div>
         </div>
         <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
         <div>
-          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>📊 누적 방문</div>
+          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
           <div style={{ fontSize: 40, fontWeight: 900, color: "#2196F3", fontFamily: "monospace" }}>{cumTotal.toLocaleString()}</div>
           <div style={{ color: "#556", fontSize: 14 }}>총 방문객</div>
         </div>
@@ -1414,7 +1414,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     <div style={{ width: "100%", maxWidth: 400 }}>
       <h3 style={{ color: "#8892b0", fontSize: 13, marginBottom: 8 }}>입력 기록</h3>
       <div style={{ maxHeight: 160, overflow: "auto" }}>
-        {log.map((l, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 10px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6, color: "#aaa", fontSize: 13 }}>
+        {log.map((l, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6, color: "#aaa", fontSize: 13 }}>
           <span style={{ color: l.delta > 0 ? "#4CAF50" : "#F44336", fontWeight: 700 }}>{l.delta > 0 ? "+" : ""}{l.delta}</span>
           {l.zone && <span style={{ color: "#556" }}>{l.zone}</span>}
           <span>체류 {l.total.toLocaleString()}</span>
@@ -1615,7 +1615,7 @@ function ShuttlePage({ settings, setSettings, session }) {
                     fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left",
                     display: "flex", alignItems: "center", gap: 12, transition: "all .2s"
                   }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 14, background: isCurrent ? "#00BCD4" : "#333", color: isCurrent ? "#fff" : "#888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
+                    <span style={{ width: 32, height: 32, borderRadius: 14, background: isCurrent ? "#00BCD4" : "#333", color: isCurrent ? "#fff" : "#888", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
                     <span style={{ flex: 1 }}>{stop.name}</span>
                     {isCurrent && <span style={{ fontSize: 13, color: "#00BCD4" }}>📍 현재</span>}
                   </button>
@@ -1718,17 +1718,17 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 12 }}>🏠</span>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{site.name}</span>
-        {sc && <span style={{ padding: "2px 6px", borderRadius: 6, background: `${sc.color}15`, color: sc.color, fontSize: 11, fontWeight: 700 }}>{sc.icon}{sc.label}</span>}
-        <span style={{ padding: "2px 8px", borderRadius: 8, background: `${st.color}22`, color: st.color, fontSize: 12, fontWeight: 700 }}>{st.icon} {st.label}</span>
+        {sc && <span style={{ padding: "3px 8px", borderRadius: 6, background: `${sc.color}15`, color: sc.color, fontSize: 12, fontWeight: 700 }}>{sc.icon}{sc.label}</span>}
+        <span style={{ padding: "3px 8px", borderRadius: 8, background: `${st.color}22`, color: st.color, fontSize: 12, fontWeight: 700 }}>{st.icon} {st.label}</span>
       </div>
       {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
         {Object.entries(statusMap).map(([k, v]) => (
-          <button key={k} onClick={() => { setStatus(site.id, k); if (k !== "active" && k !== "break") setCong(site.id, null); }} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+          <button key={k} onClick={() => { setStatus(site.id, k); if (k !== "active" && k !== "break") setCong(site.id, null); }} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
       {canEdit && isRunning && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
         {Object.entries(SITE_CONG).map(([k, v]) => (
-          <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+          <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "10px 4px", borderRadius: 8, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
       {(site.workers || []).map(w => {
@@ -1793,10 +1793,10 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         return (<div key={w.id} onClick={isAdmin ? () => setEditFspWorker({ siteId: site.id, workerId: w.id }) : undefined} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, fontSize: 13, cursor: isAdmin ? "pointer" : "default", background: "rgba(255,255,255,0.02)", border: "1px solid #1a1a2e", marginBottom: 3, opacity: w.wStatus === "off" ? 0.4 : 1 }}>
           <span style={{ fontSize: 14 }}>{ws2 ? ws2.icon : "👤"}</span>
           <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{w.name}</span>
-          {ws2 && <span style={{ padding: "2px 8px", borderRadius: 6, background: `${ws2.color}15`, color: ws2.color, fontSize: 11, fontWeight: 700 }}>{ws2.label}</span>}
-          {w.type && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(206,147,216,0.1)", color: "#CE93D8", fontSize: 11, fontWeight: 600 }}>{w.type}</span>}
-          {w.role && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 11, fontWeight: 600 }}>{w.role}</span>}
-          {w.accountId && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 10 }}>🔑</span>}
+          {ws2 && <span style={{ padding: "3px 8px", borderRadius: 6, background: `${ws2.color}15`, color: ws2.color, fontSize: 12, fontWeight: 700 }}>{ws2.label}</span>}
+          {w.type && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(206,147,216,0.1)", color: "#CE93D8", fontSize: 12, fontWeight: 600 }}>{w.type}</span>}
+          {w.role && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12, fontWeight: 600 }}>{w.role}</span>}
+          {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 12 }}>🔑</span>}
           {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} style={{ color: "#4CAF50", fontSize: 13, textDecoration: "none" }}>📞</a>}
           {isAdmin && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
         </div>);
@@ -1847,7 +1847,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             <div style={{ color: settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
             {settings.emergencyMessage && <div style={{ color: "#ccd6f6", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
           </div>
-          <span style={{ color: "#556", fontSize: 11 }}>{settings.emergencyAt}</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{settings.emergencyAt}</span>
         </div>
       </div>}
 
@@ -1861,7 +1861,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           <div key={c.label} style={{ padding: "10px 6px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${c.color}33`, textAlign: "center" }}>
             <div style={{ fontSize: 14 }}>{c.icon}</div>
             <div style={{ color: c.color, fontSize: 22, fontWeight: 900, fontFamily: "monospace" }}>{c.value}</div>
-            <div style={{ color: "#556", fontSize: 11 }}>{c.label}</div>
+            <div style={{ color: "#556", fontSize: 12 }}>{c.label}</div>
           </div>
         ))}
       </div>
@@ -1882,7 +1882,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
               { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FF9800" },
               { icon: "🔴", label: "위험", count: dangerCount, color: "#F44336" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "3px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
           {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
@@ -1891,7 +1891,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
               { icon: "🟡", label: "보통", count: sCrowded, color: "#FF9800" },
               { icon: "🔴", label: "밀집", count: sDanger, color: "#F44336" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "3px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
         </div>);
@@ -1902,7 +1902,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         <button onClick={() => setMode("festival")} style={{ padding: "12px", borderRadius: 10, border: mode === "festival" ? "2px solid #2196F3" : "1px solid #333", background: mode === "festival" ? "rgba(33,150,243,0.1)" : "transparent", color: mode === "festival" ? "#2196F3" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>🎪 축제관리</button>
         <button onClick={() => setMode("safety")} style={{ padding: "12px", borderRadius: 10, border: mode === "safety" ? "2px solid #F44336" : "1px solid #333", background: mode === "safety" ? "rgba(244,67,54,0.1)" : "transparent", color: mode === "safety" ? "#F44336" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer", position: "relative" }}>
           🛡️ 안전관리
-          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: "#F44336", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
+          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: "#F44336", color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
         </button>
       </div>
 
@@ -2019,11 +2019,11 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                 const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
                 const inactive3 = isEnded3 || nowMin3 > eh3*60+em3;
                 return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8, opacity: inactive3 ? 0.3 : 1, filter: inactive3 ? "grayscale(0.8)" : "none" }}>
-                  {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
-                  {inactive3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
+                  {isNow3 && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
+                  {inactive3 && <span style={{ padding: "2px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
                   <span style={{ color: inactive3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
-                  <span style={{ color: "#556", fontSize: 11 }}>{p.time}~{p.endTime}</span>
-                  {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
+                  <span style={{ color: "#556", fontSize: 12 }}>{p.time}~{p.endTime}</span>
+                  {p.location && <span style={{ color: "#445", fontSize: 12 }}>📍{p.location}</span>}
                 </div>);
               })}
             </div>}
@@ -2046,11 +2046,11 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                   const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
                   const isPast3 = isEnded3 || nowMin3 > eh3*60+em3;
                   return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.3 : 1, filter: isPast3 ? "grayscale(0.8)" : "none" }}>
-                    {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
-                    {isPast3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
+                    {isNow3 && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
+                    {isPast3 && <span style={{ padding: "2px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
                     <span style={{ color: "#8892b0", fontSize: 12, fontFamily: "monospace", minWidth: 45 }}>{p.time}</span>
                     <span style={{ color: isPast3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
-                    {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
+                    {p.location && <span style={{ color: "#445", fontSize: 12 }}>📍{p.location}</span>}
                   </div>);
                 })}
               </div>);
@@ -2088,7 +2088,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             <div key={mr.id} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, fontSize: 13, display: "flex", gap: 6 }}>
               <span style={{ color: "#FF9800", fontWeight: 700 }}>🆘</span>
               <span style={{ color: "#ccd6f6" }}>{mr.patient || "환자"} — {mr.symptoms}</span>
-              <span style={{ color: "#556", marginLeft: "auto", fontSize: 11 }}>{mr.location}</span>
+              <span style={{ color: "#556", marginLeft: "auto", fontSize: 12 }}>{mr.location}</span>
             </div>
           ))}
         </div>}
@@ -2101,7 +2101,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ color: rst.color, fontSize: 14, fontWeight: 700 }}>{rst.icon} {rst.label}</span>
                 <span style={{ color: "#ccd6f6", fontSize: 14 }}>← {req.fromZoneName}</span>
-                <span style={{ color: "#556", fontSize: 11, marginLeft: "auto" }}>{req.createdAt}</span>
+                <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{req.createdAt}</span>
               </div>
               <div style={{ color: "#ccd6f6", fontSize: 14, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 8 }}>💬 {req.message}</div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -2230,10 +2230,10 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     if (isDetail) {
       return (<div key={pg.id} style={{ padding: "16px", borderRadius: 14, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-          {isNow && <span style={{ padding: "3px 10px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>● 진행중</span>}
-          {isPast && <span style={{ padding: "3px 10px", borderRadius: 6, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 13, fontWeight: 700 }}>종료</span>}
-          {isDelayed && <span style={{ padding: "3px 10px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 13, fontWeight: 700 }}>⏱ 지연</span>}
-          <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
+          {isNow && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>● 진행중</span>}
+          {isPast && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 13, fontWeight: 700 }}>종료</span>}
+          {isDelayed && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 13, fontWeight: 700 }}>⏱ 지연</span>}
+          <span style={{ padding: "3px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
           <span style={{ flex: 1 }} />
           <button onClick={(e) => { e.stopPropagation(); setDetailPgId(null); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
         </div>
@@ -2266,17 +2266,17 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     return (<div key={pg.id} onClick={() => setDetailPgId(pg.id)} style={{ padding: compact ? "10px 14px" : "14px 16px", borderRadius: compact ? 10 : 14, background: isPast ? "rgba(255,255,255,0.01)" : isDelayed ? "rgba(255,152,0,0.06)" : isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isPast ? "1px solid #1a1a2e" : isDelayed ? "2px solid rgba(255,152,0,0.3)" : isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: compact ? 4 : 6, opacity: isPast ? 0.4 : 1, filter: isPast ? "grayscale(0.7)" : "none", cursor: "pointer", transition: "all .3s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: compact ? 8 : 12 }}>
         <div style={{ textAlign: "center", minWidth: compact ? 44 : 54, flexShrink: 0 }}>
-          {dateLabel && <div style={{ color: "#8892b0", fontSize: 11 }}>{dateLabel}</div>}
+          {dateLabel && <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>}
           <div style={{ color: isPast ? "#555" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time || "--"}</div>
-          <div style={{ color: "#556", fontSize: 10 }}>~{pg.endTime}</div>
+          <div style={{ color: "#556", fontSize: 12 }}>~{pg.endTime}</div>
         </div>
         <div style={{ width: 3, minHeight: compact ? 30 : 40, background: isPast ? "#333" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, flexWrap: "wrap" }}>
-            {isNow && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
-            {isDelayed && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 11, fontWeight: 700 }}>⏱ 지연</span>}
-            {isPast && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 11, fontWeight: 700 }}>종료</span>}
-            <span style={{ padding: "2px 6px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 11, fontWeight: 700 }}>{cat.label}</span>
+            {isNow && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
+            {isDelayed && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>⏱ 지연</span>}
+            {isPast && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
+            <span style={{ padding: "3px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
           </div>
           <div style={{ color: isPast ? "#445" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, textDecoration: isEnded ? "line-through" : "none" }}>{pg.title}</div>
           {pg.location && <div style={{ color: "#556", fontSize: 12 }}>📍 {pg.location}</div>}
@@ -2495,7 +2495,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
               <button onClick={() => setAddGenre(!addGenre)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#CE93D8", fontSize: 12, cursor: "pointer" }}>+</button>
             </div>
             {addGenre && <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-              <Input value={newGenre} onChange={e => setNewGenre(e.target.value)} placeholder="새 분류명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
+              <Input value={newGenre} onChange={e => setNewGenre(e.target.value)} placeholder="새 분류명" style={{ flex: 1, padding: "10px", fontSize: 13 }} />
               <button onClick={() => { if (newGenre && !GENRES.includes(newGenre)) { setSettings(prev => ({ ...prev, customGenres: [...(prev.customGenres||[]), newGenre] })); upF("genre", newGenre); setNewGenre(""); setAddGenre(false); } }} style={{ padding: "8px 12px", borderRadius: 6, border: "none", background: "#9C27B0", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>추가</button>
             </div>}
           </div>
@@ -2515,15 +2515,15 @@ function StageMgmtPage({ settings, setSettings, session }) {
       <div style={{ marginBottom: 16, borderRadius: 14, border: "1px solid rgba(156,39,176,0.15)", overflow: "hidden" }}>
           <div style={{ padding: "12px 16px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>📋 테크라이더</span>
-            <button onClick={copyTR} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>📋복사</button>
-            <button onClick={pasteTR} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>📥붙여넣기</button>
-            <button onClick={() => setImportOpen(!importOpen)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 11, cursor: "pointer" }}>📂가져오기</button>
+            <button onClick={copyTR} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📋복사</button>
+            <button onClick={pasteTR} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥붙여넣기</button>
+            <button onClick={() => setImportOpen(!importOpen)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, cursor: "pointer" }}>📂가져오기</button>
           </div>
           {importOpen && perfs.filter(p => p.id !== f.id && ((p.setlist||[]).length > 0 || (p.instruments||[]).length > 0 || (p.techrider||[]).length > 0)).length > 0 && <div style={{ padding: "8px 16px 12px", background: "rgba(156,39,176,0.03)", borderBottom: "1px solid #1a1a2e" }}>
             <div style={{ color: "#556", fontSize: 12, marginBottom: 6 }}>기존 공연에서 테크라이더 가져오기:</div>
             {perfs.filter(p => p.id !== f.id && ((p.setlist||[]).length > 0 || (p.instruments||[]).length > 0 || (p.techrider||[]).length > 0)).map(p => (
               <button key={p.id} onClick={() => importFrom(p.id)} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #222", background: "rgba(255,255,255,0.02)", color: "#ccd6f6", fontSize: 13, cursor: "pointer", marginBottom: 4, textAlign: "left" }}>
-                🎤 {p.artist} <span style={{ color: "#556", fontSize: 11 }}>({(p.setlist||[]).length}곡 · {(p.instruments||[]).length}악기 · {(p.techrider||[]).filter(t=>t.qty>0).length}요청)</span>
+                🎤 {p.artist} <span style={{ color: "#556", fontSize: 12 }}>({(p.setlist||[]).length}곡 · {(p.instruments||[]).length}악기 · {(p.techrider||[]).filter(t=>t.qty>0).length}요청)</span>
               </button>
             ))}
           </div>}
@@ -2534,24 +2534,24 @@ function StageMgmtPage({ settings, setSettings, session }) {
               <span style={{ color: "#CE93D8", fontSize: 13 }}>{trSec.setlist ? "▼" : "▶"}</span>
               <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700 }}>🎵 셋리스트</span>
               <span style={{ color: "#556", fontSize: 12 }}>{(f.setlist||[]).length}곡</span>
-              <button onClick={e => { e.stopPropagation(); addSong(); }} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
+              <button onClick={e => { e.stopPropagation(); addSong(); }} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
             </div>
             {trSec.setlist && <div style={{ padding: "0 12px 12px" }}>
               {(f.setlist||[]).map((song, si) => (
                 <div key={song.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 5 }}>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
                     <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 800, minWidth: 22 }}>{si+1}</span>
-                    <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, padding: "8px", fontSize: 14 }} />
+                    <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, padding: "10px", fontSize: 14 }} />
                     <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13, width: 70 }}>
                       <option value="MR">MR</option><option value="LIVE">라이브</option>
                     </select>
-                    <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 50, padding: "8px", fontSize: 13, textAlign: "center" }} />
+                    <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 50, padding: "10px", fontSize: 13, textAlign: "center" }} />
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <Input value={song.memo||""} onChange={e => upSong(si, "memo", e.target.value)} placeholder="메모 (키, 특이사항 등)" style={{ flex: 1, padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
-                    <button onClick={() => moveSong(si,-1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▲</button>
-                    <button onClick={() => moveSong(si,1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▼</button>
-                    <button onClick={() => delSong(si)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                    <Input value={song.memo||""} onChange={e => upSong(si, "memo", e.target.value)} placeholder="메모 (키, 특이사항 등)" style={{ flex: 1, padding: "9px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
+                    <button onClick={() => moveSong(si,-1)} style={{ padding: "6px 10px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 5, cursor: "pointer" }}>▲</button>
+                    <button onClick={() => moveSong(si,1)} style={{ padding: "6px 10px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 5, cursor: "pointer" }}>▼</button>
+                    <button onClick={() => delSong(si)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
                   </div>
                 </div>
               ))}
@@ -2578,19 +2578,19 @@ function StageMgmtPage({ settings, setSettings, session }) {
               {(f.instruments||[]).map((inst, ii) => (
                 <div key={inst.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(33,150,243,0.03)", border: "1px solid rgba(33,150,243,0.1)", marginBottom: 5 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 800, minWidth: 20 }}>{ii+1}</span>
+                    <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 800, minWidth: 24 }}>{ii+1}</span>
                     <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{inst.name}</span>
                     <span style={{ color: "#556", fontSize: 12 }}>×</span>
-                    <button onClick={() => upInst(ii, "qty", Math.max(1,(inst.qty||1)-1))} style={{ width: 26, height: 26, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>-</button>
-                    <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, minWidth: 18, textAlign: "center" }}>{inst.qty||1}</span>
-                    <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 26, height: 26, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+</button>
-                    <button onClick={() => upInst(ii, "ch", inst.ch === "S" ? "M" : "S")} style={{ padding: "4px 10px", borderRadius: 5, border: `1.5px solid ${inst.ch==="S"?"#4CAF50":"#2196F3"}`, background: "transparent", color: inst.ch==="S"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S":"M"}</button>
+                    <button onClick={() => upInst(ii, "qty", Math.max(1,(inst.qty||1)-1))} style={{ width: 30, height: 30, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>-</button>
+                    <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, minWidth: 22, textAlign: "center" }}>{inst.qty||1}</span>
+                    <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 30, height: 30, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+</button>
+                    <button onClick={() => upInst(ii, "ch", inst.ch === "S" ? "M" : "S")} style={{ padding: "6px 12px", borderRadius: 5, border: `1.5px solid ${inst.ch==="S"?"#4CAF50":"#2196F3"}`, background: "transparent", color: inst.ch==="S"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S":"M"}</button>
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모 (모델, 세팅 등)" style={{ flex: 1, padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
-                    <button onClick={() => moveInst(ii,-1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▲</button>
-                    <button onClick={() => moveInst(ii,1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▼</button>
-                    <button onClick={() => delInst(ii)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                    <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모 (모델, 세팅 등)" style={{ flex: 1, padding: "9px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
+                    <button onClick={() => moveInst(ii,-1)} style={{ padding: "6px 10px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 5, cursor: "pointer" }}>▲</button>
+                    <button onClick={() => moveInst(ii,1)} style={{ padding: "6px 10px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 5, cursor: "pointer" }}>▼</button>
+                    <button onClick={() => delInst(ii)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
                   </div>
                 </div>
               ))}
@@ -2603,19 +2603,19 @@ function StageMgmtPage({ settings, setSettings, session }) {
               <span style={{ color: "#FF9800", fontSize: 13 }}>{trSec.requests ? "▼" : "▶"}</span>
               <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 700 }}>📝 요청사항</span>
               <span style={{ color: "#556", fontSize: 12 }}>{(f.techrider||[]).filter(t=>t.qty>0).length}건</span>
-              <button onClick={e => { e.stopPropagation(); addTech(); }} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 6, border: "1px solid #FF9800", background: "transparent", color: "#FF9800", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
+              <button onClick={e => { e.stopPropagation(); addTech(); }} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #FF9800", background: "transparent", color: "#FF9800", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
             </div>
             {trSec.requests && <div style={{ padding: "0 12px 12px" }}>
               {(f.techrider||[]).map((tr, ti) => (
                 <div key={tr.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(255,152,0,0.03)", border: "1px solid rgba(255,152,0,0.1)", marginBottom: 5 }}>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-                    <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ flex: 1, padding: "8px", fontSize: 14 }} />
+                    <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ flex: 1, padding: "10px", fontSize: 14 }} />
                     <span style={{ color: "#556", fontSize: 12 }}>×</span>
-                    <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 42, padding: "8px", fontSize: 14, textAlign: "center" }} />
-                    <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "5px 10px", borderRadius: 5, border: tr.qty > 0 ? "1.5px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{tr.qty > 0 ? "✓" : "○"}</button>
-                    <button onClick={() => delTech(ti)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                    <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 42, padding: "10px", fontSize: 14, textAlign: "center" }} />
+                    <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "6px 12px", borderRadius: 5, border: tr.qty > 0 ? "1.5px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{tr.qty > 0 ? "✓" : "○"}</button>
+                    <button onClick={() => delTech(ti)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
                   </div>
-                  <Input value={tr.memo||""} onChange={e => upTech(ti, "memo", e.target.value)} placeholder="메모 (모델명, 상세 요청 등)" style={{ width: "100%", padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)", boxSizing: "border-box" }} />
+                  <Input value={tr.memo||""} onChange={e => upTech(ti, "memo", e.target.value)} placeholder="메모 (모델명, 상세 요청 등)" style={{ width: "100%", padding: "9px", fontSize: 12, background: "rgba(255,255,255,0.02)", boxSizing: "border-box" }} />
                 </div>
               ))}
             </div>}
@@ -2666,23 +2666,23 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
                 return (<div key={pf.id} onClick={canEdit ? () => setEditId(pf.id) : undefined} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a2e", marginBottom: 6, cursor: canEdit ? "pointer" : "default" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <span style={{ padding: "2px 8px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 11, fontWeight: 700 }}>{pf.genre}</span>
+                    <span style={{ padding: "3px 8px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 12, fontWeight: 700 }}>{pf.genre}</span>
                     <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
                     {canEdit && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
-                    {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "3px 6px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>🗑</button>}
+                    {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "6px 10px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, borderRadius: 4, cursor: "pointer" }}>🗑</button>}
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                     {pf.time && <span style={{ color: "#8892b0", fontSize: 13 }}>⏰ {pf.time}~{pf.endTime}</span>}
                     {(pf.location || pg?.location) && <span style={{ color: "#556", fontSize: 12 }}>📍 {pf.location || pg?.location}</span>}
                     {pf.phone && <span style={{ color: "#556", fontSize: 12 }}>📞 {pf.phone}</span>}
                   </div>
-                  {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 4, padding: "6px 8px", borderRadius: 6, background: "rgba(156,39,176,0.04)" }}>
-                    <span style={{ color: "#CE93D8", fontSize: 11, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
-                    {(pf.setlist||[]).slice(0,3).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 11, marginLeft: 6 }}>{i+1}.{s.name||"?"}</span>)}
-                    {(pf.setlist||[]).length > 3 && <span style={{ color: "#556", fontSize: 11 }}> +{(pf.setlist||[]).length-3}</span>}
+                  {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 4, padding: "8px 10px", borderRadius: 6, background: "rgba(156,39,176,0.04)" }}>
+                    <span style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
+                    {(pf.setlist||[]).slice(0,3).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 12, marginLeft: 6 }}>{i+1}.{s.name||"?"}</span>)}
+                    {(pf.setlist||[]).length > 3 && <span style={{ color: "#556", fontSize: 12 }}> +{(pf.setlist||[]).length-3}</span>}
                   </div>}
-                  {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#2196F3", fontSize: 11 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}${(i.qty||1)>1?"×"+(i.qty||1):""}`).join(", ")}</span></div>}
-                  {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#FF9800", fontSize: 11 }}>📝 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span></div>}
+                  {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#2196F3", fontSize: 12 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}${(i.qty||1)>1?"×"+(i.qty||1):""}`).join(", ")}</span></div>}
+                  {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#FF9800", fontSize: 12 }}>📝 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span></div>}
                 </div>);
               })}
             </div>}
@@ -2789,7 +2789,7 @@ function CongestionPage({ settings, setSettings, session }) {
           {cur.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {cur.photos.map(p => <div key={p.id} style={{ flexShrink: 0, cursor: "pointer" }} onClick={() => { setViewPhoto(p); setViewPhotoZone(zone.id); }}>
               <img src={p.data} alt="" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
-              <div style={{ color: "#556", fontSize: 11, textAlign: "center", marginTop: 2 }}>{p.time}</div>
+              <div style={{ color: "#556", fontSize: 12, textAlign: "center", marginTop: 2 }}>{p.time}</div>
             </div>)}
           </div>}
         </div>}
@@ -2843,7 +2843,7 @@ function CongestionPage({ settings, setSettings, session }) {
             <span style={{ fontSize: 18 }}>{cl.icon}</span>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{z.name}</div>
-              {c?.reportedAt && <div style={{ color: "#556", fontSize: 11 }}>{c.reportedByName} · {c.reportedAt}</div>}
+              {c?.reportedAt && <div style={{ color: "#556", fontSize: 12 }}>{c.reportedByName} · {c.reportedAt}</div>}
             </div>
             <span style={{ color: cl.color, fontSize: 16, fontWeight: 800 }}>{cl.label}</span>
             {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 12 }}>📷{c.photos.length}</span>}
@@ -2965,7 +2965,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
           const unread = getUnread(ch.id);
           return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#2196F3" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {ch.label}
-            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
         })}
         {dmAccounts.map(a => {
@@ -2973,7 +2973,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
           const rl = ROLES[a.role] || {};
           return (<button key={a.id} onClick={() => setChannel(a.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === a.id ? `2px solid ${rl.color || "#556"}` : "1px solid #333", background: channel === a.id ? `${rl.color || "#556"}15` : "transparent", color: channel === a.id ? (rl.color || "#ccd6f6") : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {a.name}
-            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
         })}
       </div>
@@ -2994,15 +2994,15 @@ function ChatPage({ settings, setSettings, accounts, session }) {
         return (<div key={m.id} style={{ display: "flex", justifyContent: isNotice ? "center" : isMine ? "flex-end" : "flex-start", marginBottom: 8 }}>
           {isNotice ? (
             <div style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(156,39,176,0.1)", border: "1px solid rgba(156,39,176,0.15)", maxWidth: "90%" }}>
-              <div style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>📢 공지</div>
+              <div style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📢 공지</div>
               <div style={{ color: "#ccd6f6", fontSize: 14, whiteSpace: "pre-wrap" }}>{m.content}</div>
-              <div style={{ color: "#556", fontSize: 11, marginTop: 4 }}>{m.createdBy} · {m.createdAt}</div>
+              <div style={{ color: "#556", fontSize: 12, marginTop: 4 }}>{m.createdBy} · {m.createdAt}</div>
             </div>
           ) : (
             <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMine ? "rgba(33,150,243,0.12)" : "rgba(255,255,255,0.04)", border: isMine ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222" }}>
-              {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{m.createdBy}</div>}
+              {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 5 }}>{m.createdBy}</div>}
               <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{parts.map((p, i) => p.startsWith("@") ? <span key={i} style={{ color: "#2196F3", fontWeight: 700 }}>{p}</span> : p)}</div>
-              <div style={{ color: "#445", fontSize: 11, marginTop: 3, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
+              <div style={{ color: "#445", fontSize: 12, marginTop: 3, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
             </div>
           )}
         </div>);
@@ -3115,14 +3115,14 @@ function OrgChartTab({ settings, setSettings }) {
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", border: "1px solid transparent" }}>
           <span style={{ fontSize: 12, color: "#556" }}>⠿</span>
           <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
-          {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+          {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
           {node.memo && <span style={{ color: "#556", fontSize: 12 }}>{node.memo}</span>}
-          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
-          <div style={{ display: "flex", gap: 3, flexShrink: 0, marginLeft: "auto" }}>
-            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▲</button>
-            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▼</button>
-            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
-            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
+          <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▲</button>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▼</button>
+            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
         </div>
       );
@@ -3141,10 +3141,10 @@ function OrgChartTab({ settings, setSettings }) {
             {children.length > 0 ? <button onClick={() => setCollapsed(p => ({ ...p, [node.id]: !p[node.id] }))} style={{ background: "none", border: "none", color: "#2196F3", fontSize: 14, cursor: "pointer", padding: 0, width: 18 }}>{isCol ? "▶" : "▼"}</button> : <span style={{ width: 18 }} />}
             <span style={{ fontSize: 16 }}>🏢</span>
             <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{node.name}</span>
-            {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(33,150,243,0.12)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+            {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.12)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
             <span style={{ color: "#556", fontSize: 12 }}>{childPersons.length}명</span>
-            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
-            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
           {node.memo && <div style={{ padding: "4px 14px 6px", color: "#556", fontSize: 12 }}>{node.memo}</div>}
 
@@ -3426,7 +3426,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       {kmaTestResult && <Card style={{ border: `1px solid ${kmaTestResult.ok ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.3)"}`, background: kmaTestResult.ok ? "rgba(76,175,80,0.06)" : "rgba(244,67,54,0.06)" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ color: kmaTestResult.ok ? "#4CAF50" : "#F44336", fontSize: 14, fontWeight: 700 }}>{kmaTestResult.ok ? "✅ 성공" : "❌ 실패"}</span>
-          {kmaTestResult.simulated && <span style={{ padding: "2px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", border: "1px solid rgba(255,152,0,0.3)", color: "#FF9800", fontSize: 14, fontWeight: 700 }}>시뮬레이션</span>}
+          {kmaTestResult.simulated && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", border: "1px solid rgba(255,152,0,0.3)", color: "#FF9800", fontSize: 14, fontWeight: 700 }}>시뮬레이션</span>}
         </div>
         <pre style={{ color: "#aaa", fontSize: 13, margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace" }}>{kmaTestResult.msg}</pre>
         {kmaTestResult.items && <div style={{ marginTop: 12, borderTop: "1px solid #222", paddingTop: 10 }}>
@@ -3601,11 +3601,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {/* Operating */}
     {/* Thresholds */}
     {tab === "thresholds" && <div>{categories.map(cat => (<Card key={cat.id}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><h3 style={{ color: "#ccd6f6", fontSize: 14, margin: 0 }}>{cat.icon} {cat.name} ({cat.unit})</h3><button onClick={() => { if (confirm("삭제?")) setCategories(p => p.filter(c => c.id !== cat.id)); }} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ padding: 8, borderRadius: 8, background: lv.bg, border: `1px solid ${lv.border}` }}><div style={{ color: lv.color, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{lv.label}</div><div style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="number" value={cat.thresholds[lk]?.[0] ?? 0} onChange={e => upThr(cat.id, lk, 0, e.target.value)} style={{ width: 55, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={cat.thresholds[lk]?.[1] === Infinity ? "∞" : cat.thresholds[lk]?.[1] ?? 0} onChange={e => upThr(cat.id, lk, 1, e.target.value)} style={{ width: 55, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} /></div></div>))}</div></Card>))}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ padding: 8, borderRadius: 8, background: lv.bg, border: `1px solid ${lv.border}` }}><div style={{ color: lv.color, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{lv.label}</div><div style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="number" value={cat.thresholds[lk]?.[0] ?? 0} onChange={e => upThr(cat.id, lk, 0, e.target.value)} style={{ width: 55, padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={cat.thresholds[lk]?.[1] === Infinity ? "∞" : cat.thresholds[lk]?.[1] ?? 0} onChange={e => upThr(cat.id, lk, 1, e.target.value)} style={{ width: 55, padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }} /></div></div>))}</div></Card>))}</div>}
 
     {/* Manual */}
     {tab === "manual" && <div>
-      {categories.filter(c => c.source === "manual" || !c.kmaCategory).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id}><h3 style={{ color: "#ccd6f6", fontSize: 14, margin: "0 0 10px" }}>{cat.icon} {cat.name}</h3><div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><Input type="number" value={cat.currentValue} onChange={e => upVal(cat.id, e.target.value)} style={{ width: 140, fontSize: 18, fontWeight: 700 }} /><span style={{ color: "#8892b0" }}>{cat.unit}</span><span style={{ padding: "4px 10px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span></div></Card>); })}
+      {categories.filter(c => c.source === "manual" || !c.kmaCategory).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id}><h3 style={{ color: "#ccd6f6", fontSize: 14, margin: "0 0 10px" }}>{cat.icon} {cat.name}</h3><div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><Input type="number" value={cat.currentValue} onChange={e => upVal(cat.id, e.target.value)} style={{ width: 140, fontSize: 18, fontWeight: 700 }} /><span style={{ color: "#8892b0" }}>{cat.unit}</span><span style={{ padding: "6px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 13, fontWeight: 700 }}>{li.icon} {li.label}</span></div></Card>); })}
       <Card style={{ background: "rgba(33,150,243,0.03)", border: "1px solid rgba(33,150,243,0.12)" }}><p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 10px" }}>🔄 API 항목 비상 수동 입력</p>
         {categories.filter(c => c.kmaCategory || c.apiConfig?.enabled).map(cat => (<div key={cat.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}><span style={{ color: "#ccd6f6", fontSize: 14, minWidth: 70 }}>{cat.icon}{cat.name}</span><Input type="number" value={cat.currentValue} onChange={e => upVal(cat.id, e.target.value)} style={{ width: 100, fontSize: 13 }} /><span style={{ color: "#555", fontSize: 13 }}>{cat.unit}</span></div>))}</Card></div>}
 
@@ -3652,7 +3652,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}><Input placeholder="이름" value={nc.name} onChange={e => setNc({ ...nc, name: e.target.value })} style={{ width: 80 }} /><Input placeholder="01012345678" value={nc.phone} onChange={e => setNc({ ...nc, phone: e.target.value })} style={{ flex: 1 }} /><button onClick={() => { if (nc.name && nc.phone) { setSettings({ ...settings, smsStaff: [...(settings.smsStaff || []), { name: nc.name, phone: nc.phone }] }); setNc({ name: "", phone: "" }); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#FF9800", color: "#fff", fontWeight: 700, cursor: "pointer" }}>추가</button></div>
       </Card>
 
-      <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 발송 이력</h3>{(!smsLog || !smsLog.length) ? <p style={{ color: "#445", fontSize: 14 }}>없음</p> : <div style={{ maxHeight: 200, overflow: "auto" }}>{smsLog.map((l, i) => (<div key={i} style={{ padding: "5px 8px", borderBottom: "1px solid #1a1a2e", fontSize: 13 }}><span style={{ color: l.success ? "#4CAF50" : "#F44336" }}>{l.success ? "✅" : "❌"}</span> <span style={{ color: "#555" }}>{l.time}</span><div style={{ color: "#777", whiteSpace: "pre-wrap", marginTop: 2 }}>{l.preview}</div></div>))}</div>}</Card>
+      <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 발송 이력</h3>{(!smsLog || !smsLog.length) ? <p style={{ color: "#445", fontSize: 14 }}>없음</p> : <div style={{ maxHeight: 200, overflow: "auto" }}>{smsLog.map((l, i) => (<div key={i} style={{ padding: "6px 10px", borderBottom: "1px solid #1a1a2e", fontSize: 13 }}><span style={{ color: l.success ? "#4CAF50" : "#F44336" }}>{l.success ? "✅" : "❌"}</span> <span style={{ color: "#555" }}>{l.time}</span><div style={{ color: "#777", whiteSpace: "pre-wrap", marginTop: 2 }}>{l.preview}</div></div>))}</div>}</Card>
     </div>}
 
     {/* Zone Management */}
@@ -3668,7 +3668,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
               <span style={{ color: zt.color, fontWeight: 700, fontSize: 14 }}>{zt.icon} {z.name || `구역 ${i+1}`}</span>
-              <span style={{ padding: "2px 8px", borderRadius: 4, background: `${zt.color}15`, color: zt.color, fontSize: 11, fontWeight: 700 }}>{zt.label}</span>
+              <span style={{ padding: "3px 8px", borderRadius: 4, background: `${zt.color}15`, color: zt.color, fontSize: 12, fontWeight: 700 }}>{zt.label}</span>
               <span style={{ color: "#445", fontSize: 12, flex: 1 }}>{(settings.workSites || []).filter(s => s.zoneId === z.id).length}개 근무지</span>
               <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>삭제</button>
             </div>
@@ -3745,7 +3745,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 8px" }}>📋 근무유형</h3>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {(settings.workTypes || []).map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 6, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 6, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
               <span style={{ color: "#CE93D8", fontSize: 13 }}>{t}</span>
               <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
             </div>
@@ -3860,11 +3860,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
                     style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid #333", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                    {w.type && <span style={{ color: "#CE93D8", fontSize: 10 }}>{w.type}</span>}
-                    {w.role && <span style={{ color: "#009688", fontSize: 10 }}>{w.role}</span>}
-                    {w.accountId && <span style={{ color: "#2196F3", fontSize: 9 }}>🔑</span>}
-                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "1px 6px", border: "1px solid #333", background: "none", color: "#8892b0", fontSize: 11, cursor: "pointer", borderRadius: 4 }}>✏️</button>
-                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "1px 4px", border: "none", background: "none", color: "#F44336", fontSize: 11, cursor: "pointer" }}>✕</button>
+                    {w.type && <span style={{ color: "#CE93D8", fontSize: 12 }}>{w.type}</span>}
+                    {w.role && <span style={{ color: "#009688", fontSize: 12 }}>{w.role}</span>}
+                    {w.accountId && <span style={{ color: "#2196F3", fontSize: 12 }}>🔑</span>}
+                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid #333", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>✏️</button>
+                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
                   </div>
                 );
               })}
@@ -3925,15 +3925,15 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                       style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid #1a1a2e" }}>
                       <span style={{ fontSize: 14, color: "#556" }}>⠿</span>
                       <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{w.name}</span>
-                      {w.type && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 12 }}>{w.type}</span>}
-                      {w.role && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                      {w.accountId && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 10 }}>🔑{w.accountId}</span>}
+                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 12 }}>{w.type}</span>}
+                      {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
+                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 12 }}>🔑{w.accountId}</span>}
                       {w.phone && <span style={{ color: "#556", fontSize: 12 }}>{w.phone}</span>}
                       <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
-                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
-                        <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteW(); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
+                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
+                        <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
+                        <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteW(); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
                       </div>
                     </div>
                   );
@@ -3998,7 +3998,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 </select>
               </div>
             </div>
-            {z.accountId && <div style={{ marginTop: 6, padding: "4px 8px", borderRadius: 6, background: "rgba(76,175,80,0.06)" }}>
+            {z.accountId && <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 6, background: "rgba(76,175,80,0.06)" }}>
               <span style={{ color: "#4CAF50", fontSize: 14 }}>✅ {z.accountId} 계정이 로그인하면 이 구역이 자동 선택됩니다</span>
             </div>}
           </div>
@@ -4019,7 +4019,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div key={w.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: `1px solid ${w.role === "manager" ? "rgba(244,67,54,0.2)" : "rgba(255,152,0,0.15)"}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ padding: "2px 8px", borderRadius: 10, background: w.role === "manager" ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.15)", color: w.role === "manager" ? "#F44336" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "🔴 책임자" : "🟠 요원"}</span>
+                <span style={{ padding: "3px 8px", borderRadius: 10, background: w.role === "manager" ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.15)", color: w.role === "manager" ? "#F44336" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "🔴 책임자" : "🟠 요원"}</span>
                 <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{w.name || "이름 미입력"}</span>
               </div>
               <button onClick={() => setSettings({ ...settings, workers: settings.workers.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
@@ -4042,7 +4042,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       </Card>
       {(settings.workers || []).length > 0 && <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 근무자 현황</h3>
-        <div style={{ display: "grid", gap: 2 }}>
+        <div style={{ display: "grid", gap: 4 }}>
           <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 80px 1fr 1fr", gap: 6, padding: "6px 10px", background: "rgba(255,255,255,0.05)", borderRadius: 6 }}>
             <span style={{ color: "#556", fontSize: 14, fontWeight: 700 }}>역할</span>
             <span style={{ color: "#556", fontSize: 14, fontWeight: 700 }}>이름</span>
@@ -4121,8 +4121,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div key={stop.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "rgba(0,188,212,0.04)", borderRadius: 8, marginBottom: 4, border: "1px solid rgba(0,188,212,0.1)" }}>
             <span style={{ width: 24, height: 24, borderRadius: 12, background: "#00BCD4", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{i+1}</span>
             <Input value={stop.name} onChange={e => { const ss = [...(settings.shuttleStops||[])]; ss[ss.findIndex(s=>s.id===stop.id)] = {...stop, name: e.target.value}; setSettings({...settings, shuttleStops: ss}); }} placeholder="정류장명" style={{ flex: 1, padding: "8px 10px", fontSize: 13 }} />
-            <Input type="number" value={stop.order||i+1} onChange={e => { const ss = [...(settings.shuttleStops||[])]; ss[ss.findIndex(s=>s.id===stop.id)] = {...stop, order: parseInt(e.target.value)||0}; setSettings({...settings, shuttleStops: ss}); }} style={{ width: 50, padding: "8px", fontSize: 14, textAlign: "center" }} />
-            <button onClick={() => setSettings({...settings, shuttleStops: (settings.shuttleStops||[]).filter(s=>s.id!==stop.id)})} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>✕</button>
+            <Input type="number" value={stop.order||i+1} onChange={e => { const ss = [...(settings.shuttleStops||[])]; ss[ss.findIndex(s=>s.id===stop.id)] = {...stop, order: parseInt(e.target.value)||0}; setSettings({...settings, shuttleStops: ss}); }} style={{ width: 50, padding: "10px", fontSize: 14, textAlign: "center" }} />
+            <button onClick={() => setSettings({...settings, shuttleStops: (settings.shuttleStops||[]).filter(s=>s.id!==stop.id)})} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>✕</button>
           </div>
         ))}
         <button onClick={() => { const ord = (settings.shuttleStops||[]).length + 1; setSettings({...settings, shuttleStops: [...(settings.shuttleStops||[]), {id: "st"+Date.now(), name: "", order: ord}]}); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #00BCD4", background: "transparent", color: "#00BCD4", fontSize: 13, cursor: "pointer", marginTop: 8 }}>+ 정류장 추가</button>
@@ -4136,7 +4136,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span style={{ color: "#00BCD4", fontWeight: 700, fontSize: 14 }}>🚌 {bus.name || `버스 ${i+1}`}</span>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                {bus.status && <span style={{ padding: "2px 8px", borderRadius: 10, background: bus.status==="running"?"rgba(76,175,80,0.15)":bus.status==="stopped"?"rgba(255,152,0,0.15)":"rgba(244,67,54,0.15)", color: bus.status==="running"?"#4CAF50":bus.status==="stopped"?"#FF9800":"#F44336", fontSize: 13, fontWeight: 700 }}>{bus.status==="running"?"운행중":bus.status==="stopped"?"대기":"종료"}</span>}
+                {bus.status && <span style={{ padding: "3px 8px", borderRadius: 10, background: bus.status==="running"?"rgba(76,175,80,0.15)":bus.status==="stopped"?"rgba(255,152,0,0.15)":"rgba(244,67,54,0.15)", color: bus.status==="running"?"#4CAF50":bus.status==="stopped"?"#FF9800":"#F44336", fontSize: 13, fontWeight: 700 }}>{bus.status==="running"?"운행중":bus.status==="stopped"?"대기":"종료"}</span>}
                 <button onClick={() => setSettings({...settings, shuttleBuses: settings.shuttleBuses.filter((_,j)=>j!==i)})} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
               </div>
             </div>
@@ -4324,13 +4324,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <option value="">구역 미지정</option>
                 {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
               </select>
-              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
             </div>
 
             {/* 근무자 목록 */}
             <div style={{ marginLeft: 20 }}>
               {(site.workers || []).map((w, wi) => (
-                <div key={w.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}
+                <div key={w.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}
                   draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}>
                   <span style={{ cursor: "grab", fontSize: 12, color: "#556" }}>⠿</span>
                   <Input value={w.name} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, name: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="이름" style={{ width: 70 }} />
@@ -4340,7 +4340,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                     {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <Input value={w.duty || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, duty: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="담당업무" style={{ flex: 1 }} />
-                  <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: (ws[si].workers || []).filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+                  <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: (ws[si].workers || []).filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
                 </div>
               ))}
               <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: [...(ws[si].workers || []), { id: "w_" + Date.now(), name: "", phone: "", type: "", duty: "" }] }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "8px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", width: "100%" }}>+ 근무자 추가</button>
@@ -4412,11 +4412,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         const catColor = catColors[cl.category] || "#8892b0";
         return (<Card key={cl.id}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ padding: "4px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 13, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
+            <span style={{ padding: "6px 12px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 13, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
             <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
             <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 16, fontWeight: 800 }}>{done}/{total}</span>
             {fixCount > 0 && <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700 }}>🔧{fixCount}</span>}
-            <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", marginBottom: 12 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 3, transition: "width .3s" }} /></div>
           {cl.items.map((item, ii) => {
@@ -4449,8 +4449,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 {status === "done" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>완료</span>}
                 {status === "fix" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>보완</span>}
                 {/* 수정/삭제 */}
-                <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
-                <button onClick={() => { if (confirm("삭제?")) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items.splice(ii, 1); setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
+                <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+                <button onClick={() => { if (confirm("삭제?")) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items.splice(ii, 1); setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
               </div>
               {/* 완료/보완 버튼 */}
               {!isOff && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
@@ -4639,8 +4639,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <div style={{ color: "#556", fontSize: 12 }}>{pg.location ? "📍"+pg.location : ""} {pg.manager ? "👤"+pg.manager : ""}</div>
               </div>
               {stLabel && <span style={{ color: pg.pgStatus === "delayed" ? "#FF9800" : "#556", fontSize: 12, fontWeight: 700 }}>{stLabel}</span>}
-              <button onClick={() => setEditPgId(pg.id)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
-              <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
+              <button onClick={() => setEditPgId(pg.id)} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+              <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
             </div>
           </div>);
         })}
@@ -4663,7 +4663,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <span style={{ color: "#556", fontSize: 12, flex: 1 }}>{mr.time}</span>
               <div style={{ display: "flex", gap: 4 }}>
                 {Object.entries(stMap).map(([k, v]) => (
-                  <button key={k} onClick={() => { upMed("status", k); if (k !== mr.status) setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "medical", message: `🏥 응급환자 #${mi+1} → ${v.label}`, actor: session?.name }] })); }} style={{ padding: "4px 8px", borderRadius: 6, border: mr.status === k ? `2px solid ${v.color}` : "1px solid #333", background: mr.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.label}</button>
+                  <button key={k} onClick={() => { upMed("status", k); if (k !== mr.status) setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "medical", message: `🏥 응급환자 #${mi+1} → ${v.label}`, actor: session?.name }] })); }} style={{ padding: "6px 10px", borderRadius: 6, border: mr.status === k ? `2px solid ${v.color}` : "1px solid #333", background: mr.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{v.label}</button>
                 ))}
               </div>
             </div>
@@ -4675,7 +4675,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ marginTop: 6 }}><Label>조치사항</Label><Input value={mr.action} onChange={e => upMed("action", e.target.value)} placeholder="응급처치 후 119 이송" /></div>
             <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
               <span style={{ color: "#556", fontSize: 12 }}>담당: {mr.responder}</span>
-              <button onClick={() => { if (confirm("이 기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: prev.medicalRecords.filter((_,i)=>i!==mi) })); }} style={{ marginLeft: "auto", padding: "2px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>삭제</button>
+              <button onClick={() => { if (confirm("이 기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: prev.medicalRecords.filter((_,i)=>i!==mi) })); }} style={{ marginLeft: "auto", padding: "3px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>삭제</button>
             </div>
           </div>);
         })}
@@ -4699,11 +4699,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const typeIcon = { check: "✅", emergency: "🚨", medical: "🏥", request: "📨", manual: "📝", congestion: "🚦", status: "📊" }[tl.type] || "📌";
           const typeColor = { emergency: "#F44336", medical: "#FF9800", manual: "#2196F3" }[tl.type] || "#8892b0";
           return (<div key={tl.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid #1a1a2e" }}>
-            <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}><div style={{ color: "#556", fontSize: 11 }}>{tl.time?.split(" ")[0]}</div><div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{tl.time?.split(" ")[1]}</div></div>
+            <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}><div style={{ color: "#556", fontSize: 12 }}>{tl.time?.split(" ")[0]}</div><div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{tl.time?.split(" ")[1]}</div></div>
             <div style={{ width: 3, background: typeColor, borderRadius: 2, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ color: "#ccd6f6", fontSize: 13 }}>{typeIcon} {tl.message}</div>
-              {tl.actor && <div style={{ color: "#556", fontSize: 11 }}>👤 {tl.actor}</div>}
+              {tl.actor && <div style={{ color: "#556", fontSize: 12 }}>👤 {tl.actor}</div>}
             </div>
           </div>);
         })}
@@ -4712,7 +4712,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <button onClick={() => { if (confirm("상황일지를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, timeline: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 상황일지 초기화</button>
     </div>}
 
-    {tab === "custom" && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>➕ 항목 추가</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "항목명", k: "name" }, { l: "단위", k: "unit" }, { l: "아이콘", k: "icon" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={newCat[f.k]} onChange={e => setNewCat({ ...newCat, [f.k]: e.target.value })} /></div>))}<div><Label>기상청 카테고리</Label><select value={newCat.kmaCategory || ""} onChange={e => setNewCat({ ...newCat, kmaCategory: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff" }}><option value="">없음</option>{Object.entries(KMA_CODES).map(([code, info]) => <option key={code} value={code}>{code} — {info.name}</option>)}</select></div>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ color: lv.color, fontSize: 13, fontWeight: 700, minWidth: 36 }}>{lv.label}</span><input type="number" value={newCat.thresholds[lk][0]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [parseFloat(e.target.value) || 0, t[lk][1]]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={newCat.thresholds[lk][1] === Infinity ? "∞" : newCat.thresholds[lk][1]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [t[lk][0], e.target.value === "∞" ? Infinity : parseFloat(e.target.value) || 0]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /></div>))}<button onClick={() => { if (!newCat.name) return; setCategories(p => [...p, { ...newCat, id: "c_" + Date.now(), source: newCat.kmaCategory ? "api" : "manual" }]); }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button></div></Card>}
+    {tab === "custom" && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>➕ 항목 추가</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "항목명", k: "name" }, { l: "단위", k: "unit" }, { l: "아이콘", k: "icon" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={newCat[f.k]} onChange={e => setNewCat({ ...newCat, [f.k]: e.target.value })} /></div>))}<div><Label>기상청 카테고리</Label><select value={newCat.kmaCategory || ""} onChange={e => setNewCat({ ...newCat, kmaCategory: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff" }}><option value="">없음</option>{Object.entries(KMA_CODES).map(([code, info]) => <option key={code} value={code}>{code} — {info.name}</option>)}</select></div>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ color: lv.color, fontSize: 13, fontWeight: 700, minWidth: 36 }}>{lv.label}</span><input type="number" value={newCat.thresholds[lk][0]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [parseFloat(e.target.value) || 0, t[lk][1]]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={newCat.thresholds[lk][1] === Infinity ? "∞" : newCat.thresholds[lk][1]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [t[lk][0], e.target.value === "∞" ? Infinity : parseFloat(e.target.value) || 0]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /></div>))}<button onClick={() => { if (!newCat.name) return; setCategories(p => [...p, { ...newCat, id: "c_" + Date.now(), source: newCat.kmaCategory ? "api" : "manual" }]); }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button></div></Card>}
 
     {/* Settings */}
     {tab === "settings" && <div>
@@ -4767,8 +4767,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <span style={{ color: isToday ? "#4CAF50" : "#2196F3", fontSize: 14, fontWeight: 700 }}>{i+1}일차</span>
                 <span style={{ color: "#ccd6f6", fontSize: 14 }}>{dt.getMonth()+1}/{dt.getDate()}</span>
                 <span style={{ color: "#556", fontSize: 12 }}>({dayNames[dt.getDay()]})</span>
-                {isToday && <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>오늘</span>}
-                <button onClick={() => setSettings({...settings, festivalDates: (settings.festivalDates||[]).filter(x => x !== d)})} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "transparent", color: "#a33", fontSize: 12, cursor: "pointer", marginLeft: 4 }}>✕</button>
+                {isToday && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>오늘</span>}
+                <button onClick={() => setSettings({...settings, festivalDates: (settings.festivalDates||[]).filter(x => x !== d)})} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "transparent", color: "#a33", fontSize: 12, cursor: "pointer", marginLeft: 4 }}>✕</button>
               </div>;
             })}
           </div>
@@ -5434,23 +5434,23 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                   <span style={{ width: 8, height: 8, borderRadius: 4, background: isOnline ? "#4CAF50" : "#556", flexShrink: 0 }} />
                   <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{acc.name}</span>
                   <span style={{ color: "#556", fontSize: 14 }}>({acc.id})</span>
-                  <span style={{ padding: "2px 8px", borderRadius: 10, background: `${rl.color}22`, border: `1px solid ${rl.color}44`, color: rl.color, fontSize: 14, fontWeight: 700 }}>{rl.label}</span>
-                  {isOnline && <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>● 접속중</span>}
-                  {!isOnline && lastSeenLabel && <span style={{ color: "#556", fontSize: 11 }}>{lastSeenLabel}</span>}
+                  <span style={{ padding: "3px 8px", borderRadius: 10, background: `${rl.color}22`, border: `1px solid ${rl.color}44`, color: rl.color, fontSize: 14, fontWeight: 700 }}>{rl.label}</span>
+                  {isOnline && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>● 접속중</span>}
+                  {!isOnline && lastSeenLabel && <span style={{ color: "#556", fontSize: 12 }}>{lastSeenLabel}</span>}
                   {isSelf && <span style={{ color: "#2196F3", fontSize: 14 }}>← 현재</span>}
                 </div>
-                {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>}
+                {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {editable && (
-                  <select value={acc.role} onChange={e => changeRole(acc.id, e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                  <select value={acc.role} onChange={e => changeRole(acc.id, e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
                     {Object.entries(ROLES).filter(([k]) => (ROLE_RANK[k] || 0) < myRank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 )}
                 {(editable || isSelf) && <>
                   <input type="password" placeholder="새 비밀번호" value={editPw[acc.id] || ""} onChange={e => setEditPw({ ...editPw, [acc.id]: e.target.value })}
-                    style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, width: 120 }} />
-                  <button onClick={() => changePw(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#FF9800", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>변경</button>
+                    style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, width: 120 }} />
+                  <button onClick={() => changePw(acc.id)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#FF9800", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>변경</button>
                 </>}
                 {!editable && !isSelf && <span style={{ color: "#556", fontSize: 12 }}>🔒 상위 관리자</span>}
               </div>
@@ -5472,7 +5472,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                 return (<div style={{ marginTop: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <span style={{ color: "#556", fontSize: 12 }}>하단바 기능</span>
-                    <button onClick={() => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: undefined } : a))} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 11, cursor: "pointer" }}>기본값</button>
+                    <button onClick={() => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: undefined } : a))} style={{ padding: "3px 8px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 12, cursor: "pointer" }}>기본값</button>
                   </div>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {allPages.map(p => {
@@ -5482,7 +5482,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                         const cur = [...(acc.enabledPages || rolePg)];
                         const next = on ? cur.filter(x => x !== p.id) : [...cur, p.id];
                         setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: next } : a));
-                      }} style={{ padding: "5px 10px", borderRadius: 6, border: on ? "1.5px solid #4CAF50" : "1px solid #333", background: on ? "rgba(76,175,80,0.08)" : "transparent", color: on ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      }} style={{ padding: "6px 12px", borderRadius: 6, border: on ? "1.5px solid #4CAF50" : "1px solid #333", background: on ? "rgba(76,175,80,0.08)" : "transparent", color: on ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         {p.icon} {p.label}{!isDefault && on ? " +" : ""}
                       </button>);
                     })}
@@ -5701,7 +5701,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
           <div key={f.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, gap: 10 }}>
             <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>🏮 {f.name}</span>
             <span style={{ color: "#445", fontSize: 12 }}>{f.dates || ""}</span>
-            {f.id !== "default" && <button onClick={() => deleteFestival(f.id)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>}
+            {f.id !== "default" && <button onClick={() => deleteFestival(f.id)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>}
           </div>
         ))}
       </div>
@@ -5724,7 +5724,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
                   const newFests = assigned ? curFests.filter(x => x !== f.id) : [...curFests, f.id];
                   if (newFests.length === 0) { alert("최소 1개 축제에 배정해야 합니다."); return; }
                   setAccounts(p => p.map(a => a.id === acc.id ? { ...a, festivals: newFests, festivalId: newFests[0] } : a));
-                }} style={{ padding: "4px 10px", borderRadius: 6, border: assigned ? "1px solid #4CAF50" : "1px solid #333", background: assigned ? "rgba(76,175,80,0.1)" : "transparent", color: assigned ? "#4CAF50" : "#556", fontSize: 12, cursor: "pointer" }}>{assigned ? "✅" : "⬜"} {f.name}</button>;
+                }} style={{ padding: "6px 12px", borderRadius: 6, border: assigned ? "1px solid #4CAF50" : "1px solid #333", background: assigned ? "rgba(76,175,80,0.1)" : "transparent", color: assigned ? "#4CAF50" : "#556", fontSize: 12, cursor: "pointer" }}>{assigned ? "✅" : "⬜"} {f.name}</button>;
               })}
             </div>
           </div>
@@ -5939,12 +5939,12 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     {/* Top bar - user info */}
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid #1a1a2e", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-        <span style={{ padding: "2px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
+        <span style={{ padding: "3px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#FF9800", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
-        <button onClick={onLogout} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
+        {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#FF9800", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
+        <button onClick={onLogout} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
       </div>
     </div>
 
