@@ -2414,11 +2414,15 @@ function StageMgmtPage({ settings, setSettings, session }) {
   const perfs = settings.performances || [];
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
-  const [newPerf, setNewPerf] = useState({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], techrider: [
+  const [newPerf, setNewPerf] = useState({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], instruments: [], techrider: [
     { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
     { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
   ]});
-  const GENRES = ["보컬","밴드","재즈","댄스","마술","퍼포먼스"];
+  const DEFAULT_GENRES = ["보컬","밴드","재즈","댄스","마술","퍼포먼스"];
+  const GENRES = [...new Set([...DEFAULT_GENRES, ...(settings.customGenres || [])])];
+  const [addGenre, setAddGenre] = useState(false);
+  const [newGenre, setNewGenre] = useState("");
+  const INST_PRESETS = ["어쿠스틱기타(마이킹)","어쿠스틱기타(DI)","일렉기타(앰프)","일렉기타(이펙터)","키보드","드럼","베이스(DI)","베이스(앰프)","MTR"];
   const programs = (settings.programs || []).filter(p => p.category === "P");
   const canEdit = ["admin","manager","sysadmin","stagemgr"].includes(session?.role);
 
@@ -2456,6 +2460,11 @@ function StageMgmtPage({ settings, setSettings, session }) {
     const addTech = () => upF("techrider", [...(f.techrider||[]), { id: "tr_"+Date.now(), item: "", qty: 1, model: "" }]);
     const upTech = (i, k, v) => { const tr = [...(f.techrider||[])]; tr[i] = { ...tr[i], [k]: v }; upF("techrider", tr); };
     const delTech = (i) => upF("techrider", (f.techrider||[]).filter((_,j)=>j!==i));
+    const addInst = (name) => upF("instruments", [...(f.instruments||[]), { id: "in_"+Date.now(), name, ch: "M" }]);
+    const upInst = (i, k, v) => { const ins = [...(f.instruments||[])]; ins[i] = { ...ins[i], [k]: v }; upF("instruments", ins); };
+    const delInst = (i) => upF("instruments", (f.instruments||[]).filter((_,j)=>j!==i));
+    const moveInst = (i, d) => { const ins = [...(f.instruments||[])]; const ni = i+d; if (ni<0||ni>=ins.length) return; [ins[i],ins[ni]]=[ins[ni],ins[i]]; upF("instruments", ins); };
+    const [instCustom, setInstCustom] = useState("");
 
     return (<div style={{ padding: "16px", borderRadius: 14, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -2471,9 +2480,18 @@ function StageMgmtPage({ settings, setSettings, session }) {
           <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>연락처</label><Input value={f.phone} onChange={e => upF("phone", e.target.value)} placeholder="010-0000-0000" /></div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>분류</label><select value={f.genre} onChange={e => upF("genre", e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
-            {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
-          </select></div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>분류</label>
+            <div style={{ display: "flex", gap: 4 }}>
+              <select value={f.genre} onChange={e => upF("genre", e.target.value)} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+                {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <button onClick={() => setAddGenre(!addGenre)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#CE93D8", fontSize: 12, cursor: "pointer" }}>+</button>
+            </div>
+            {addGenre && <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+              <Input value={newGenre} onChange={e => setNewGenre(e.target.value)} placeholder="새 분류명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
+              <button onClick={() => { if (newGenre && !GENRES.includes(newGenre)) { setSettings(prev => ({ ...prev, customGenres: [...(prev.customGenres||[]), newGenre] })); upF("genre", newGenre); setNewGenre(""); setAddGenre(false); } }} style={{ padding: "8px 12px", borderRadius: 6, border: "none", background: "#9C27B0", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>추가</button>
+            </div>}
+          </div>
           <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>연결 프로그램</label><select value={f.programId || ""} onChange={e => { const pg = programs.find(p=>p.id===e.target.value); upF("programId", e.target.value); if (pg) { upF("programTitle", pg.title); upF("date", pg.date); upF("time", pg.time); upF("endTime", pg.endTime); upF("location", pg.location); } }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
             <option value="">수동 입력</option>
             {programs.map(p => <option key={p.id} value={p.id}>{p.title} ({p.time})</option>)}
@@ -2504,6 +2522,39 @@ function StageMgmtPage({ settings, setSettings, session }) {
             <button onClick={() => moveSong(si,-1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▲</button>
             <button onClick={() => moveSong(si,1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▼</button>
             <button onClick={() => delSong(si)} style={{ padding: "4px 6px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* 사용악기 */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700 }}>🎸 사용악기</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{(f.instruments||[]).length}개</span>
+        </div>
+        {/* 프리셋 선택 */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+          {INST_PRESETS.filter(p => !(f.instruments||[]).find(i => i.name === p)).map(preset => (
+            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>+ {preset}</button>
+          ))}
+        </div>
+        {/* 커스텀 추가 */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+          <Input value={instCustom} onChange={e => setInstCustom(e.target.value)} placeholder="직접 입력 (예: 첼로)" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
+          <button onClick={() => { if (instCustom) { addInst(instCustom); setInstCustom(""); } }} style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: "#2196F3", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>추가</button>
+        </div>
+        {/* 등록된 악기 */}
+        {(f.instruments||[]).map((inst, ii) => (
+          <div key={inst.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
+            <span style={{ color: "#556", fontSize: 13, fontWeight: 700, minWidth: 20 }}>{ii+1}</span>
+            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{inst.name}</span>
+            <div style={{ display: "flex", gap: 2 }}>
+              <button onClick={() => upInst(ii, "ch", "S")} style={{ padding: "4px 8px", borderRadius: 4, border: inst.ch === "S" ? "2px solid #4CAF50" : "1px solid #333", background: inst.ch === "S" ? "rgba(76,175,80,0.1)" : "transparent", color: inst.ch === "S" ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>S</button>
+              <button onClick={() => upInst(ii, "ch", "M")} style={{ padding: "4px 8px", borderRadius: 4, border: inst.ch === "M" ? "2px solid #2196F3" : "1px solid #333", background: inst.ch === "M" ? "rgba(33,150,243,0.1)" : "transparent", color: inst.ch === "M" ? "#2196F3" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>M</button>
+            </div>
+            <button onClick={() => moveInst(ii,-1)} style={{ padding: "3px 5px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 10, borderRadius: 4, cursor: "pointer" }}>▲</button>
+            <button onClick={() => moveInst(ii,1)} style={{ padding: "3px 5px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 10, borderRadius: 4, cursor: "pointer" }}>▼</button>
+            <button onClick={() => delInst(ii)} style={{ padding: "3px 5px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
           </div>
         ))}
       </div>
@@ -2571,6 +2622,9 @@ function StageMgmtPage({ settings, setSettings, session }) {
           </div>}
           {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 4 }}>
             <span style={{ color: "#FF9800", fontSize: 11 }}>🔧 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span>
+          </div>}
+          {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 4 }}>
+            <span style={{ color: "#2196F3", fontSize: 11 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}(${i.ch})`).join(", ")}</span>
           </div>}
         </div>);
       })}
