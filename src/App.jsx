@@ -2414,6 +2414,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
   const perfs = settings.performances || [];
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
+  const [dateOpen, setDateOpen] = useState({});
   const [newPerf, setNewPerf] = useState({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], instruments: [], techrider: [
     { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
     { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
@@ -2460,11 +2461,17 @@ function StageMgmtPage({ settings, setSettings, session }) {
     const addTech = () => upF("techrider", [...(f.techrider||[]), { id: "tr_"+Date.now(), item: "", qty: 1, model: "" }]);
     const upTech = (i, k, v) => { const tr = [...(f.techrider||[])]; tr[i] = { ...tr[i], [k]: v }; upF("techrider", tr); };
     const delTech = (i) => upF("techrider", (f.techrider||[]).filter((_,j)=>j!==i));
-    const addInst = (name) => upF("instruments", [...(f.instruments||[]), { id: "in_"+Date.now(), name, ch: "M" }]);
+    const addInst = (name) => upF("instruments", [...(f.instruments||[]), { id: "in_"+Date.now(), name, ch: "M", qty: 1 }]);
     const upInst = (i, k, v) => { const ins = [...(f.instruments||[])]; ins[i] = { ...ins[i], [k]: v }; upF("instruments", ins); };
     const delInst = (i) => upF("instruments", (f.instruments||[]).filter((_,j)=>j!==i));
     const moveInst = (i, d) => { const ins = [...(f.instruments||[])]; const ni = i+d; if (ni<0||ni>=ins.length) return; [ins[i],ins[ni]]=[ins[ni],ins[i]]; upF("instruments", ins); };
     const [instCustom, setInstCustom] = useState("");
+    const [trSec, setTrSec] = useState({ setlist: true, instruments: false, requests: false });
+    const toggleTr = (k) => setTrSec(p => ({ ...p, [k]: !p[k] }));
+    const copyTR = () => { localStorage.setItem("_tr_clipboard", JSON.stringify({ setlist: f.setlist, instruments: f.instruments, techrider: f.techrider })); alert("✅ 테크라이더 복사 완료"); };
+    const pasteTR = () => { try { const d = JSON.parse(localStorage.getItem("_tr_clipboard")); if (d) { if (d.setlist) upF("setlist", d.setlist); if (d.instruments) upF("instruments", d.instruments); if (d.techrider) upF("techrider", d.techrider); alert("✅ 붙여넣기 완료"); } } catch { alert("❌ 실패"); } };
+    const [importOpen, setImportOpen] = useState(false);
+    const importFrom = (srcId) => { const src = perfs.find(p => p.id === srcId); if (src) { if (src.setlist?.length) upF("setlist", JSON.parse(JSON.stringify(src.setlist))); if (src.instruments?.length) upF("instruments", JSON.parse(JSON.stringify(src.instruments))); if (src.techrider?.length) upF("techrider", JSON.parse(JSON.stringify(src.techrider))); setImportOpen(false); alert(`✅ ${src.artist}의 테크라이더를 가져왔습니다.`); } };
 
     return (<div style={{ padding: "16px", borderRadius: 14, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -2504,78 +2511,116 @@ function StageMgmtPage({ settings, setSettings, session }) {
         </div>}
       </div>
 
-      {/* 셋리스트 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700 }}>🎵 셋리스트</span>
-          <span style={{ color: "#556", fontSize: 12 }}>{(f.setlist||[]).length}곡</span>
-          <button onClick={addSong} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 곡 추가</button>
-        </div>
-        {(f.setlist||[]).map((song, si) => (
-          <div key={song.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
-            <span style={{ color: "#556", fontSize: 13, fontWeight: 700, minWidth: 20 }}>{si+1}</span>
-            <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
-            <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 12, width: 65 }}>
-              <option value="MR">MR</option><option value="LIVE">라이브</option>
-            </select>
-            <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 50, padding: "8px", fontSize: 12, textAlign: "center" }} />
-            <button onClick={() => moveSong(si,-1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▲</button>
-            <button onClick={() => moveSong(si,1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▼</button>
-            <button onClick={() => delSong(si)} style={{ padding: "4px 6px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+      {/* 테크라이더 아코디언 */}
+      <div style={{ marginBottom: 16, borderRadius: 14, border: "1px solid rgba(156,39,176,0.15)", overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>📋 테크라이더</span>
+            <button onClick={copyTR} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>📋복사</button>
+            <button onClick={pasteTR} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>📥붙여넣기</button>
+            <button onClick={() => setImportOpen(!importOpen)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 11, cursor: "pointer" }}>📂가져오기</button>
           </div>
-        ))}
-      </div>
+          {importOpen && perfs.filter(p => p.id !== f.id && ((p.setlist||[]).length > 0 || (p.instruments||[]).length > 0 || (p.techrider||[]).length > 0)).length > 0 && <div style={{ padding: "8px 16px 12px", background: "rgba(156,39,176,0.03)", borderBottom: "1px solid #1a1a2e" }}>
+            <div style={{ color: "#556", fontSize: 12, marginBottom: 6 }}>기존 공연에서 테크라이더 가져오기:</div>
+            {perfs.filter(p => p.id !== f.id && ((p.setlist||[]).length > 0 || (p.instruments||[]).length > 0 || (p.techrider||[]).length > 0)).map(p => (
+              <button key={p.id} onClick={() => importFrom(p.id)} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #222", background: "rgba(255,255,255,0.02)", color: "#ccd6f6", fontSize: 13, cursor: "pointer", marginBottom: 4, textAlign: "left" }}>
+                🎤 {p.artist} <span style={{ color: "#556", fontSize: 11 }}>({(p.setlist||[]).length}곡 · {(p.instruments||[]).length}악기 · {(p.techrider||[]).filter(t=>t.qty>0).length}요청)</span>
+              </button>
+            ))}
+          </div>}
 
-      {/* 사용악기 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700 }}>🎸 사용악기</span>
-          <span style={{ color: "#556", fontSize: 12 }}>{(f.instruments||[]).length}개</span>
-        </div>
-        {/* 프리셋 선택 */}
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-          {INST_PRESETS.filter(p => !(f.instruments||[]).find(i => i.name === p)).map(preset => (
-            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>+ {preset}</button>
-          ))}
-        </div>
-        {/* 커스텀 추가 */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-          <Input value={instCustom} onChange={e => setInstCustom(e.target.value)} placeholder="직접 입력 (예: 첼로)" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
-          <button onClick={() => { if (instCustom) { addInst(instCustom); setInstCustom(""); } }} style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: "#2196F3", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>추가</button>
-        </div>
-        {/* 등록된 악기 */}
-        {(f.instruments||[]).map((inst, ii) => (
-          <div key={inst.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
-            <span style={{ color: "#556", fontSize: 13, fontWeight: 700, minWidth: 20 }}>{ii+1}</span>
-            <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{inst.name}</span>
-            <div style={{ display: "flex", gap: 2 }}>
-              <button onClick={() => upInst(ii, "ch", "S")} style={{ padding: "4px 8px", borderRadius: 4, border: inst.ch === "S" ? "2px solid #4CAF50" : "1px solid #333", background: inst.ch === "S" ? "rgba(76,175,80,0.1)" : "transparent", color: inst.ch === "S" ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>S</button>
-              <button onClick={() => upInst(ii, "ch", "M")} style={{ padding: "4px 8px", borderRadius: 4, border: inst.ch === "M" ? "2px solid #2196F3" : "1px solid #333", background: inst.ch === "M" ? "rgba(33,150,243,0.1)" : "transparent", color: inst.ch === "M" ? "#2196F3" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>M</button>
+          {/* 셋리스트 */}
+          <div style={{ borderTop: "1px solid #1a1a2e" }}>
+            <div onClick={() => toggleTr("setlist")} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "rgba(255,255,255,0.01)" }}>
+              <span style={{ color: "#CE93D8", fontSize: 13 }}>{trSec.setlist ? "▼" : "▶"}</span>
+              <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700 }}>🎵 셋리스트</span>
+              <span style={{ color: "#556", fontSize: 12 }}>{(f.setlist||[]).length}곡</span>
+              <button onClick={e => { e.stopPropagation(); addSong(); }} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
             </div>
-            <button onClick={() => moveInst(ii,-1)} style={{ padding: "3px 5px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 10, borderRadius: 4, cursor: "pointer" }}>▲</button>
-            <button onClick={() => moveInst(ii,1)} style={{ padding: "3px 5px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 10, borderRadius: 4, cursor: "pointer" }}>▼</button>
-            <button onClick={() => delInst(ii)} style={{ padding: "3px 5px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+            {trSec.setlist && <div style={{ padding: "0 12px 12px" }}>
+              {(f.setlist||[]).map((song, si) => (
+                <div key={song.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 5 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 800, minWidth: 22 }}>{si+1}</span>
+                    <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, padding: "8px", fontSize: 14 }} />
+                    <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13, width: 70 }}>
+                      <option value="MR">MR</option><option value="LIVE">라이브</option>
+                    </select>
+                    <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 50, padding: "8px", fontSize: 13, textAlign: "center" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <Input value={song.memo||""} onChange={e => upSong(si, "memo", e.target.value)} placeholder="메모 (키, 특이사항 등)" style={{ flex: 1, padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
+                    <button onClick={() => moveSong(si,-1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▲</button>
+                    <button onClick={() => moveSong(si,1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▼</button>
+                    <button onClick={() => delSong(si)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                  </div>
+                </div>
+              ))}
+            </div>}
           </div>
-        ))}
-      </div>
 
-      {/* 테크라이더 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 700 }}>🔧 테크라이더</span>
-          <button onClick={addTech} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #FF9800", background: "transparent", color: "#FF9800", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 항목 추가</button>
-        </div>
-        {(f.techrider||[]).map((tr, ti) => (
-          <div key={tr.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
-            <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="장비명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
-            <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 45, padding: "8px", fontSize: 13, textAlign: "center" }} />
-            <span style={{ color: "#556", fontSize: 11 }}>개</span>
-            {tr.item?.includes("앰프") && <Input value={tr.model||""} onChange={e => upTech(ti, "model", e.target.value)} placeholder="모델명" style={{ width: 80, padding: "8px", fontSize: 12 }} />}
-            <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "4px 8px", borderRadius: 4, border: tr.qty > 0 ? "1px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 11, cursor: "pointer" }}>{tr.qty > 0 ? "✓" : "○"}</button>
-            <button onClick={() => delTech(ti)} style={{ padding: "4px 6px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+          {/* 사용악기 */}
+          <div style={{ borderTop: "1px solid #1a1a2e" }}>
+            <div onClick={() => toggleTr("instruments")} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "rgba(255,255,255,0.01)" }}>
+              <span style={{ color: "#2196F3", fontSize: 13 }}>{trSec.instruments ? "▼" : "▶"}</span>
+              <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700 }}>🎸 사용악기</span>
+              <span style={{ color: "#556", fontSize: 12 }}>{(f.instruments||[]).length}개</span>
+            </div>
+            {trSec.instruments && <div style={{ padding: "0 12px 12px" }}>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                {INST_PRESETS.filter(p => !(f.instruments||[]).find(i => i.name === p)).map(preset => (
+                  <button key={preset} onClick={() => addInst(preset)} style={{ padding: "7px 10px", borderRadius: 6, border: "1px solid rgba(33,150,243,0.2)", background: "rgba(33,150,243,0.04)", color: "#2196F3", fontSize: 12, cursor: "pointer" }}>+ {preset}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <Input value={instCustom} onChange={e => setInstCustom(e.target.value)} placeholder="직접 입력" style={{ flex: 1, padding: "9px", fontSize: 13 }} />
+                <button onClick={() => { if (instCustom) { addInst(instCustom); setInstCustom(""); } }} style={{ padding: "9px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+              </div>
+              {(f.instruments||[]).map((inst, ii) => (
+                <div key={inst.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(33,150,243,0.03)", border: "1px solid rgba(33,150,243,0.1)", marginBottom: 5 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 800, minWidth: 20 }}>{ii+1}</span>
+                    <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{inst.name}</span>
+                    <span style={{ color: "#556", fontSize: 12 }}>×</span>
+                    <button onClick={() => upInst(ii, "qty", Math.max(1,(inst.qty||1)-1))} style={{ width: 26, height: 26, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>-</button>
+                    <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, minWidth: 18, textAlign: "center" }}>{inst.qty||1}</span>
+                    <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 26, height: 26, borderRadius: 5, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+</button>
+                    <button onClick={() => upInst(ii, "ch", inst.ch === "S" ? "M" : "S")} style={{ padding: "4px 10px", borderRadius: 5, border: `1.5px solid ${inst.ch==="S"?"#4CAF50":"#2196F3"}`, background: "transparent", color: inst.ch==="S"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S":"M"}</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모 (모델, 세팅 등)" style={{ flex: 1, padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)" }} />
+                    <button onClick={() => moveInst(ii,-1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▲</button>
+                    <button onClick={() => moveInst(ii,1)} style={{ padding: "5px 7px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 5, cursor: "pointer" }}>▼</button>
+                    <button onClick={() => delInst(ii)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                  </div>
+                </div>
+              ))}
+            </div>}
           </div>
-        ))}
-      </div>
+
+          {/* 요청사항 */}
+          <div style={{ borderTop: "1px solid #1a1a2e" }}>
+            <div onClick={() => toggleTr("requests")} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "rgba(255,255,255,0.01)" }}>
+              <span style={{ color: "#FF9800", fontSize: 13 }}>{trSec.requests ? "▼" : "▶"}</span>
+              <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 700 }}>📝 요청사항</span>
+              <span style={{ color: "#556", fontSize: 12 }}>{(f.techrider||[]).filter(t=>t.qty>0).length}건</span>
+              <button onClick={e => { e.stopPropagation(); addTech(); }} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 6, border: "1px solid #FF9800", background: "transparent", color: "#FF9800", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 추가</button>
+            </div>
+            {trSec.requests && <div style={{ padding: "0 12px 12px" }}>
+              {(f.techrider||[]).map((tr, ti) => (
+                <div key={tr.id} style={{ padding: "10px", borderRadius: 10, background: "rgba(255,152,0,0.03)", border: "1px solid rgba(255,152,0,0.1)", marginBottom: 5 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                    <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ flex: 1, padding: "8px", fontSize: 14 }} />
+                    <span style={{ color: "#556", fontSize: 12 }}>×</span>
+                    <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 42, padding: "8px", fontSize: 14, textAlign: "center" }} />
+                    <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "5px 10px", borderRadius: 5, border: tr.qty > 0 ? "1.5px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{tr.qty > 0 ? "✓" : "○"}</button>
+                    <button onClick={() => delTech(ti)} style={{ padding: "5px 7px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+                  </div>
+                  <Input value={tr.memo||""} onChange={e => upTech(ti, "memo", e.target.value)} placeholder="메모 (모델명, 상세 요청 등)" style={{ width: "100%", padding: "7px", fontSize: 12, background: "rgba(255,255,255,0.02)", boxSizing: "border-box" }} />
+                </div>
+              ))}
+            </div>}
+          </div>
+        </div>
 
       <button onClick={() => { if (!f.artist) { alert("아티스트명을 입력하세요."); return; } onSave(f); }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>✅ {f.id ? "수정 완료" : "등록"}</button>
     </div>);
@@ -2587,7 +2632,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
       <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{perfs.length}개 공연 등록</p>
 
       {canEdit && !addMode && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-        <button onClick={() => { setAddMode(true); setEditId(null); setNewPerf({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], techrider: [
+        <button onClick={() => { setAddMode(true); setEditId(null); setNewPerf({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], instruments: [], techrider: [
           { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
           { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
         ]}); }} style={{ padding: "14px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🎤 수동 등록</button>
@@ -2596,38 +2641,54 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
       {addMode && <PerfForm perf={newPerf} onSave={savePerf} onCancel={() => setAddMode(false)} />}
 
-      {/* 등록된 공연 목록 */}
-      {perfs.sort((a,b) => (a.time||"").localeCompare(b.time||"")).map(pf => {
-        const isEdit = editId === pf.id;
-        const pg = pf.programId ? programs.find(p => p.id === pf.programId) : null;
+      {/* 일자별 아코디언 */}
+      {(() => {
+        const sorted = [...perfs].sort((a,b) => (a.date||"9999").localeCompare(b.date||"9999") || (a.time||"").localeCompare(b.time||""));
+        const dateGroups = {};
+        sorted.forEach(pf => { const d = pf.date || "미지정"; if (!dateGroups[d]) dateGroups[d] = []; dateGroups[d].push(pf); });
         const genreColor = { 보컬: "#E91E63", 밴드: "#F44336", 재즈: "#2196F3", 댄스: "#4CAF50", 마술: "#FF9800", 퍼포먼스: "#9C27B0" };
 
-        if (isEdit) return <PerfForm key={pf.id} perf={pf} onSave={savePerf} onCancel={() => setEditId(null)} />;
+        return Object.entries(dateGroups).map(([dateKey, items]) => {
+          const dateLabel = dateKey === "미지정" ? "📅 일자 미지정" : (() => { const d = new Date(dateKey); return `📅 ${d.getMonth()+1}/${d.getDate()} (${["일","월","화","수","목","금","토"][d.getDay()]})`; })();
+          const isOpen = dateOpen[dateKey] !== false;
 
-        return (<div key={pf.id} onClick={canEdit ? () => setEditId(pf.id) : undefined} style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid #222", marginBottom: 8, cursor: canEdit ? "pointer" : "default" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span style={{ padding: "3px 10px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 12, fontWeight: 700 }}>{pf.genre}</span>
-            <span style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
-            {canEdit && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
-            {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "4px 8px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, borderRadius: 6, cursor: "pointer" }}>🗑</button>}
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-            {pf.time && <span style={{ color: "#8892b0", fontSize: 13 }}>⏰ {pf.time}~{pf.endTime}</span>}
-            {(pf.location || pg?.location) && <span style={{ color: "#556", fontSize: 13 }}>📍 {pf.location || pg?.location}</span>}
-            {pf.phone && <span style={{ color: "#556", fontSize: 12 }}>📞 {pf.phone}</span>}
-          </div>
-          {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 8, background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.1)" }}>
-            <span style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
-            {(pf.setlist||[]).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 12, marginLeft: 8 }}>{i+1}. {s.name || "?"} ({s.type})</span>)}
-          </div>}
-          {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 4 }}>
-            <span style={{ color: "#FF9800", fontSize: 11 }}>🔧 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span>
-          </div>}
-          {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 4 }}>
-            <span style={{ color: "#2196F3", fontSize: 11 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}(${i.ch})`).join(", ")}</span>
-          </div>}
-        </div>);
-      })}
+          return (<div key={dateKey} style={{ marginBottom: 10, borderRadius: 12, border: "1px solid #222", overflow: "hidden" }}>
+            <div onClick={() => setDateOpen(p => ({ ...p, [dateKey]: !isOpen }))} style={{ padding: "12px 16px", background: "rgba(156,39,176,0.04)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <span style={{ color: "#CE93D8", fontSize: 13 }}>{isOpen ? "▼" : "▶"}</span>
+              <span style={{ color: "#CE93D8", fontSize: 15, fontWeight: 800, flex: 1 }}>{dateLabel}</span>
+              <span style={{ color: "#556", fontSize: 12 }}>{items.length}팀</span>
+            </div>
+            {isOpen && <div style={{ padding: "8px 10px" }}>
+              {items.map(pf => {
+                const isEdit = editId === pf.id;
+                const pg = pf.programId ? programs.find(p => p.id === pf.programId) : null;
+                if (isEdit) return <PerfForm key={pf.id} perf={pf} onSave={savePerf} onCancel={() => setEditId(null)} />;
+
+                return (<div key={pf.id} onClick={canEdit ? () => setEditId(pf.id) : undefined} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a2e", marginBottom: 6, cursor: canEdit ? "pointer" : "default" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={{ padding: "2px 8px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 11, fontWeight: 700 }}>{pf.genre}</span>
+                    <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
+                    {canEdit && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
+                    {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "3px 6px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>🗑</button>}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                    {pf.time && <span style={{ color: "#8892b0", fontSize: 13 }}>⏰ {pf.time}~{pf.endTime}</span>}
+                    {(pf.location || pg?.location) && <span style={{ color: "#556", fontSize: 12 }}>📍 {pf.location || pg?.location}</span>}
+                    {pf.phone && <span style={{ color: "#556", fontSize: 12 }}>📞 {pf.phone}</span>}
+                  </div>
+                  {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 4, padding: "6px 8px", borderRadius: 6, background: "rgba(156,39,176,0.04)" }}>
+                    <span style={{ color: "#CE93D8", fontSize: 11, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
+                    {(pf.setlist||[]).slice(0,3).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 11, marginLeft: 6 }}>{i+1}.{s.name||"?"}</span>)}
+                    {(pf.setlist||[]).length > 3 && <span style={{ color: "#556", fontSize: 11 }}> +{(pf.setlist||[]).length-3}</span>}
+                  </div>}
+                  {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#2196F3", fontSize: 11 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}${(i.qty||1)>1?"×"+(i.qty||1):""}`).join(", ")}</span></div>}
+                  {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#FF9800", fontSize: 11 }}>📝 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span></div>}
+                </div>);
+              })}
+            </div>}
+          </div>);
+        });
+      })()}
 
       {perfs.length === 0 && !addMode && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>등록된 공연이 없습니다.<br/>수동 등록 또는 프로그램에서 가져오세요.</div>}
     </div>
