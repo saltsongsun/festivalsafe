@@ -1671,7 +1671,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
   const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
   const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
   const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FF9800", icon: "🚗" }, supporting: { label: "현장지원중", color: "#4CAF50", icon: "🚑" } };
-  const getStatusMap = (zone) => zone?.zoneType === "safety" ? STATUS_SAFETY : zone?.zoneType === "support" ? STATUS_SUPPORT : STATUS_NORMAL;
+  const STATUS_PERFORMANCE = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, preparing: { label: "준비중", color: "#FF9800", icon: "🔧" }, performing: { label: "공연중", color: "#9C27B0", icon: "🎭" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const getStatusMap = (zone) => zone?.zoneType === "safety" ? STATUS_SAFETY : zone?.zoneType === "support" ? STATUS_SUPPORT : zone?.zoneType === "performance" ? STATUS_PERFORMANCE : STATUS_NORMAL;
 
   const setStatus = (siteId, status) => { const site = workSites.find(s => s.id === siteId); setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s), timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "status", message: `📊 ${site?.name || ""} 상태 → ${status}`, actor: session?.name }] })); };
   const sendRequest = () => {
@@ -1688,7 +1689,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
   const totalWorkers = workSites.reduce((n, s) => n + (s.workers || []).length, 0);
   const safetyZones = zones.filter(z => z.zoneType === "safety" && z.name);
   const supportZones = zones.filter(z => z.zoneType === "support" && z.name);
-  const normalZones = zones.filter(z => (!z.zoneType || z.zoneType === "normal") && z.name);
+  const performanceZones = zones.filter(z => z.zoneType === "performance" && z.name);
+  const normalZones = zones.filter(z => (!z.zoneType || z.zoneType === "normal" || z.zoneType === "none") && z.name);
   const myRequests = (settings.zoneRequests || []).filter(r => r.targetZoneId === myZone?.id && r.status !== "completed");
   const pendingCount = (settings.zoneRequests || []).filter(r => r.status === "pending").length;
   const congestionData = settings.zoneCongestion || [];
@@ -1731,6 +1733,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         const deleteW = () => { if (!confirm(`${w.name} 삭제?`)) return; const ws = JSON.parse(JSON.stringify(settings.workSites || [])); const si = ws.findIndex(s => s.id === site.id); if (si >= 0) { ws[si].workers = ws[si].workers.filter(ww => ww.id !== w.id); setSettings(prev => ({ ...prev, workSites: ws })); setEditFspWorker(null); } };
 
         if (isEditing && isAdmin) {
+          const WSTAT = { working: { label: "근무중", color: "#4CAF50", icon: "🟢" }, away: { label: "자리비움", color: "#FF9800", icon: "🟡" }, moving: { label: "이동중", color: "#2196F3", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
           return (<div key={w.id} style={{ padding: "14px", borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "2px solid rgba(33,150,243,0.2)", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 18 }}>✏️</span>
@@ -1738,6 +1741,15 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
               <button onClick={() => setEditFspWorker(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
             </div>
             <div style={{ display: "grid", gap: 10 }}>
+              {/* 상태 버튼 */}
+              <div>
+                <label style={{ color: "#556", fontSize: 12, marginBottom: 6, display: "block" }}>현재 상태</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
+                  {Object.entries(WSTAT).map(([k, v]) => (
+                    <button key={k} onClick={() => updateW("wStatus", w.wStatus === k ? null : k)} style={{ padding: "10px 4px", borderRadius: 8, border: w.wStatus === k ? `2px solid ${v.color}` : "1px solid #333", background: w.wStatus === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>{v.icon}<br/>{v.label}</button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div><label style={{ color: "#556", fontSize: 12, marginBottom: 4, display: "block" }}>이름</label><Input value={w.name} onChange={e => updateW("name", e.target.value)} /></div>
                 <div><label style={{ color: "#556", fontSize: 12, marginBottom: 4, display: "block" }}>연락처</label><Input value={w.phone || ""} onChange={e => updateW("phone", e.target.value)} /></div>
@@ -1771,9 +1783,12 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           </div>);
         }
 
-        return (<div key={w.id} onClick={isAdmin ? () => setEditFspWorker({ siteId: site.id, workerId: w.id }) : undefined} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, fontSize: 13, cursor: isAdmin ? "pointer" : "default", background: "rgba(255,255,255,0.02)", border: "1px solid #1a1a2e", marginBottom: 3 }}>
-          <span style={{ fontSize: 14 }}>👤</span>
+        const WSTAT2 = { working: { label: "근무중", color: "#4CAF50", icon: "🟢" }, away: { label: "자리비움", color: "#FF9800", icon: "🟡" }, moving: { label: "이동중", color: "#2196F3", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
+        const ws2 = WSTAT2[w.wStatus];
+        return (<div key={w.id} onClick={isAdmin ? () => setEditFspWorker({ siteId: site.id, workerId: w.id }) : undefined} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, fontSize: 13, cursor: isAdmin ? "pointer" : "default", background: "rgba(255,255,255,0.02)", border: "1px solid #1a1a2e", marginBottom: 3, opacity: w.wStatus === "off" ? 0.4 : 1 }}>
+          <span style={{ fontSize: 14 }}>{ws2 ? ws2.icon : "👤"}</span>
           <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{w.name}</span>
+          {ws2 && <span style={{ padding: "2px 8px", borderRadius: 6, background: `${ws2.color}15`, color: ws2.color, fontSize: 11, fontWeight: 700 }}>{ws2.label}</span>}
           {w.type && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(206,147,216,0.1)", color: "#CE93D8", fontSize: 11, fontWeight: 600 }}>{w.type}</span>}
           {w.role && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 11, fontWeight: 600 }}>{w.role}</span>}
           {w.accountId && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 10 }}>🔑</span>}
@@ -1908,7 +1923,23 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             {open && sites.length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 12, textAlign: "center" }}>근무지 없음</div>}
           </div>);
         })}
-        {normalZones.length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556", fontSize: 13 }}>일반 관리구역이 없습니다.</div>}
+        {normalZones.length === 0 && performanceZones.length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556", fontSize: 13 }}>관리구역이 없습니다.</div>}
+
+        {/* 공연관리 구역 */}
+        {performanceZones.map(zone => {
+          const sites = workSites.filter(s => s.zoneId === zone.id);
+          const open = zoneOpen[zone.id];
+          return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(156,39,176,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+            <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <span style={{ color: "#9C27B0", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+              <span style={{ fontSize: 14 }}>🎭</span>
+              <span style={{ color: "#9C27B0", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+              <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
+            </div>
+            {open && sites.map(site => renderSiteBlock(site, STATUS_PERFORMANCE, zone))}
+            {open && sites.length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 12, textAlign: "center" }}>근무지 없음</div>}
+          </div>);
+        })}
 
         {/* 프로그램 현황 */}
         {(settings.programs || []).length > 0 && (() => {
@@ -2103,6 +2134,16 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
           {open && sites.map(site => renderSiteBlock(site, STATUS_SUPPORT, zone))}
+        </div>); })}
+
+        {/* 공연관리 구역 */}
+        {performanceZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(156,39,176,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+          <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ color: "#9C27B0", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🎭</span><span style={{ color: "#9C27B0", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
+          </div>
+          {open && sites.map(site => renderSiteBlock(site, STATUS_PERFORMANCE, zone))}
         </div>); })}
 
         {(settings.zoneRequests || []).filter(r => r.status === "completed").length > 0 && <div>
@@ -3307,7 +3348,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 등록</h3>
         {(settings.zones || []).map((z, i) => {
-          const ZTYPES = { normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" } };
+          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" } };
           const zt = ZTYPES[z.zoneType] || ZTYPES.normal;
           return (
           <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
@@ -3323,7 +3364,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
               <div><Label>구역 속성</Label><select value={z.zoneType || "normal"} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, zoneType: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+                <option value="none">⬜ 속성없음</option>
                 <option value="normal">📍 일반관리</option>
+                <option value="performance">🎭 공연관리</option>
                 <option value="safety">🛡️ 안전관리</option>
                 <option value="support">🚑 지원관리</option>
               </select></div>
