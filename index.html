@@ -47,11 +47,10 @@
   <script>
   if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').then(function(reg) {
-      // Check for updates every 60 seconds
       setInterval(function() { reg.update(); }, 60000);
       reg.addEventListener('updatefound', function() {
         var nw = reg.installing;
-        nw.addEventListener('statechange', function() {
+        if (nw) nw.addEventListener('statechange', function() {
           if (nw.state === 'installed' && navigator.serviceWorker.controller) {
             window.dispatchEvent(new CustomEvent('sw-update-available'));
           }
@@ -63,11 +62,18 @@
         window.dispatchEvent(new CustomEvent('sw-update-available'));
       }
     });
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (window._swUpdating) window.location.reload();
+    });
     window.applySwUpdate = function() {
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage('skipWaiting');
-      }
-      window.location.reload();
+      window._swUpdating = true;
+      navigator.serviceWorker.getRegistration().then(function(reg) {
+        if (reg && reg.waiting) {
+          reg.waiting.postMessage('skipWaiting');
+        } else {
+          window.location.reload();
+        }
+      });
     };
   }
   </script>
