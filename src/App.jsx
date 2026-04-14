@@ -1884,7 +1884,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
 
 // ─── Program Page (축제 프로그램) ─────────────────────────────────
-function ProgramPage({ settings, session, onManage }) {
+function ProgramPage({ settings, setSettings, session, onManage }) {
   const programs = (settings.programs || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   const rawDates = settings.festivalDates || [];
   // 축제일자가 없으면 프로그램 데이터에서 자동 추출
@@ -1950,29 +1950,41 @@ function ProgramPage({ settings, session, onManage }) {
           {items.map(pg => {
             const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
             const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
-            const isNow = (selDate === todayStr || selDate === "all") && pg.date !== "always" && nowMin >= sh*60+sm && nowMin <= eh*60+em;
-            const isPast = selDate === todayStr && pg.date !== "always" && nowMin > eh*60+em;
+            const pgDate = pg.date && pg.date !== "always" ? new Date(pg.date) : null;
+            const dateLabel = pgDate ? `${pgDate.getMonth()+1}/${pgDate.getDate()}` : "";
+            const isNow = (selDate === todayStr || selDate === "all") && pg.date !== "always" && nowMin >= sh*60+sm && nowMin <= eh*60+em && pg.pgStatus !== "ended";
+            const isPast = (pg.pgStatus === "ended") || (selDate === todayStr && pg.date !== "always" && nowMin > eh*60+em);
+            const isDelayed = pg.pgStatus === "delayed";
             const cat = CATS[pg.category] || CATS.all;
-            return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.4 : 1 }}>
+            const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+            const setPgStatus = (status) => setSettings(prev => ({ ...prev, programs: (prev.programs||[]).map(p => p.id === pg.id ? { ...p, pgStatus: p.pgStatus === status ? null : status } : p) }));
+            return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: isDelayed ? "rgba(255,152,0,0.06)" : isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isDelayed ? "2px solid rgba(255,152,0,0.3)" : isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.4 : 1 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ textAlign: "center", minWidth: 54, paddingTop: 2 }}>
                   {pg.date === "always" ? <div style={{ color: "#009688", fontSize: 13, fontWeight: 800 }}>상시</div> : <>
-                    <div style={{ color: isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
+                    {dateLabel && <div style={{ color: "#556", fontSize: 11 }}>{dateLabel}</div>}
+                    <div style={{ color: isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
                     <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime}</div>
                   </>}
                 </div>
-                <div style={{ width: 3, minHeight: 40, background: isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
+                <div style={{ width: 3, minHeight: 40, background: isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                    {isNow && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
-                    <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 11, fontWeight: 700 }}>{cat.label}</span>
+                    {isNow && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
+                    {isDelayed && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>⏱ 지연</span>}
+                    {pg.pgStatus === "ended" && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
+                    <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
                   </div>
-                  <div style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{pg.title}</div>
+                  <div style={{ color: isPast ? "#556" : "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{pg.title}</div>
                   {pg.location && <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>📍 {pg.location}</div>}
                   {pg.description && <div style={{ color: "#556", fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>{pg.description}</div>}
                   {pg.manager && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                     <span style={{ color: "#556", fontSize: 12 }}>👤 {pg.manager}</span>
                     {pg.managerPhone && <a href={`tel:${pg.managerPhone.replace(/-/g,"")}`} style={{ color: "#4CAF50", fontSize: 12, textDecoration: "none" }}>📞 {pg.managerPhone}</a>}
+                  </div>}
+                  {canControl && pg.date !== "always" && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <button onClick={() => setPgStatus("delayed")} style={{ flex: 1, padding: "8px", borderRadius: 8, border: isDelayed ? "2px solid #FF9800" : "1px solid #333", background: isDelayed ? "rgba(255,152,0,0.1)" : "transparent", color: "#FF9800", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>⏱ 지연</button>
+                    <button onClick={() => setPgStatus("ended")} style={{ flex: 1, padding: "8px", borderRadius: 8, border: pg.pgStatus === "ended" ? "2px solid #556" : "1px solid #333", background: pg.pgStatus === "ended" ? "rgba(85,85,85,0.1)" : "transparent", color: "#888", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>⬛ 종료</button>
                   </div>}
                 </div>
               </div>
@@ -3807,21 +3819,38 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             XLSX.writeFile(wb, `프로그램_${settings.festivalName||"축제"}.xlsx`);
           }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥 내보내기</button>
         </div>
-        {(settings.programs || []).sort((a,b) => (a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||"")).map((pg, idx) => {
+        {(settings.programs || []).sort((a,b) => (a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||"")).map((pg) => {
           const catMap = { O: { l: "공식", c: "#2196F3" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#4CAF50" }, S: { l: "부대", c: "#FF9800" } };
           const cat = catMap[pg.category] || { l: pg.category, c: "#556" };
           const dateLabel = pg.date === "always" ? "🔄상시" : pg.date ? new Date(pg.date).getMonth()+1 + "/" + new Date(pg.date).getDate() : "";
-          return (<div key={pg.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
-            <div style={{ minWidth: 44, textAlign: "center" }}>
-              <div style={{ color: "#8892b0", fontSize: 11 }}>{dateLabel}</div>
-              <div style={{ color: "#ccd6f6", fontSize: 12, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
+          const stLabel = pg.pgStatus === "delayed" ? "⏱지연" : pg.pgStatus === "ended" ? "종료" : "";
+          const upPg = (field, val) => setSettings(prev => ({ ...prev, programs: prev.programs.map(p => p.id === pg.id ? { ...p, [field]: val } : p) }));
+          return (<div key={pg.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <div style={{ minWidth: 50, textAlign: "center" }}>
+                <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>
+                <div style={{ color: "#ccd6f6", fontSize: 13, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
+              </div>
+              <span style={{ padding: "3px 8px", borderRadius: 6, background: `${cat.c}15`, color: cat.c, fontSize: 12, fontWeight: 700 }}>{cat.l}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{pg.title}</div>
+                <div style={{ color: "#556", fontSize: 12 }}>{pg.location ? "📍"+pg.location : ""} {pg.manager ? "👤"+pg.manager : ""}</div>
+              </div>
+              {stLabel && <span style={{ color: pg.pgStatus === "delayed" ? "#FF9800" : "#556", fontSize: 12, fontWeight: 700 }}>{stLabel}</span>}
+              <button onClick={() => {
+                const t = prompt("프로그램명:", pg.title); if (t === null) return;
+                const loc = prompt("장소:", pg.location || "");
+                const d = prompt("날짜 (YYYY-MM-DD 또는 always):", pg.date || "");
+                const st = prompt("시작시간 (HH:MM):", pg.time || "");
+                const et = prompt("종료시간 (HH:MM):", pg.endTime || "");
+                const ct = prompt("구분 (O공식/P공연/E체험/S부대):", pg.category || "");
+                const mg = prompt("담당자:", pg.manager || "");
+                const mp = prompt("연락처:", pg.managerPhone || "");
+                const desc = prompt("내용:", pg.description || "");
+                setSettings(prev => ({ ...prev, programs: prev.programs.map(p => p.id === pg.id ? { ...p, title: t || p.title, location: loc ?? p.location, date: d ?? p.date, time: st ?? p.time, endTime: et ?? p.endTime, category: ct || p.category, manager: mg ?? p.manager, managerPhone: mp ?? p.managerPhone, description: desc ?? p.description } : p) }));
+              }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+              <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
             </div>
-            <span style={{ padding: "2px 6px", borderRadius: 4, background: `${cat.c}15`, color: cat.c, fontSize: 11, fontWeight: 700 }}>{cat.l}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pg.title}</div>
-              {pg.location && <div style={{ color: "#556", fontSize: 11 }}>📍{pg.location}</div>}
-            </div>
-            <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
           </div>);
         })}
       </Card>
@@ -4994,7 +5023,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "chat" && <ChatPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
       
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
-      {page === "program" && <ProgramPage settings={settings} session={session} onManage={() => { setCmsTab("programs"); setPage("cms"); }} />}
+      {page === "program" && <ProgramPage settings={settings} setSettings={setSettings} session={session} onManage={() => { setCmsTab("programs"); setPage("cms"); }} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
