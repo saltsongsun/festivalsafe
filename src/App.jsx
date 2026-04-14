@@ -1464,6 +1464,14 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   const [mode, setMode] = useState("festival");
   const [reqTarget, setReqTarget] = useState("");
   const [reqMsg, setReqMsg] = useState("");
+  const [zoneOpen, setZoneOpen] = useState(() => {
+    const open = {};
+    (settings.zones || []).forEach(z => { open[z.id] = z.accountId === session?.id; });
+    return open;
+  });
+  const toggleZone = (zid) => setZoneOpen(p => ({ ...p, [zid]: !p[zid] }));
+
+  const SITE_CONG = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
 
   const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
   const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
@@ -1500,15 +1508,23 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   const renderSiteBlock = (site, statusMap, zone) => {
     const st = statusMap[site.status] || Object.values(statusMap)[0];
     const canEdit = canEditZone(zone);
+    const sc = SITE_CONG[site.congestion] || null;
+    const setCong = (siteId, level) => setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, congestion: level } : s) }));
     return (<div key={site.id} style={{ padding: "10px 14px", borderTop: "1px solid #1a1a2e" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 12 }}>🏠</span>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>{site.name}</span>
+        {sc && <span style={{ padding: "2px 6px", borderRadius: 6, background: `${sc.color}15`, color: sc.color, fontSize: 11, fontWeight: 700 }}>{sc.icon}{sc.label}</span>}
         <span style={{ padding: "2px 8px", borderRadius: 8, background: `${st.color}22`, color: st.color, fontSize: 12, fontWeight: 700 }}>{st.icon} {st.label}</span>
       </div>
-      {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+      {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
         {Object.entries(statusMap).map(([k, v]) => (
           <button key={k} onClick={() => setStatus(site.id, k)} style={{ flex: 1, padding: "7px 2px", borderRadius: 6, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+        ))}
+      </div>}
+      {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+        {Object.entries(SITE_CONG).map(([k, v]) => (
+          <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "5px 2px", borderRadius: 6, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
       {(site.workers || []).map(w => (
@@ -1568,14 +1584,19 @@ function FestivalStatusPage({ settings, setSettings, session }) {
           const sites = workSites.filter(s => s.zoneId === zone.id);
           const cg = congestionData.find(c => c.zoneId === zone.id);
           const CL = { smooth: { icon: "🟢" }, crowded: { icon: "🟡" }, danger: { icon: "🔴" } };
-          return (<div key={zone.id} style={{ marginBottom: 10, borderRadius: 12, border: "1px solid #222", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
-            <div style={{ padding: "10px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+          const open = zoneOpen[zone.id];
+          const siteCongs = sites.filter(s => s.congestion).map(s => SITE_CONG[s.congestion]);
+          return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid #222", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+            <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <span style={{ color: "#2196F3", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
               <span style={{ fontSize: 14 }}>📍</span>
               <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
               {cg && <span>{CL[cg.level]?.icon}</span>}
+              {!open && siteCongs.length > 0 && siteCongs.map((sc, i) => <span key={i} style={{ fontSize: 12 }}>{sc.icon}</span>)}
+              <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
             </div>
-            {sites.map(site => renderSiteBlock(site, STATUS_NORMAL, zone))}
-            {sites.length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 12, textAlign: "center" }}>근무지 없음</div>}
+            {open && sites.map(site => renderSiteBlock(site, STATUS_NORMAL, zone))}
+            {open && sites.length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 12, textAlign: "center" }}>근무지 없음</div>}
           </div>);
         })}
         {normalZones.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#556" }}>일반 관리구역이 없습니다.</div>}
@@ -1613,19 +1634,23 @@ function FestivalStatusPage({ settings, setSettings, session }) {
           <button onClick={sendRequest} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: reqTarget && reqMsg ? "#F44336" : "#333", color: "#fff", fontSize: 15, fontWeight: 700, cursor: reqTarget && reqMsg ? "pointer" : "default", opacity: reqTarget && reqMsg ? 1 : 0.5 }}>🚨 요청 전송</button>
         </div>}
 
-        {safetyZones.map(zone => (<div key={zone.id} style={{ marginBottom: 10, borderRadius: 12, border: "1px solid rgba(244,67,54,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
-          <div style={{ padding: "10px 14px", background: "rgba(244,67,54,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+        {safetyZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(244,67,54,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+          <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(244,67,54,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ color: "#F44336", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
             <span>🛡️</span><span style={{ color: "#F44336", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
-          {workSites.filter(s => s.zoneId === zone.id).map(site => renderSiteBlock(site, STATUS_SAFETY, zone))}
-        </div>))}
+          {open && sites.map(site => renderSiteBlock(site, STATUS_SAFETY, zone))}
+        </div>); })}
 
-        {supportZones.map(zone => (<div key={zone.id} style={{ marginBottom: 10, borderRadius: 12, border: "1px solid rgba(255,152,0,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
-          <div style={{ padding: "10px 14px", background: "rgba(255,152,0,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
+        {supportZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(255,152,0,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+          <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(255,152,0,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ color: "#FF9800", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
             <span>🚑</span><span style={{ color: "#FF9800", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
-          {workSites.filter(s => s.zoneId === zone.id).map(site => renderSiteBlock(site, STATUS_SUPPORT, zone))}
-        </div>))}
+          {open && sites.map(site => renderSiteBlock(site, STATUS_SUPPORT, zone))}
+        </div>); })}
 
         {(settings.zoneRequests || []).filter(r => r.status === "completed").length > 0 && <div>
           <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📋 조치완료 이력</div>
