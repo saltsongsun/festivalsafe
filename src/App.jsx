@@ -2249,8 +2249,23 @@ function OrgChartTab({ settings, setSettings }) {
     if (!dragId || dragId === targetId) return;
     const isDesc = (pid, cid) => { const ch = org.filter(n => n.parentId === pid); return ch.some(c => c.id === cid || isDesc(c.id, cid)); };
     if (targetId && isDesc(dragId, targetId)) return;
-    setSettings(prev => ({ ...prev, orgChart: (prev.orgChart || []).map(n => n.id === dragId ? { ...n, parentId: targetId || null } : n) }));
+    const target = org.find(n => n.id === targetId);
+    const newParent = target?.type === "person" ? target.parentId : targetId;
+    setSettings(prev => ({ ...prev, orgChart: (prev.orgChart || []).map(n => n.id === dragId ? { ...n, parentId: newParent || null } : n) }));
     setDragId(null);
+  };
+
+  const moveOrgNode = (nodeId, dir) => {
+    const node = org.find(n => n.id === nodeId);
+    if (!node) return;
+    const siblings = org.filter(n => n.parentId === node.parentId && n.type === node.type).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = siblings.findIndex(s => s.id === nodeId);
+    if (idx < 0 || idx + dir < 0 || idx + dir >= siblings.length) return;
+    setSettings(prev => ({ ...prev, orgChart: (prev.orgChart || []).map(n => {
+      if (n.id === nodeId) return { ...n, order: idx + dir };
+      if (n.id === siblings[idx + dir].id) return { ...n, order: idx };
+      return n;
+    }) }));
   };
 
   const renderNode = (node, depth) => {
@@ -2261,7 +2276,6 @@ function OrgChartTab({ settings, setSettings }) {
     const isOrg = node.type === "org";
 
     if (!isOrg) {
-      // 인원: 조직 내부 멤버로 표시
       return (
         <div key={node.id} draggable onDragStart={(e) => { e.stopPropagation(); setDragId(node.id); }}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.style.outline = "2px solid #4CAF50"; }}
@@ -2272,8 +2286,10 @@ function OrgChartTab({ settings, setSettings }) {
           <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
           {node.position && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
           {node.memo && <span style={{ color: "#556", fontSize: 12 }}>{node.memo}</span>}
-          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto", whiteSpace: "nowrap" }}>📞</a>}
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
+          <div style={{ display: "flex", gap: 3, flexShrink: 0, marginLeft: "auto" }}>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>▲</button>
+            <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>▼</button>
             <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
             <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
@@ -3781,25 +3797,39 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🔌 기능 ON/OFF</h3>
         <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>사용하지 않는 기능을 끄면 메뉴와 대시보드에서 숨겨집니다.</p>
         {[
-          { k: "crowd", icon: "👥", label: "인파관리" },
-          { k: "congestion", icon: "🚦", label: "인파혼잡도" },
-          { k: "parking", icon: "🅿️", label: "주차관리" },
-          { k: "shuttle", icon: "🚌", label: "셔틀버스" },
-          { k: "weather", icon: "🌤️", label: "기상청 연동" },
-          { k: "sms", icon: "📱", label: "SMS 알림" },
-          { k: "message", icon: "💬", label: "메시지/공지" },
-          { k: "customApi", icon: "🔌", label: "커스텀 API" },
-        ].map(f => {
-          const on = settings.features?.[f.k] !== false;
-          return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 5, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
-            <div style={{ width: 40, height: 22, borderRadius: 11, background: on ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
-              <div style={{ width: 18, height: 18, borderRadius: 9, background: "#fff", position: "absolute", top: 2, left: on ? 20 : 2, transition: "all .3s" }} />
-            </div>
-            <span style={{ fontSize: 18 }}>{f.icon}</span>
-            <span style={{ color: on ? "#ccd6f6" : "#556", fontSize: 14, fontWeight: 700, flex: 1 }}>{f.label}</span>
-            <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
-          </div>);
-        })}
+          { group: "👥 인파/안전", items: [
+            { k: "crowd", icon: "👥", label: "인파관리 (계수/출입구)" },
+            { k: "congestion", icon: "🚦", label: "인파혼잡도" },
+            { k: "checklist", icon: "✅", label: "안전점검 체크리스트" },
+            { k: "emergency", icon: "🚨", label: "긴급상황 발령" },
+            { k: "medical", icon: "🏥", label: "의료/응급 기록" },
+          ]},
+          { group: "🎪 축제운영", items: [
+            { k: "parking", icon: "🅿️", label: "주차관리" },
+            { k: "shuttle", icon: "🚌", label: "셔틀버스" },
+            { k: "program", icon: "🎭", label: "축제 프로그램" },
+            { k: "timeline", icon: "📋", label: "상황일지" },
+          ]},
+          { group: "📡 데이터/연동", items: [
+            { k: "weather", icon: "🌤️", label: "기상청 연동" },
+            { k: "sms", icon: "📱", label: "SMS 알림" },
+            { k: "message", icon: "💬", label: "메시지/공지" },
+            { k: "customApi", icon: "🔌", label: "커스텀 API" },
+          ]},
+        ].map(g => (<div key={g.group} style={{ marginBottom: 12 }}>
+          <div style={{ color: "#8892b0", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{g.group}</div>
+          {g.items.map(f => {
+            const on = settings.features?.[f.k] !== false;
+            return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 8, marginBottom: 3, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
+              <div style={{ width: 36, height: 20, borderRadius: 10, background: on ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
+                <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: on ? 18 : 2, transition: "all .3s" }} />
+              </div>
+              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ color: on ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 700, flex: 1 }}>{f.label}</span>
+              <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 12, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
+            </div>);
+          })}
+        </div>))}
       </Card>
 
       <Card>
@@ -3839,7 +3869,6 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
             { id: "message", icon: "📢", label: "발송", feat: "message" },
             { id: "status", icon: "🎪", label: "축제관리" },
-    { id: "program", icon: "🎭", label: "프로그램" },
             { id: "program", icon: "🎭", label: "프로그램" },
             { id: "cms", icon: "⚙️", label: "관리" },
           ];
