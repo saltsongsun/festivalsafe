@@ -1185,7 +1185,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
   const [log, setLog] = useState([]);
   const [showExport, setShowExport] = useState(false);
   const gates = settings.gates || [];
-  const hasGates = gates.length > 1 || (gates.length === 1 && zones[0].name);
+  const hasGates = gates.length > 1 || (gates.length === 1 && gates[0]?.name);
   const myGate = session ? gates.find(z => z.accountId === session.id) : null;
   const [selZone, setSelZone] = useState(myGate?.id || null);
 
