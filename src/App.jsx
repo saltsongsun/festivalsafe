@@ -107,7 +107,7 @@ const DEFAULT_SETTINGS = {
   messages: [],
   shuttleStops: [],
   shuttleBuses: [],
-  festivalDates: [],
+  festivalDates: ["2026-05-02","2026-05-03","2026-05-04","2026-05-05"],
   cumulativeVisitors: 0,
   hourlyLog: [],
   dailyRecords: [],
@@ -136,8 +136,57 @@ const DEFAULT_SETTINGS = {
   emergencyMessage: "",
   emergencyAt: null,
   medicalRecords: [],
-  programs: [],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
-  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "cms"],
+  programs: [
+    {id:"pg1",date:"2026-05-02",time:"17:00",endTime:"17:20",title:"헌다례",location:"임진대첩계사순의단",category:"P",memo:"고유문 봉독 및 헌다"},
+    {id:"pg2",date:"2026-05-02",time:"17:20",endTime:"18:00",title:"신위순행",location:"진주성 일대",category:"P",memo:"신위순행 퍼레이드"},
+    {id:"pg3",date:"2026-05-02",time:"18:00",endTime:"18:10",title:"개제선언",location:"진주성 특설무대",category:"P",memo:""},
+    {id:"pg4",date:"2026-05-02",time:"18:10",endTime:"19:00",title:"의암별제",location:"진주성 특설무대",category:"P",memo:"논개 추모 제전"},
+    {id:"pg5",date:"2026-05-02",time:"14:00",endTime:"14:30",title:"코미디 서커스 <멋> 231쇼",location:"야외공연장",category:"P",memo:""},
+    {id:"pg6",date:"2026-05-02",time:"16:00",endTime:"16:30",title:"폴로세움 서남재",location:"야외공연장",category:"P",memo:"서커스 공연"},
+    {id:"pg7",date:"2026-05-02",time:"19:00",endTime:"19:30",title:"혼둘혼둘",location:"야외공연장",category:"P",memo:""},
+    {id:"pg8",date:"2026-05-02",time:"20:00",endTime:"21:00",title:"무소음 툇마루 음악회",location:"진주성 중영",category:"P",memo:"살롱드국악 선율모리"},
+    {id:"pg9",date:"2026-05-02",time:"13:00",endTime:"21:00",title:"교방 플레이존",location:"진주성 내",category:"E",memo:"어린이 교방문화 체험"},
+    {id:"pg10",date:"2026-05-02",time:"13:00",endTime:"21:00",title:"교방문화로놀장",location:"진주성 내",category:"E",memo:"악가무시서화 체험"},
+    {id:"pg11",date:"2026-05-02",time:"13:00",endTime:"21:00",title:"교방예술촌",location:"진주성 내",category:"E",memo:"전통 공예 체험"},
+    {id:"pg12",date:"2026-05-02",time:"13:00",endTime:"18:00",title:"가족이 함께하는 수상레저",location:"남강",category:"E",memo:"카약 체험"},
+    {id:"pg13",date:"2026-05-02",time:"13:00",endTime:"21:00",title:"27년의 나에게",location:"진주성 내",category:"E",memo:"느린우체통"},
+    {id:"pg14",date:"2026-05-02",time:"13:00",endTime:"21:00",title:"AI 교방 체험",location:"진주성 내",category:"E",memo:"전통+현대기술 콘텐츠"},
+    {id:"pg15",date:"2026-05-02",time:"17:40",endTime:"18:00",title:"진주검무 플래시몹",location:"특설무대",category:"S",memo:"시민 100명 참여"},
+    {id:"pg16",date:"2026-05-02",time:"13:00",endTime:"17:00",title:"교방문화 꼬리에 꼬리를 물고",location:"진주성 내",category:"S",memo:""},
+    {id:"pg17",date:"2026-05-02",time:"11:00",endTime:"21:00",title:"진주교방 의상대여",location:"진주성 내",category:"S",memo:"교방 한복 대여"},
+    {id:"pg18",date:"2026-05-02",time:"11:00",endTime:"21:00",title:"논개 깃발전",location:"역사공원",category:"S",memo:"시서화 깃발 전시"},
+    {id:"pg19",date:"2026-05-02",time:"11:00",endTime:"21:00",title:"교방문화의 빛 유등",location:"진주성 일대",category:"S",memo:"유등 전시"},
+    {id:"pg20",date:"2026-05-02",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:"플리마켓"},
+    {id:"pg21",date:"2026-05-02",time:"11:00",endTime:"21:00",title:"옛다! 에나-캐시",location:"진주성 내",category:"S",memo:"상품권 증정"},
+    {id:"pg22",date:"2026-05-02",time:"15:00",endTime:"15:30",title:"수성중군영 교대의식",location:"공북문 앞",category:"S",memo:"성문 교대의식 재현"},
+    {id:"pg23",date:"2026-05-03",time:"14:00",endTime:"14:30",title:"코미디 서커스 <멋> 231쇼",location:"야외공연장",category:"P",memo:""},
+    {id:"pg24",date:"2026-05-03",time:"16:00",endTime:"16:30",title:"폴로세움 서남재",location:"야외공연장",category:"P",memo:""},
+    {id:"pg25",date:"2026-05-03",time:"19:00",endTime:"19:30",title:"혼둘혼둘",location:"야외공연장",category:"P",memo:""},
+    {id:"pg26",date:"2026-05-03",time:"20:00",endTime:"21:00",title:"무소음 툇마루 음악회",location:"진주성 중영",category:"P",memo:""},
+    {id:"pg27",date:"2026-05-03",time:"13:00",endTime:"21:00",title:"교방 플레이존",location:"진주성 내",category:"E",memo:""},
+    {id:"pg28",date:"2026-05-03",time:"13:00",endTime:"21:00",title:"교방문화로놀장",location:"진주성 내",category:"E",memo:""},
+    {id:"pg29",date:"2026-05-03",time:"13:00",endTime:"21:00",title:"교방예술촌",location:"진주성 내",category:"E",memo:""},
+    {id:"pg30",date:"2026-05-03",time:"13:00",endTime:"18:00",title:"가족이 함께하는 수상레저",location:"남강",category:"E",memo:""},
+    {id:"pg31",date:"2026-05-03",time:"11:00",endTime:"21:00",title:"진주교방 의상대여",location:"진주성 내",category:"S",memo:""},
+    {id:"pg32",date:"2026-05-03",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:""},
+    {id:"pg33",date:"2026-05-03",time:"11:00",endTime:"21:00",title:"옛다! 에나-캐시",location:"진주성 내",category:"S",memo:""},
+    {id:"pg34",date:"2026-05-03",time:"15:00",endTime:"15:30",title:"수성중군영 교대의식",location:"공북문 앞",category:"S",memo:""},
+    {id:"pg35",date:"2026-05-04",time:"14:00",endTime:"14:30",title:"코미디 서커스 <멋> 231쇼",location:"야외공연장",category:"P",memo:""},
+    {id:"pg36",date:"2026-05-04",time:"16:00",endTime:"16:30",title:"폴로세움 서남재",location:"야외공연장",category:"P",memo:""},
+    {id:"pg37",date:"2026-05-04",time:"19:00",endTime:"19:30",title:"혼둘혼둘",location:"야외공연장",category:"P",memo:""},
+    {id:"pg38",date:"2026-05-04",time:"20:00",endTime:"21:00",title:"무소음 툇마루 음악회",location:"진주성 중영",category:"P",memo:""},
+    {id:"pg39",date:"2026-05-04",time:"13:00",endTime:"21:00",title:"교방 플레이존",location:"진주성 내",category:"E",memo:""},
+    {id:"pg40",date:"2026-05-04",time:"13:00",endTime:"21:00",title:"교방문화로놀장",location:"진주성 내",category:"E",memo:""},
+    {id:"pg41",date:"2026-05-04",time:"11:00",endTime:"21:00",title:"진주교방 의상대여",location:"진주성 내",category:"S",memo:""},
+    {id:"pg42",date:"2026-05-04",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:""},
+    {id:"pg43",date:"2026-05-05",time:"14:00",endTime:"14:30",title:"코미디 서커스 <멋> 231쇼",location:"야외공연장",category:"P",memo:""},
+    {id:"pg44",date:"2026-05-05",time:"16:00",endTime:"16:30",title:"폴로세움 서남재",location:"야외공연장",category:"P",memo:""},
+    {id:"pg45",date:"2026-05-05",time:"19:00",endTime:"20:00",title:"폐제식",location:"특설무대",category:"P",memo:"폐막 공연"},
+    {id:"pg46",date:"2026-05-05",time:"13:00",endTime:"21:00",title:"교방 플레이존",location:"진주성 내",category:"E",memo:""},
+    {id:"pg47",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:""},
+    {id:"pg48",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"옛다! 에나-캐시",location:"진주성 내",category:"S",memo:""},
+  ],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
+  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "program", "cms"],
   features: {
     crowd: true,
     parking: true,
@@ -1152,7 +1201,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       if (zRows.length) { const ws4 = XLSX.utils.json_to_sheet(zRows); XLSX.utils.book_append_sheet(wb, ws4, "일자별구역데이터"); }
     }
     if (wb.SheetNames.length === 0) { alert("내보낼 데이터가 없습니다."); return; }
-    XLSX.writeFile(wb, `축제현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `축제관리_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const showZoneFirst = hasGates && myGate;
@@ -1484,7 +1533,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
   </div>);
 }
 
-// ─── Festival Status Page (축제현황) ─────────────────────────────
+// ─── Festival Status Page (축제관리) ─────────────────────────────
 function FestivalStatusPage({ settings, setSettings, session }) {
   const zones = settings.zones || [];
   const workSites = settings.workSites || [];
@@ -1571,7 +1620,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "20px 16px 80px" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
-        <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 2px" }}>🎪 {settings.festivalName || "축제현황"}</h2>
+        <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 2px" }}>🎪 {settings.festivalName || "축제관리"}</h2>
         <div style={{ color: "#8892b0", fontSize: 13 }}>🕐 {opStart}~{opEnd} · 현재 {now.toLocaleTimeString("ko-KR")}</div>
       </div>
 
@@ -1762,6 +1811,84 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   </div>);
 }
 
+
+// ─── Program Page (축제 프로그램) ─────────────────────────────────
+function ProgramPage({ settings }) {
+  const programs = (settings.programs || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const dates = settings.festivalDates || [];
+  const [selDate, setSelDate] = useState(dates[0] || new Date().toISOString().slice(0, 10));
+  const [selCat, setSelCat] = useState("all");
+  const CATS = { all: "전체", P: "공연", E: "체험", S: "부대" };
+  const CAT_COLORS = { P: "#E91E63", E: "#4CAF50", S: "#FF9800" };
+
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const isToday = selDate === now.toISOString().slice(0, 10);
+
+  const filtered = programs.filter(p => {
+    if (p.date && p.date !== selDate) return false;
+    if (!p.date && dates.length > 0 && selDate !== dates[0]) return false;
+    if (selCat !== "all" && p.category !== selCat) return false;
+    return true;
+  });
+
+  return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "20px 16px 80px" }}>
+    <div style={{ maxWidth: 500, margin: "0 auto" }}>
+      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🎭 축제 프로그램</h2>
+      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{settings.festivalName || "축제"}</p>
+
+      {/* 일자 선택 */}
+      {dates.length > 0 && <div style={{ display: "flex", gap: 6, marginBottom: 10, overflowX: "auto" }}>
+        {dates.map((d, i) => {
+          const dt = new Date(d);
+          const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+          const label = `${dt.getMonth() + 1}/${dt.getDate()} (${dayNames[dt.getDay()]})`;
+          const active = selDate === d;
+          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "10px 16px", borderRadius: 10, border: active ? "2px solid #9C27B0" : "1px solid #333", background: active ? "rgba(156,39,176,0.15)" : "transparent", color: active ? "#CE93D8" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {i === 0 ? "첫째 날" : i === dates.length - 1 ? "마지막 날" : `${i + 1}일차`}<br /><span style={{ fontSize: 12 }}>{label}</span>
+          </button>);
+        })}
+      </div>}
+
+      {/* 카테고리 필터 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {Object.entries(CATS).map(([k, v]) => (
+          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? "2px solid #9C27B0" : "1px solid #333", background: selCat === k ? "rgba(156,39,176,0.1)" : "transparent", color: selCat === k ? "#CE93D8" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{v}</button>
+        ))}
+      </div>
+
+      {/* 프로그램 목록 */}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>등록된 프로그램이 없습니다.</div>}
+      {filtered.map(pg => {
+        const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
+        const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
+        const isNow = isToday && nowMin >= sh * 60 + sm && nowMin <= eh * 60 + em;
+        const isPast = isToday && nowMin > eh * 60 + em;
+        const catColor = CAT_COLORS[pg.category] || "#8892b0";
+        const catLabel = CATS[pg.category] || pg.category || "";
+
+        return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 12, background: isNow ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.03)", border: isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.5 : 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ textAlign: "center", minWidth: 60 }}>
+              <div style={{ color: isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
+              <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime || "--:--"}</div>
+            </div>
+            <div style={{ width: 3, height: 40, background: isNow ? "#4CAF50" : catColor, borderRadius: 2 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                {isNow && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>진행중</span>}
+                {catLabel && <span style={{ padding: "1px 6px", borderRadius: 4, background: `${catColor}15`, color: catColor, fontSize: 11, fontWeight: 700 }}>{catLabel}</span>}
+              </div>
+              <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{pg.title}</div>
+              {pg.location && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>📍 {pg.location}</div>}
+              {pg.memo && <div style={{ color: "#556", fontSize: 12 }}>{pg.memo}</div>}
+            </div>
+          </div>
+        </div>);
+      })}
+    </div>
+  </div>);
+}
 
 // ─── Congestion Page (인파혼잡도) ─────────────────────────────────
 function CongestionPage({ settings, setSettings, session }) {
@@ -3374,22 +3501,93 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
     {/* 프로그램/일정 */}
     {tab === "programs" && <div>
+      {/* 엑셀 양식 다운로드 / 업로드 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>🎭 축제 프로그램</h3>
-        {(settings.programs || []).map((pg, pi) => {
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📥 엑셀로 일괄 등록</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>양식을 다운로드 → 작성 → 업로드하면 자동 적용됩니다.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <button onClick={() => {
+            const sample = [
+              { 날짜: "2026-05-02", 시작시간: "09:00", 종료시간: "10:00", 프로그램명: "개막식", 장소: "주무대", 구분: "공연", 비고: "" },
+              { 날짜: "2026-05-02", 시작시간: "10:30", 종료시간: "11:30", 프로그램명: "풍물놀이", 장소: "주무대", 구분: "공연", 비고: "" },
+              { 날짜: "2026-05-02", 시작시간: "13:00", 종료시간: "21:00", 프로그램명: "전통체험", 장소: "진주성", 구분: "체험", 비고: "" },
+              { 날짜: "2026-05-03", 시작시간: "14:00", 종료시간: "15:30", 프로그램명: "가수 공연", 장소: "주무대", 구분: "공연", 비고: "" },
+            ];
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(sample);
+            ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 8 }, { wch: 15 }];
+            XLSX.utils.book_append_sheet(wb, ws, "프로그램");
+            XLSX.writeFile(wb, "축제프로그램_양식.xlsx");
+          }} style={{ padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 양식 다운로드</button>
+          <label style={{ padding: "14px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+            📤 엑셀 업로드
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={e => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                try {
+                  const wb = XLSX.read(evt.target.result, { type: "binary" });
+                  const ws = wb.Sheets[wb.SheetNames[0]];
+                  const rows = XLSX.utils.sheet_to_json(ws);
+                  const programs = rows.filter(r => r["프로그램명"] || r["시작시간"]).map((r, i) => ({
+                    id: "pg_" + Date.now() + "_" + i,
+                    title: r["프로그램명"] || r["프로그램"] || r["제목"] || r["title"] || "",
+                    date: r["날짜"] || r["date"] || "",
+                    time: String(r["시작시간"] || r["시작"] || r["start"] || "").replace(/\./g, ":").slice(0, 5),
+                    endTime: String(r["종료시간"] || r["종료"] || r["end"] || "").replace(/\./g, ":").slice(0, 5),
+                    location: r["장소"] || r["location"] || "",
+                    category: ({"공연":"P","체험":"E","부대":"S","부대행사":"S"})[r["구분"]] || r["구분"] || "",
+                    memo: r["비고"] || r["memo"] || "",
+                  }));
+                  if (programs.length === 0) { alert("프로그램 데이터를 찾을 수 없습니다.\n'프로그램명', '시작시간', '종료시간', '장소' 열이 필요합니다."); return; }
+                  setSettings(prev => ({ ...prev, programs }));
+                  alert(`✅ ${programs.length}개 프로그램이 등록되었습니다.`);
+                } catch (err) { alert("❌ 파일 읽기 실패: " + err.message); }
+              };
+              reader.readAsBinaryString(file);
+              e.target.value = "";
+            }} style={{ display: "none" }} />
+          </label>
+        </div>
+        <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)", margin: 0 }}>
+          <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+            ℹ️ 엑셀 열: <strong>날짜</strong>(2026-05-02) · <strong>시작시간</strong> · <strong>종료시간</strong> · <strong>프로그램명</strong> · <strong>장소</strong> · <strong>구분</strong>(공연/체험/부대) · 비고<br />
+            • 시간 형식: 09:00, 14:30 (24시간)<br />
+            • 업로드 시 기존 프로그램은 교체됩니다
+          </p>
+        </Card>
+      </Card>
+
+      {/* 프로그램 목록 */}
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>🎭 프로그램 목록 ({(settings.programs||[]).length}개)</h3>
+          <button onClick={() => {
+            if ((settings.programs||[]).length === 0) return;
+            const wb = XLSX.utils.book_new();
+            const data = (settings.programs||[]).map(p => ({ 날짜: p.date || "", 시작시간: p.time, 종료시간: p.endTime, 프로그램명: p.title, 장소: p.location, 구분: ({"P":"공연","E":"체험","S":"부대"})[p.category] || "", 비고: p.memo || "" }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, "프로그램");
+            XLSX.writeFile(wb, `프로그램_${settings.festivalName||"축제"}.xlsx`);
+          }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥 현재 목록 내보내기</button>
+        </div>
+        {(settings.programs || []).sort((a,b) => (a.time||"").localeCompare(b.time||"")).map((pg, pi) => {
           const now2 = new Date(); const [sh,sm] = (pg.time||"00:00").split(":").map(Number); const [eh,em] = (pg.endTime||"23:59").split(":").map(Number);
           const isNow = now2.getHours()*60+now2.getMinutes() >= sh*60+sm && now2.getHours()*60+now2.getMinutes() <= eh*60+em;
-          return (<div key={pg.id} style={{ padding: 12, borderRadius: 10, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", border: isNow ? "1px solid rgba(76,175,80,0.2)" : "1px solid #222", marginBottom: 6 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "80px 80px 1fr auto", gap: 8, alignItems: "center" }}>
-              <Input type="time" value={pg.time || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, time: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} style={{ fontSize: 13 }} />
-              <Input type="time" value={pg.endTime || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, endTime: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} style={{ fontSize: 13 }} />
-              <Input value={pg.title || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, title: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} placeholder="프로그램명" />
-              <button onClick={() => setSettings(prev => ({ ...prev, programs: prev.programs.filter((_,i) => i !== pi) }))} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+          const idx = (settings.programs||[]).indexOf(pg);
+          return (<div key={pg.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", border: isNow ? "1px solid rgba(76,175,80,0.2)" : "1px solid #222", marginBottom: 4 }}>
+            {isNow && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>🟢</span>}
+            <span style={{ color: "#8892b0", fontSize: 14, fontFamily: "monospace", minWidth: 100 }}>{pg.time||"--:--"}~{pg.endTime||"--:--"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{pg.title || "프로그램명 없음"}</div>
+              {pg.location && <div style={{ color: "#556", fontSize: 12 }}>📍 {pg.location}</div>}
             </div>
-            <Input value={pg.location || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, location: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} placeholder="장소 (예: 주무대)" style={{ marginTop: 6 }} />
+            <button onClick={() => setSettings(prev => ({ ...prev, programs: prev.programs.filter((_,i) => i !== idx) }))} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>);
         })}
-        <button onClick={() => setSettings(prev => ({ ...prev, programs: [...(prev.programs||[]), { id: "pg_"+Date.now(), title: "", time: "", endTime: "", location: "" }] }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 프로그램 추가</button>
+        {(settings.programs||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>프로그램이 없습니다. 엑셀을 업로드하거나 수동으로 추가하세요.</div>}
+        <button onClick={() => setSettings(prev => ({ ...prev, programs: [...(prev.programs||[]), { id: "pg_"+Date.now(), title: "", time: "", endTime: "", location: "", memo: "" }] }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer", marginTop: 6 }}>+ 수동 추가</button>
       </Card>
       <button onClick={() => { if (confirm("프로그램 목록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
     </div>}
@@ -3640,7 +3838,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "shuttle", icon: "🚌", label: "셔틀버스", feat: "shuttle" },
             { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
             { id: "message", icon: "📢", label: "발송", feat: "message" },
-            { id: "status", icon: "🎪", label: "축제현황" },
+            { id: "status", icon: "🎪", label: "축제관리" },
+    { id: "program", icon: "🎭", label: "프로그램" },
+            { id: "program", icon: "🎭", label: "프로그램" },
             { id: "cms", icon: "⚙️", label: "관리" },
           ];
           const order = settings.navOrder || allItems.map(i => i.id);
@@ -3939,14 +4139,14 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
-  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "status", "inbox"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
-  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox", "status"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox", "status"], desc: "주차장 관리 + 대시보드 조회" },
-  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox", "status"], desc: "셔틀버스 위치 관리" },
-  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox", "status"], desc: "대시보드 조회만 가능" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "status", "program", "inbox"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
+  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
+  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox", "status", "program", "program"], desc: "셔틀버스 위치 관리" },
+  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox", "status", "program"], desc: "대시보드 조회만 가능" },
 };
 
 // ─── Login Page ──────────────────────────────────────────────────
@@ -4473,12 +4673,13 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
     ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
-    { id: "status", icon: "🎪", label: "축제현황" },
+    { id: "status", icon: "🎪", label: "축제관리" },
+    { id: "program", icon: "🎭", label: "프로그램" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "inbox", icon: "💬", label: unreadCount > 0 ? `수신함(${unreadCount})` : "수신함" },
@@ -4527,6 +4728,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "message" && <MessagePage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
       {page === "inbox" && <InboxPage settings={settings} session={session} />}
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "program" && <ProgramPage settings={settings} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
