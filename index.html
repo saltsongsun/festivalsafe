@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="안전관리" />
+  <meta name="theme-color" content="#0a0a1a" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <title>축제 안전관리시스템</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -37,5 +44,32 @@
   </script>
   <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show')"></script>
   <script>setTimeout(function(){if(!document.getElementById('root').children.length)document.getElementById('error-fallback').classList.add('show')},8000)</script>
+  <script>
+  if('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      // Check for updates every 60 seconds
+      setInterval(function() { reg.update(); }, 60000);
+      reg.addEventListener('updatefound', function() {
+        var nw = reg.installing;
+        nw.addEventListener('statechange', function() {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            window.dispatchEvent(new CustomEvent('sw-update-available'));
+          }
+        });
+      });
+    }).catch(function(){});
+    navigator.serviceWorker.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        window.dispatchEvent(new CustomEvent('sw-update-available'));
+      }
+    });
+    window.applySwUpdate = function() {
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage('skipWaiting');
+      }
+      window.location.reload();
+    };
+  }
+  </script>
 </body>
 </html>
