@@ -330,9 +330,14 @@ function usePersist(key, init) {
       const s = localStorage.getItem(key);
       if (!s) return init;
       const parsed = JSON.parse(s);
-      // 타입 검증: init이 배열이면 배열만, 객체면 객체만
       if (Array.isArray(init) && !Array.isArray(parsed)) return init;
       if (typeof init === "object" && !Array.isArray(init) && (Array.isArray(parsed) || typeof parsed !== "object")) return init;
+      // 객체면 새 기본값 병합 (기존 데이터 우선, 신규 필드 추가)
+      if (typeof init === "object" && !Array.isArray(init)) {
+        const merged = { ...init };
+        for (const k in parsed) { merged[k] = parsed[k]; }
+        return merged;
+      }
       return parsed;
     } catch { return init; }
   });
@@ -1881,7 +1886,9 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 // ─── Program Page (축제 프로그램) ─────────────────────────────────
 function ProgramPage({ settings }) {
   const programs = (settings.programs || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-  const dates = settings.festivalDates || [];
+  const rawDates = settings.festivalDates || [];
+  // 축제일자가 없으면 프로그램 데이터에서 자동 추출
+  const dates = rawDates.length > 0 ? rawDates : [...new Set(programs.map(p => p.date).filter(d => d && d !== "always"))].sort();
   const [selDate, setSelDate] = useState("all");
   const [selCat, setSelCat] = useState("all");
   const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#2196F3" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#4CAF50" }, S: { label: "부대", color: "#FF9800" } };
