@@ -2499,7 +2499,7 @@ function OrgChartTab({ settings, setSettings }) {
 }
 
 // ─── CMS Page ────────────────────────────────────────────────────
-function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset }) {
+function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset, presence }) {
   const [tab, setTab] = useState(initialTab || "monitor");
   const [focusCat, setFocusCat] = useState(initialCatId || null);
   const [editWorker, setEditWorker] = useState(null); // {siteId, workerId}
@@ -4435,13 +4435,13 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
     <div>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>👤 계정 목록</h3>
-        {(() => { let presence = {}; try { presence = JSON.parse(localStorage.getItem("fest_presence") || "{}"); } catch {} return null; })()}
         {accounts.map(acc => {
           const rl = ROLES[acc.role] || ROLES.viewer;
           const editable = canManage(acc);
           const isSelf = acc.id === currentUser.id;
-          let isOnline = false; let lastSeenLabel = "";
-          try { const p = JSON.parse(localStorage.getItem("fest_presence") || "{}"); if (p[acc.id]) { const diff = Date.now() - p[acc.id].lastSeen; isOnline = diff < 120000; if (!isOnline) { const min = Math.floor(diff/60000); lastSeenLabel = min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; } } } catch {}
+          const pr = (presence || {})[acc.id];
+          const isOnline = pr && (Date.now() - pr.lastSeen) < 120000;
+          const lastSeenLabel = pr && !isOnline ? (() => { const min = Math.floor((Date.now() - pr.lastSeen)/60000); return min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; })() : "";
           return (
             <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
@@ -4713,18 +4713,15 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const role = ROLES[session.role] || ROLES.viewer;
   const allowedPages = role.pages;
 
-  // 접속 상태 추적
+  // 접속 상태 추적 (Supabase 동기화)
+  const [presence, setPresence] = usePersist("fest_presence_v1", {});
   useEffect(() => {
     const updatePresence = () => {
-      try {
-        const presence = JSON.parse(localStorage.getItem("fest_presence") || "{}");
-        presence[session.id] = { name: session.name, role: session.role, lastSeen: Date.now() };
-        localStorage.setItem("fest_presence", JSON.stringify(presence));
-      } catch {}
+      setPresence(prev => ({ ...prev, [session.id]: { name: session.name, role: session.role, lastSeen: Date.now() } }));
     };
     updatePresence();
     const iv = setInterval(updatePresence, 30000);
-    return () => { clearInterval(iv); try { const p = JSON.parse(localStorage.getItem("fest_presence") || "{}"); delete p[session.id]; localStorage.setItem("fest_presence", JSON.stringify(p)); } catch {} };
+    return () => clearInterval(iv);
   }, [session.id]);
 
   const handleRefresh = () => setRefreshKey(k => k + 1);
@@ -4936,7 +4933,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           </div>
         </div>
       ) : page === "cms" && (
-        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} />
+        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} presence={presence} />
       )}
     </div>
   </div>);
