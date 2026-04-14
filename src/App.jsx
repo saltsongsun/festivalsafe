@@ -1671,8 +1671,10 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
   const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
   const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
   const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FF9800", icon: "🚗" }, supporting: { label: "현장지원중", color: "#4CAF50", icon: "🚑" } };
-  const STATUS_PERFORMANCE = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, preparing: { label: "준비중", color: "#FF9800", icon: "🔧" }, performing: { label: "공연중", color: "#9C27B0", icon: "🎭" }, done: { label: "종료", color: "#556", icon: "⬛" } };
-  const getStatusMap = (zone) => zone?.zoneType === "safety" ? STATUS_SAFETY : zone?.zoneType === "support" ? STATUS_SUPPORT : zone?.zoneType === "performance" ? STATUS_PERFORMANCE : STATUS_NORMAL;
+  const STATUS_PERFORMANCE = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, rehearsal: { label: "리허설", color: "#FF9800", icon: "🎤" }, performing: { label: "공연중", color: "#9C27B0", icon: "🎭" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const STATUS_PARKING = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, full: { label: "만차", color: "#F44336", icon: "🔴" } };
+  const STATUS_ENTRY = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, dense: { label: "밀집", color: "#F44336", icon: "🔴" } };
+  const getStatusMap = (zone) => { const t = zone?.zoneType; return t === "safety" ? STATUS_SAFETY : t === "support" ? STATUS_SUPPORT : t === "performance" ? STATUS_PERFORMANCE : t === "parking" ? STATUS_PARKING : t === "entry" ? STATUS_ENTRY : STATUS_NORMAL; };
 
   const setStatus = (siteId, status) => { const site = workSites.find(s => s.id === siteId); setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s), timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "status", message: `📊 ${site?.name || ""} 상태 → ${status}`, actor: session?.name }] })); };
   const sendRequest = () => {
@@ -1690,6 +1692,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
   const safetyZones = zones.filter(z => z.zoneType === "safety" && z.name);
   const supportZones = zones.filter(z => z.zoneType === "support" && z.name);
   const performanceZones = zones.filter(z => z.zoneType === "performance" && z.name);
+  const parkingZones = zones.filter(z => z.zoneType === "parking" && z.name);
+  const entryZones = zones.filter(z => z.zoneType === "entry" && z.name);
   const normalZones = zones.filter(z => (!z.zoneType || z.zoneType === "normal" || z.zoneType === "none") && z.name);
   const myRequests = (settings.zoneRequests || []).filter(r => r.targetZoneId === myZone?.id && r.status !== "completed");
   const pendingCount = (settings.zoneRequests || []).filter(r => r.status === "pending").length;
@@ -2113,6 +2117,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             <option value="">대상 선택...</option>
             {safetyZones.map(z => <option key={z.id} value={z.id}>🛡️ {z.name}</option>)}
             {supportZones.map(z => <option key={z.id} value={z.id}>🚑 {z.name}</option>)}
+            {parkingZones.map(z => <option key={z.id} value={z.id}>🅿️ {z.name}</option>)}
+            {entryZones.map(z => <option key={z.id} value={z.id}>🚪 {z.name}</option>)}
+            {performanceZones.map(z => <option key={z.id} value={z.id}>🎭 {z.name}</option>)}
           </select>
           <textarea value={reqMsg} onChange={e => setReqMsg(e.target.value)} placeholder="요청 내용" rows={3} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 8 }} />
           <button onClick={sendRequest} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: reqTarget && reqMsg ? "#F44336" : "#333", color: "#fff", fontSize: 15, fontWeight: 700, cursor: reqTarget && reqMsg ? "pointer" : "default", opacity: reqTarget && reqMsg ? 1 : 0.5 }}>🚨 요청 전송</button>
@@ -2136,6 +2143,26 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           {open && sites.map(site => renderSiteBlock(site, STATUS_SUPPORT, zone))}
         </div>); })}
 
+        {/* 주차관리 구역 */}
+        {parkingZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(0,150,136,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+          <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(0,150,136,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ color: "#009688", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🅿️</span><span style={{ color: "#009688", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
+          </div>
+          {open && sites.map(site => renderSiteBlock(site, STATUS_PARKING, zone))}
+        </div>); })}
+
+        {/* 출입관리 구역 */}
+        {entryZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(121,85,72,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
+          <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(121,85,72,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ color: "#795548", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🚪</span><span style={{ color: "#795548", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
+          </div>
+          {open && sites.map(site => renderSiteBlock(site, STATUS_ENTRY, zone))}
+        </div>); })}
+
         {/* 공연관리 구역 */}
         {performanceZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(156,39,176,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
           <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -2157,7 +2184,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           })}
         </div>}
 
-        {safetyZones.length === 0 && supportZones.length === 0 && myRequests.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#556" }}>안전/지원 구역이 없습니다.</div>}
+        {safetyZones.length === 0 && supportZones.length === 0 && parkingZones.length === 0 && entryZones.length === 0 && performanceZones.length === 0 && myRequests.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#556" }}>안전/지원/주차/출입/공연 구역이 없습니다.</div>}
       </>}
     </div>
   </div>);
@@ -3348,7 +3375,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 등록</h3>
         {(settings.zones || []).map((z, i) => {
-          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" } };
+          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, parking: { label: "주차관리", color: "#009688", icon: "🅿️" }, entry: { label: "출입관리", color: "#795548", icon: "🚪" } };
           const zt = ZTYPES[z.zoneType] || ZTYPES.normal;
           return (
           <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
@@ -3369,6 +3396,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <option value="performance">🎭 공연관리</option>
                 <option value="safety">🛡️ 안전관리</option>
                 <option value="support">🚑 지원관리</option>
+                <option value="parking">🅿️ 주차관리</option>
+                <option value="entry">🚪 출입관리</option>
               </select></div>
               <div><Label>대시보드 표시</Label>
                 <div onClick={() => { const zs = [...settings.zones]; zs[i] = { ...z, dashboardShow: !(z.dashboardShow !== false) }; setSettings({ ...settings, zones: zs }); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", cursor: "pointer" }}>
