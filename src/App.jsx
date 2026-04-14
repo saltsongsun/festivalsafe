@@ -1036,31 +1036,48 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     {/* 셔틀버스 */}
     {settings.features?.shuttle !== false && (settings.shuttleBuses || []).length > 0 && <div style={{ maxWidth: 1100, margin: "12px auto 0" }}>
       <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8, paddingLeft: 4 }}>🚌 셔틀버스 현황</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+      <div style={{ display: "grid", gap: 10 }}>
         {(settings.shuttleBuses || []).map(bus => {
           const isRun = bus.status === "running";
           const cap = bus.capacity || 45;
           const pax = bus.passengers || 0;
           const pct = Math.round(pax/cap*100);
+          const stops = (settings.shuttleStops || []).sort((a,b) => (a.order||0)-(b.order||0));
+          const curIdx = stops.findIndex(s => s.id === bus.currentStopId);
           return (<div key={bus.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${isRun ? "#4CAF50" : "#FF9800"}33` }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 20, marginRight: 8 }}>🚌</span>
               <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{bus.name}</span>
               <span style={{ padding: "4px 10px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#4CAF50" : "#FF9800", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 16 }}>👥</span>
-                  <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontFamily: "monospace" }}>{pax}</span>
-                  <span style={{ color: "#556", fontSize: 14 }}>/ {cap}명</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", marginTop: 6 }}>
-                  <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#F44336" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
-                </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
+              <span style={{ fontSize: 16 }}>👥</span>
+              <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontFamily: "monospace" }}>{pax}</span>
+              <span style={{ color: "#556", fontSize: 14 }}>/ {cap}명</span>
+              <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", marginLeft: 8 }}>
+                <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#F44336" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
               </div>
-              {bus.route && <div style={{ color: "#556", fontSize: 12, textAlign: "right" }}>🛣️ {bus.route}</div>}
             </div>
+            {/* 정류장 노선도 */}
+            {stops.length > 0 && <div style={{ padding: "10px 0 4px" }}>
+              <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+                {/* 연결선 */}
+                <div style={{ position: "absolute", top: 10, left: 10, right: 10, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, zIndex: 0 }} />
+                {curIdx >= 0 && <div style={{ position: "absolute", top: 10, left: 10, width: `${(curIdx / Math.max(stops.length-1,1)) * (100 - 20/stops.length)}%`, height: 3, background: "#00BCD4", borderRadius: 2, zIndex: 1, transition: "width .5s" }} />}
+                {stops.map((stop, si) => {
+                  const isCur = si === curIdx;
+                  const isPassed = curIdx >= 0 && si < curIdx;
+                  const isNext = curIdx >= 0 && si === curIdx + 1;
+                  return (<div key={stop.id} style={{ flex: 1, textAlign: "center", position: "relative", zIndex: 2 }}>
+                    <div style={{ width: isCur ? 20 : 12, height: isCur ? 20 : 12, borderRadius: "50%", background: isCur ? "#00BCD4" : isPassed ? "#00BCD4" : "#333", border: isCur ? "3px solid #00E5FF" : isNext ? "2px solid #00BCD4" : "2px solid #444", margin: `${isCur ? 0 : 4}px auto`, transition: "all .3s", boxShadow: isCur ? "0 0 8px rgba(0,188,212,0.5)" : "none" }}>
+                      {isCur && <span style={{ position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 14 }}>📍</span>}
+                    </div>
+                    <div style={{ color: isCur ? "#00E5FF" : isPassed ? "#00BCD4" : "#556", fontSize: 11, fontWeight: isCur ? 800 : 600, marginTop: 6, lineHeight: 1.2 }}>{stop.name}</div>
+                  </div>);
+                })}
+              </div>
+            </div>}
+            {bus.route && stops.length === 0 && <div style={{ color: "#556", fontSize: 13, marginTop: 4 }}>🛣️ {bus.route}</div>}
           </div>);
         })}
       </div>
@@ -1934,11 +1951,16 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const todayStr = now.toISOString().slice(0, 10);
 
-  const filtered = programs.filter(p => {
+  // 날짜 필터만 적용 (카테고리 카운트용)
+  const dateFiltered = programs.filter(p => {
     if (selDate !== "all") {
       if (selDate === "always") return p.date === "always";
       if (p.date !== selDate && p.date !== "always") return false;
     }
+    return true;
+  });
+
+  const filtered = dateFiltered.filter(p => {
     if (selCat !== "all" && p.category !== selCat) return false;
     return true;
   });
@@ -1975,7 +1997,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
       {/* 카테고리 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
         {Object.entries(CATS).map(([k, v]) => (
-          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? `2px solid ${v.color}` : "1px solid #333", background: selCat === k ? `${v.color}15` : "transparent", color: selCat === k ? v.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{v.label} {k !== "all" ? filtered.filter(p => k === "all" || p.category === k).length : ""}</button>
+          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? `2px solid ${v.color}` : "1px solid #333", background: selCat === k ? `${v.color}15` : "transparent", color: selCat === k ? v.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{v.label} {k !== "all" ? dateFiltered.filter(p => p.category === k).length : dateFiltered.length}</button>
         ))}
       </div>
 
@@ -1995,16 +2017,16 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
             const cat = CATS[pg.category] || CATS.all;
             const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
             const setPgStatus = (status) => setSettings(prev => ({ ...prev, programs: (prev.programs||[]).map(p => p.id === pg.id ? { ...p, pgStatus: p.pgStatus === status ? null : status } : p) }));
-            return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: isDelayed ? "rgba(255,152,0,0.06)" : isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isDelayed ? "2px solid rgba(255,152,0,0.3)" : isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.4 : 1 }}>
+            return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: isPast ? "rgba(255,255,255,0.01)" : isDelayed ? "rgba(255,152,0,0.06)" : isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.03)", border: isPast ? "1px solid #1a1a2e" : isDelayed ? "2px solid rgba(255,152,0,0.3)" : isNow ? "2px solid rgba(76,175,80,0.3)" : "1px solid #222", marginBottom: 6, opacity: isPast ? 0.35 : 1, filter: isPast ? "grayscale(0.8)" : "none", transition: "all .3s" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ textAlign: "center", minWidth: 54, paddingTop: 2 }}>
                   {pg.date === "always" ? <div style={{ color: "#009688", fontSize: 13, fontWeight: 800 }}>상시</div> : <>
-                    {dateLabel && <div style={{ color: "#556", fontSize: 11 }}>{dateLabel}</div>}
-                    <div style={{ color: isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
+                    {dateLabel && <div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{dateLabel}</div>}
+                    <div style={{ color: isPast ? "#333" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
                     <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime}</div>
                   </>}
                 </div>
-                <div style={{ width: 3, minHeight: 40, background: isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
+                <div style={{ width: 3, minHeight: 40, background: isPast ? "#333" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                     {isNow && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
@@ -2012,7 +2034,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
                     {pg.pgStatus === "ended" && <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
                     <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
                   </div>
-                  <div style={{ color: isPast ? "#556" : "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{pg.title}</div>
+                  <div style={{ color: isPast ? "#445" : "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4, textDecoration: pg.pgStatus === "ended" ? "line-through" : "none" }}>{pg.title}</div>
                   {pg.location && <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>📍 {pg.location}</div>}
                   {pg.description && <div style={{ color: "#556", fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>{pg.description}</div>}
                   {pg.manager && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
