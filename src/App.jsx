@@ -2460,7 +2460,7 @@ function CongestionPage({ settings, setSettings, session }) {
   };
 
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
-  const normalOnly = zones.filter(z => z.name && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "none" || z.zoneType === "performance"));
+  const normalOnly = zones.filter(z => z.name && (z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking"));
   const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
   const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
