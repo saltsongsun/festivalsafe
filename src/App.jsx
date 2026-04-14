@@ -2088,8 +2088,25 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
   });
   const timePgs = filtered.filter(p => !alwaysPgs.includes(p));
 
+  // 정렬: 진행중 → 예정 → 종료
+  const sortedTimePgs = [...timePgs].map(pg => {
+    const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
+    const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
+    const isEnded = pg.pgStatus === "ended";
+    const isTimePast = !isEnded && nowMin > eh*60+em;
+    const isDatePast = !isEnded && pg.date && pg.date !== "always" && pg.date < todayStr;
+    const isPast = isEnded || isTimePast || isDatePast;
+    const isNow = !isPast && pg.date !== "always" && nowMin >= sh*60+sm && nowMin <= eh*60+em;
+    const order = isNow ? 0 : isPast ? 2 : 1;
+    return { ...pg, _order: order };
+  }).sort((a, b) => a._order - b._order || (a.time || "").localeCompare(b.time || ""));
+
+  // 그룹: 진행중 / 시간별(예정) / 종료
+  const nowGroup = sortedTimePgs.filter(p => p._order === 0);
+  const upcomingPgs = sortedTimePgs.filter(p => p._order === 1);
+  const pastPgs = sortedTimePgs.filter(p => p._order === 2);
   const timeGroups = {};
-  timePgs.forEach(pg => {
+  upcomingPgs.forEach(pg => {
     const h = (pg.time || "00:00").split(":")[0];
     const key = h + "시";
     if (!timeGroups[key]) timeGroups[key] = [];
@@ -2126,6 +2143,45 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
 
       {/* 프로그램 목록 */}
       {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>해당 조건의 프로그램이 없습니다.</div>}
+
+      {/* 진행중 프로그램 */}
+      {nowGroup.length > 0 && <div style={{ marginBottom: 14 }}>
+        <div style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ animation: "blink 2s infinite" }}>●</span> 진행중 {nowGroup.length}개
+        </div>
+        {nowGroup.map(pg => {
+          const cat = CATS[pg.category] || CATS.all;
+          const pgDate = pg.date && pg.date !== "always" ? new Date(pg.date) : null;
+          const dateLabel = pgDate ? `${pgDate.getMonth()+1}/${pgDate.getDate()}` : "";
+          const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+          const setPgStatus = (status) => setSettings(prev => ({ ...prev, programs: (prev.programs||[]).map(p => p.id === pg.id ? { ...p, pgStatus: p.pgStatus === status ? null : status } : p) }));
+          return (<div key={pg.id} style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(76,175,80,0.06)", border: "2px solid rgba(76,175,80,0.3)", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ textAlign: "center", minWidth: 54, paddingTop: 2 }}>
+                {dateLabel && <div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{dateLabel}</div>}
+                <div style={{ color: "#4CAF50", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time}</div>
+                <div style={{ color: "#556", fontSize: 11 }}>~{pg.endTime}</div>
+              </div>
+              <div style={{ width: 3, minHeight: 40, background: "#4CAF50", borderRadius: 2, flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <span style={{ padding: "3px 10px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 13, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>
+                  <span style={{ padding: "2px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
+                </div>
+                <div style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{pg.title}</div>
+                {pg.location && <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 2 }}>📍 {pg.location}</div>}
+                {pg.manager && <div style={{ color: "#556", fontSize: 12, marginTop: 4 }}>👤 {pg.manager}</div>}
+                {canControl && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button onClick={() => setPgStatus("delayed")} style={{ flex: 1, padding: "8px", borderRadius: 8, border: pg.pgStatus === "delayed" ? "2px solid #FF9800" : "1px solid #333", background: pg.pgStatus === "delayed" ? "rgba(255,152,0,0.1)" : "transparent", color: "#FF9800", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>⏱ 지연</button>
+                  <button onClick={() => setPgStatus("ended")} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>⬛ 종료</button>
+                </div>}
+              </div>
+            </div>
+          </div>);
+        })}
+      </div>}
+
+      {/* 예정 프로그램 - 시간별 */}
       {Object.entries(timeGroups).map(([timeKey, items]) => (
         <div key={timeKey} style={{ marginBottom: 12 }}>
           <div style={{ color: "#556", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>⏰ {timeKey}</div>
@@ -2178,6 +2234,20 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
           })}
         </div>
       ))}
+
+      {/* 종료 프로그램 */}
+      {pastPgs.length > 0 && <div style={{ marginTop: 4, marginBottom: 12 }}>
+        <div style={{ color: "#445", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>종료 {pastPgs.length}개</div>
+        {pastPgs.map(pg => {
+          const cat = CATS[pg.category] || CATS.all;
+          return (<div key={pg.id} style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(255,255,255,0.01)", border: "1px solid #1a1a2e", marginBottom: 3, opacity: 0.3, filter: "grayscale(0.8)", display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>
+            <span style={{ color: "#556", fontSize: 12, fontFamily: "monospace", minWidth: 40 }}>{pg.time}</span>
+            <span style={{ padding: "1px 5px", borderRadius: 4, background: `${cat.color}10`, color: cat.color, fontSize: 10 }}>{cat.label}</span>
+            <span style={{ color: "#445", fontSize: 13, flex: 1, textDecoration: pg.pgStatus === "ended" ? "line-through" : "none" }}>{pg.title}</span>
+          </div>);
+        })}
+      </div>}
 
       {/* 상시 프로그램 아코디언 */}
       {alwaysPgs.length > 0 && <div style={{ marginTop: 4, marginBottom: 12, borderRadius: 14, border: "1px solid rgba(0,150,136,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
