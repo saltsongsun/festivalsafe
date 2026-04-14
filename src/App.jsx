@@ -1592,7 +1592,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   });
   const toggleZone = (zid) => setZoneOpen(p => ({ ...p, [zid]: !p[zid] }));
 
-  const SITE_CONG = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
+  const SITE_CONG = { smooth: { label: "여유", color: "#4CAF50", icon: "🟢" }, crowded: { label: "보통", color: "#FF9800", icon: "🟡" }, danger: { label: "밀집", color: "#F44336", icon: "🔴" } };
 
   const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
   const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
@@ -1630,7 +1630,8 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   const renderSiteBlock = (site, statusMap, zone) => {
     const st = statusMap[site.status] || Object.values(statusMap)[0];
     const canEdit = canEditZone(zone);
-    const sc = SITE_CONG[site.congestion] || null;
+    const isRunning = site.status === "active" || site.status === "break";
+    const sc = isRunning && site.congestion ? SITE_CONG[site.congestion] : null;
     const setCong = (siteId, level) => setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, congestion: level } : s) }));
     return (<div key={site.id} style={{ padding: "10px 14px", borderTop: "1px solid #1a1a2e" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -1641,10 +1642,10 @@ function FestivalStatusPage({ settings, setSettings, session }) {
       </div>
       {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
         {Object.entries(statusMap).map(([k, v]) => (
-          <button key={k} onClick={() => setStatus(site.id, k)} style={{ flex: 1, padding: "7px 2px", borderRadius: 6, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
+          <button key={k} onClick={() => { setStatus(site.id, k); if (k !== "active" && k !== "break") setCong(site.id, null); }} style={{ flex: 1, padding: "7px 2px", borderRadius: 6, border: site.status === k ? `2px solid ${v.color}` : "1px solid #333", background: site.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
       </div>}
-      {canEdit && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+      {canEdit && isRunning && <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
         {Object.entries(SITE_CONG).map(([k, v]) => (
           <button key={k} onClick={() => setCong(site.id, site.congestion === k ? null : k)} style={{ flex: 1, padding: "5px 2px", borderRadius: 6, border: site.congestion === k ? `2px solid ${v.color}` : "1px solid #222", background: site.congestion === k ? `${v.color}10` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.icon} {v.label}</button>
         ))}
@@ -1694,14 +1695,36 @@ function FestivalStatusPage({ settings, setSettings, session }) {
         ))}
       </div>
 
-      {congestionData.length > 0 && <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10 }}>
-        {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#4CAF50" },
-          { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FF9800" },
-          { icon: "🔴", label: "위험", count: dangerCount, color: "#F44336" }
-        ].filter(c => c.count > 0).map(c => (
-          <span key={c.label} style={{ padding: "4px 12px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 13, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
-        ))}
-      </div>}
+      {/* 인파혼잡도 (구역별) + 근무지현황 */}
+      {(() => {
+        const siteCongs = workSites.filter(s => s.congestion && (s.status === "active" || s.status === "break"));
+        const sDanger = siteCongs.filter(s => s.congestion === "danger").length;
+        const sCrowded = siteCongs.filter(s => s.congestion === "crowded").length;
+        const sSmooth = siteCongs.filter(s => s.congestion === "smooth").length;
+        const hasZone = congestionData.length > 0;
+        const hasSite = siteCongs.length > 0;
+        if (!hasZone && !hasSite) return null;
+        return (<div style={{ marginBottom: 10 }}>
+          {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 4 }}>
+            <span style={{ color: "#556", fontSize: 12, lineHeight: "24px" }}>👥인파</span>
+            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#4CAF50" },
+              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FF9800" },
+              { icon: "🔴", label: "위험", count: dangerCount, color: "#F44336" }
+            ].filter(c => c.count > 0).map(c => (
+              <span key={c.label} style={{ padding: "3px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+            ))}
+          </div>}
+          {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+            <span style={{ color: "#556", fontSize: 12, lineHeight: "24px" }}>🏠근무지</span>
+            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#4CAF50" },
+              { icon: "🟡", label: "보통", count: sCrowded, color: "#FF9800" },
+              { icon: "🔴", label: "밀집", count: sDanger, color: "#F44336" }
+            ].filter(c => c.count > 0).map(c => (
+              <span key={c.label} style={{ padding: "3px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+            ))}
+          </div>}
+        </div>);
+      })()}
 
       {/* 모드 전환 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
@@ -1740,7 +1763,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
           const cg = congestionData.find(c => c.zoneId === zone.id);
           const CL = { smooth: { icon: "🟢" }, crowded: { icon: "🟡" }, danger: { icon: "🔴" } };
           const open = zoneOpen[zone.id];
-          const siteCongs = sites.filter(s => s.congestion).map(s => SITE_CONG[s.congestion]);
+          const siteCongs = sites.filter(s => s.congestion && (s.status === "active" || s.status === "break")).map(s => SITE_CONG[s.congestion]).filter(Boolean);
           return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid #222", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
             <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <span style={{ color: "#2196F3", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
@@ -2499,7 +2522,7 @@ function OrgChartTab({ settings, setSettings }) {
 }
 
 // ─── CMS Page ────────────────────────────────────────────────────
-function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset, presence }) {
+function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset }) {
   const [tab, setTab] = useState(initialTab || "monitor");
   const [focusCat, setFocusCat] = useState(initialCatId || null);
   const [editWorker, setEditWorker] = useState(null); // {siteId, workerId}
@@ -4439,9 +4462,8 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
           const rl = ROLES[acc.role] || ROLES.viewer;
           const editable = canManage(acc);
           const isSelf = acc.id === currentUser.id;
-          const pr = (presence || {})[acc.id];
-          const isOnline = pr && (Date.now() - pr.lastSeen) < 120000;
-          const lastSeenLabel = pr && !isOnline ? (() => { const min = Math.floor((Date.now() - pr.lastSeen)/60000); return min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; })() : "";
+          let isOnline = false, lastSeenLabel = "";
+          try { const pr = JSON.parse(localStorage.getItem("fest_presence") || "{}")[acc.id]; if (pr) { const diff = Date.now() - pr.lastSeen; isOnline = diff < 120000; if (!isOnline) { const min = Math.floor(diff/60000); lastSeenLabel = min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; } } } catch {}
           return (
             <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
@@ -4713,11 +4735,14 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const role = ROLES[session.role] || ROLES.viewer;
   const allowedPages = role.pages;
 
-  // 접속 상태 추적 (Supabase 동기화)
-  const [presence, setPresence] = usePersist("fest_presence_v1", {});
+  // 접속 상태 추적 (localStorage, 리렌더 없음)
   useEffect(() => {
     const updatePresence = () => {
-      setPresence(prev => ({ ...prev, [session.id]: { name: session.name, role: session.role, lastSeen: Date.now() } }));
+      try {
+        const p = JSON.parse(localStorage.getItem("fest_presence") || "{}");
+        p[session.id] = { name: session.name, role: session.role, lastSeen: Date.now() };
+        localStorage.setItem("fest_presence", JSON.stringify(p));
+      } catch {}
     };
     updatePresence();
     const iv = setInterval(updatePresence, 30000);
@@ -4933,7 +4958,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           </div>
         </div>
       ) : page === "cms" && (
-        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} presence={presence} />
+        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} />
       )}
     </div>
   </div>);
