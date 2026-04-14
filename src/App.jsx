@@ -1884,7 +1884,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
 
 // ─── Program Page (축제 프로그램) ─────────────────────────────────
-function ProgramPage({ settings }) {
+function ProgramPage({ settings, session, onManage }) {
   const programs = (settings.programs || []).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   const rawDates = settings.festivalDates || [];
   // 축제일자가 없으면 프로그램 데이터에서 자동 추출
@@ -1917,7 +1917,10 @@ function ProgramPage({ settings }) {
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "20px 16px 80px" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
       <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎭 축제 프로그램</h2>
-      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
+      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 10px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
+      {["admin","manager","sysadmin"].includes(session?.role) && <div style={{ textAlign: "center", marginBottom: 14 }}>
+        <button onClick={onManage} style={{ padding: "10px 24px", borderRadius: 10, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⚙️ 프로그램 관리</button>
+      </div>}
 
       {/* 일자 선택 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
@@ -4991,7 +4994,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "chat" && <ChatPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
       
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
-      {page === "program" && <ProgramPage settings={settings} />}
+      {page === "program" && <ProgramPage settings={settings} session={session} onManage={() => { setCmsTab("programs"); setPage("cms"); }} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
