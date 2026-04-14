@@ -4009,45 +4009,116 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
     {/* Settings */}
     {tab === "settings" && <div>
+      {/* 축제 기본정보 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>🕐 운영 시간 및 모드</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          <div><Label>시작 시간</Label><Input type="time" value={settings.operatingStart} onChange={e => setSettings({ ...settings, operatingStart: e.target.value })} /></div>
-          <div><Label>종료 시간</Label><Input type="time" value={settings.operatingEnd} onChange={e => setSettings({ ...settings, operatingEnd: e.target.value })} /></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div onClick={() => { const e = prompt("로고 이모지:", settings.logoEmoji); if (e) setSettings({ ...settings, logoEmoji: e }); }} style={{ width: 56, height: 56, borderRadius: 14, background: "rgba(156,39,176,0.1)", border: "2px solid rgba(156,39,176,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, cursor: "pointer", flexShrink: 0 }}>{settings.logoEmoji || "🏮"}</div>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ color: "#ccd6f6", fontSize: 18, margin: "0 0 2px", fontWeight: 800 }}>🎪 축제 기본정보</h3>
+            <p style={{ color: "#556", fontSize: 12, margin: 0 }}>로고를 터치하면 이모지를 변경할 수 있습니다</p>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <Toggle on={settings.is24HourMode} onToggle={() => setSettings({ ...settings, is24HourMode: !settings.is24HourMode })} labelOn="🔒 24시간 감시 활성" labelOff="설정 시간 운영" />
-          {settings.is24HourMode && <button onClick={() => setSettings({ ...settings, is24HourMode: false })} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>끄기</button>}
+        <div style={{ display: "grid", gap: 12 }}>
+          <div><Label>축제명 *</Label><Input value={settings.festivalName} onChange={e => setSettings({ ...settings, festivalName: e.target.value })} placeholder="제25회 진주논개제" style={{ fontSize: 16, fontWeight: 700 }} /></div>
+          <div><Label>부제목</Label><Input value={settings.festivalSubtitle} onChange={e => setSettings({ ...settings, festivalSubtitle: e.target.value })} placeholder="축제 안전관리시스템" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div><Label>관리기관</Label><Input value={settings.organization} onChange={e => setSettings({ ...settings, organization: e.target.value })} placeholder="진주시청" /></div>
+            <div><Label>대표 연락처</Label><Input value={settings.contactNumber} onChange={e => setSettings({ ...settings, contactNumber: e.target.value })} placeholder="055-000-0000" /></div>
+          </div>
         </div>
       </Card>
-      <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>🔧 축제 기본정보</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "축제명", k: "festivalName" }, { l: "부제목", k: "festivalSubtitle" }, { l: "관리기관", k: "organization" }, { l: "연락처", k: "contactNumber" }, { l: "로고", k: "logoEmoji" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={settings[f.k]} onChange={e => setSettings({ ...settings, [f.k]: e.target.value })} /></div>))}</div></Card>
+
+      {/* 운영 일정 */}
       <Card>
-        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📅 축제 일자</h3>
-        <p style={{ color: "#556", fontSize: 13, margin: "0 0 12px" }}>축제 운영 일자를 등록하세요. 일일 마감 시 일자별 데이터가 저장됩니다.</p>
-        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-          <Input type="date" id="fest-date-add" style={{ flex: 1 }} />
-          <button onClick={() => { const d = document.getElementById("fest-date-add")?.value; if (d && !(settings.festivalDates || []).includes(d)) setSettings({ ...settings, festivalDates: [...(settings.festivalDates || []), d].sort() }); }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button>
+        <h3 style={{ color: "#ccd6f6", fontSize: 18, margin: "0 0 4px", fontWeight: 800 }}>📅 운영 일정</h3>
+        <p style={{ color: "#556", fontSize: 12, margin: "0 0 16px" }}>축제 운영 기간과 시간을 설정합니다</p>
+
+        {/* 일자 등록 */}
+        <div style={{ marginBottom: 16 }}>
+          <Label>축제 일자</Label>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <Input type="date" id="fest-date-start" style={{ flex: 1 }} />
+            <span style={{ color: "#556", fontSize: 14, alignSelf: "center" }}>~</span>
+            <Input type="date" id="fest-date-end" style={{ flex: 1 }} />
+            <button onClick={() => {
+              const s = document.getElementById("fest-date-start")?.value;
+              const e = document.getElementById("fest-date-end")?.value;
+              if (!s) { const d = document.getElementById("fest-date-start")?.value; if (d && !(settings.festivalDates||[]).includes(d)) setSettings({...settings, festivalDates: [...(settings.festivalDates||[]), d].sort()}); return; }
+              const dates = [];
+              let cur = new Date(s);
+              const end = e ? new Date(e) : cur;
+              while (cur <= end) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+              const merged = [...new Set([...(settings.festivalDates||[]), ...dates])].sort();
+              setSettings({...settings, festivalDates: merged});
+            }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>추가</button>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {(settings.festivalDates || []).map((d, i) => {
+              const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
+              const isToday = d === new Date().toISOString().slice(0, 10);
+              return <div key={d} style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 12px", borderRadius: 10, background: isToday ? "rgba(76,175,80,0.1)" : "rgba(33,150,243,0.06)", border: isToday ? "1.5px solid rgba(76,175,80,0.3)" : "1px solid rgba(33,150,243,0.12)" }}>
+                <span style={{ color: isToday ? "#4CAF50" : "#2196F3", fontSize: 14, fontWeight: 700 }}>{i+1}일차</span>
+                <span style={{ color: "#ccd6f6", fontSize: 14 }}>{dt.getMonth()+1}/{dt.getDate()}</span>
+                <span style={{ color: "#556", fontSize: 12 }}>({dayNames[dt.getDay()]})</span>
+                {isToday && <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>오늘</span>}
+                <button onClick={() => setSettings({...settings, festivalDates: (settings.festivalDates||[]).filter(x => x !== d)})} style={{ padding: "2px 6px", borderRadius: 4, border: "none", background: "transparent", color: "#a33", fontSize: 12, cursor: "pointer", marginLeft: 4 }}>✕</button>
+              </div>;
+            })}
+          </div>
+          {(settings.festivalDates||[]).length === 0 && <div style={{ padding: 12, color: "#445", fontSize: 13, textAlign: "center" }}>날짜를 추가하세요 (시작~종료일 범위 또는 개별 추가)</div>}
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {(settings.festivalDates || []).map(d => {
-            const dt = new Date(d); const label = `${dt.getMonth()+1}/${dt.getDate()}`;
-            const isToday = d === new Date().toISOString().slice(0, 10);
-            return <span key={d} onClick={() => setSettings({ ...settings, festivalDates: (settings.festivalDates || []).filter(x => x !== d) })} style={{ padding: "6px 12px", borderRadius: 8, background: isToday ? "rgba(76,175,80,0.12)" : "rgba(33,150,243,0.1)", border: isToday ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(33,150,243,0.15)", color: isToday ? "#4CAF50" : "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{label}{isToday ? " (오늘)" : ""} ✕</span>;
-          })}
+
+        {/* 운영 시간 */}
+        <div style={{ padding: "16px", borderRadius: 12, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.1)" }}>
+          <Label>일일 운영시간</Label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <Input type="time" value={settings.operatingStart} onChange={e => setSettings({...settings, operatingStart: e.target.value})} style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }} />
+            <span style={{ color: "#556", fontSize: 16 }}>~</span>
+            <Input type="time" value={settings.operatingEnd} onChange={e => setSettings({...settings, operatingEnd: e.target.value})} style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Toggle on={settings.is24HourMode} onToggle={() => setSettings({...settings, is24HourMode: !settings.is24HourMode})} labelOn="🔒 24시간 감시 모드" labelOff="설정 시간 운영" />
+          </div>
         </div>
+
+        {/* 저장된 일자별 데이터 */}
         {(settings.dailyRecords || []).length > 0 && <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222" }}>
-          <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📋 저장된 일자별 데이터</div>
+          <div style={{ color: "#8892b0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📋 일자별 누적 데이터</div>
           {(settings.dailyRecords || []).map((r, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6 }}>
-              <span style={{ color: "#ccd6f6", fontSize: 14 }}>{r.date}</span>
-              <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700 }}>누적 {(r.cumulative || 0).toLocaleString()}명</span>
-              <span style={{ color: "#4CAF50", fontSize: 13 }}>최대체류 {(r.peakCurrent || 0).toLocaleString()}</span>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6 }}>
+              <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{r.date}</span>
+              <span style={{ color: "#2196F3", fontSize: 14 }}>누적 {(r.cumulative||0).toLocaleString()}명</span>
+              <span style={{ color: "#4CAF50", fontSize: 13 }}>최대 {(r.peakCurrent||0).toLocaleString()}</span>
             </div>
           ))}
         </div>}
       </Card>
-      <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>📍 위치</h3><div style={{ display: "flex", gap: 8, marginBottom: 14 }}><button onClick={autoLocate} disabled={locLoading} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: loc.mode === "auto" ? "#4CAF50" : "#2196F3", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: locLoading ? .6 : 1 }}>{locLoading ? "📡 확인 중..." : "📡 자동 위치"}</button><button onClick={() => setSettings({ ...settings, location: { ...loc, mode: "manual" } })} style={{ flex: 1, padding: "12px", borderRadius: 8, border: loc.mode === "manual" ? "1px solid #FF9800" : "1px solid #333", background: loc.mode === "manual" ? "rgba(255,152,0,0.1)" : "transparent", color: loc.mode === "manual" ? "#FF9800" : "#8892b0", fontWeight: 700, cursor: "pointer" }}>✏️ 수동</button></div><div style={{ display: "grid", gap: 10 }}><div><Label>위치명</Label><Input value={loc.name || ""} onChange={e => setSettings({ ...settings, location: { ...loc, name: e.target.value, mode: "manual" } })} /></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><div><Label>위도</Label><Input type="number" step="0.0001" value={loc.lat || ""} onChange={e => setSettings({ ...settings, location: { ...loc, lat: parseFloat(e.target.value) || 0, mode: "manual" } })} /></div><div><Label>경도</Label><Input type="number" step="0.0001" value={loc.lon || ""} onChange={e => setSettings({ ...settings, location: { ...loc, lon: parseFloat(e.target.value) || 0, mode: "manual" } })} /></div></div></div><div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.02)" }}><p style={{ color: "#445", fontSize: 14, margin: 0 }}>📍{loc.name} ({loc.lat?.toFixed(4)}, {loc.lon?.toFixed(4)}) — {loc.mode === "auto" ? "자동" : "수동"} | 격자: nx={grid.nx}, ny={grid.ny}</p></div></Card>
-      <Card><h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 6px" }}>📐 순면적</h3><div style={{ marginBottom: 12 }}><Label>면적 (㎡)</Label><div style={{ display: "flex", gap: 8, alignItems: "center" }}><Input type="number" value={settings.venueArea} onChange={e => setSettings({ ...settings, venueArea: parseFloat(e.target.value) || 0 })} style={{ width: 150, fontSize: 18, fontWeight: 700 }} /><span style={{ color: "#8892b0" }}>㎡</span><span style={{ color: "#445", fontSize: 14 }}>({(settings.venueArea * .3025).toFixed(0)}평)</span></div></div><button onClick={() => { const t = calcCrowdThr(settings.venueArea); setCategories(p => p.map(c => c.id === "crowd" ? { ...c, thresholds: t } : c)); alert("✅ 인파 기준 적용"); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 인파 기준 자동 적용</button></Card>
+
+      {/* 위치 + 면적 */}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 18, margin: "0 0 4px", fontWeight: 800 }}>📍 행사장 위치</h3>
+        <p style={{ color: "#556", fontSize: 12, margin: "0 0 14px" }}>기상청 API 연동에 사용됩니다</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          <button onClick={autoLocate} disabled={locLoading} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "auto" ? "2px solid #4CAF50" : "1px solid #333", background: loc.mode === "auto" ? "rgba(76,175,80,0.08)" : "transparent", color: loc.mode === "auto" ? "#4CAF50" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{locLoading ? "📡 확인 중..." : "📡 자동 위치"}</button>
+          <button onClick={() => setSettings({...settings, location: {...loc, mode: "manual"}})} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "manual" ? "2px solid #FF9800" : "1px solid #333", background: loc.mode === "manual" ? "rgba(255,152,0,0.08)" : "transparent", color: loc.mode === "manual" ? "#FF9800" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>✏️ 수동 입력</button>
+        </div>
+        <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+          <div><Label>위치명</Label><Input value={loc.name||""} onChange={e => setSettings({...settings, location: {...loc, name: e.target.value, mode: "manual"}})} placeholder="진주성" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div><Label>위도</Label><Input type="number" step="0.0001" value={loc.lat||""} onChange={e => setSettings({...settings, location: {...loc, lat: parseFloat(e.target.value)||0, mode: "manual"}})} /></div>
+            <div><Label>경도</Label><Input type="number" step="0.0001" value={loc.lon||""} onChange={e => setSettings({...settings, location: {...loc, lon: parseFloat(e.target.value)||0, mode: "manual"}})} /></div>
+          </div>
+        </div>
+        <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 14, fontSize: 13, color: "#556" }}>📍 {loc.name} ({loc.lat?.toFixed(4)}, {loc.lon?.toFixed(4)}) — {loc.mode === "auto" ? "자동" : "수동"} | 격자: nx={grid.nx}, ny={grid.ny}</div>
+
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 8px", fontWeight: 700 }}>📐 행사장 면적</h3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <Input type="number" value={settings.venueArea} onChange={e => setSettings({...settings, venueArea: parseFloat(e.target.value)||0})} style={{ width: 140, fontSize: 18, fontWeight: 700 }} />
+          <span style={{ color: "#8892b0", fontSize: 14 }}>㎡</span>
+          <span style={{ color: "#445", fontSize: 13 }}>= {(settings.venueArea * 0.3025).toFixed(0)}평</span>
+        </div>
+        <button onClick={() => { const t = calcCrowdThr(settings.venueArea); setCategories(p => p.map(c => c.id === "crowd" ? { ...c, thresholds: t } : c)); alert("✅ 인파 기준 자동 적용 완료"); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 면적 기반 인파 기준 자동 적용</button>
+      </Card>
 
 
 
