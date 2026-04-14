@@ -2603,7 +2603,7 @@ function OrgChartTab({ settings, setSettings }) {
 }
 
 // ─── CMS Page ────────────────────────────────────────────────────
-function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset, onForceSync }) {
+function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset, onForceSync, updateAvailable }) {
   const [tab, setTab] = useState(initialTab || "monitor");
   const [focusCat, setFocusCat] = useState(initialCatId || null);
   const [editWorker, setEditWorker] = useState(null); // {siteId, workerId}
@@ -4122,6 +4122,37 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
 
 
+      {/* 앱 업데이트 */}
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: 24 }}>📲</span>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 2px", fontWeight: 800 }}>앱 업데이트</h3>
+            <p style={{ color: "#556", fontSize: 12, margin: 0 }}>{updateAvailable ? "새 버전이 준비되었습니다" : "현재 최신 버전입니다"}</p>
+          </div>
+          {updateAvailable && <span style={{ width: 10, height: 10, borderRadius: 5, background: "#F44336", flexShrink: 0 }} />}
+        </div>
+        <button onClick={() => {
+          if (updateAvailable) {
+            const overlay = document.createElement("div");
+            overlay.id = "update-overlay";
+            overlay.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999"><div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#ccd6f6;margin-top:16px;font-size:16px;font-weight:700">업데이트 적용 중...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
+            document.body.appendChild(overlay);
+            setTimeout(() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }, 500);
+          } else {
+            if (navigator.serviceWorker?.controller) {
+              navigator.serviceWorker.getRegistration().then(reg => {
+                if (reg) reg.update().then(() => {
+                  setTimeout(() => { if (!updateAvailable) alert("✅ 현재 최신 버전입니다."); }, 2000);
+                });
+              });
+            } else { alert("✅ 현재 최신 버전입니다."); }
+          }
+        }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: updateAvailable ? "none" : "1px solid #333", background: updateAvailable ? "linear-gradient(135deg, #2196F3, #1565C0)" : "transparent", color: updateAvailable ? "#fff" : "#8892b0", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          {updateAvailable ? "🔄 지금 업데이트" : "🔍 업데이트 확인"}
+        </button>
+      </Card>
+
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>💾 설정 저장 / 불러오기</h3>
         <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>축제 설정 전체를 파일로 저장하고 다시 불러올 수 있습니다.</p>
@@ -4899,19 +4930,14 @@ function AppMain({ onError }) {
     sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: session.id }));
   };
 
-  const UpdateBanner = updateAvailable ? (<div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "12px 16px", background: "linear-gradient(135deg, #2196F3, #1565C0)", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, boxShadow: "0 4px 20px rgba(33,150,243,0.3)" }}>
-    <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>🔄 새 버전이 있습니다</span>
-    <button onClick={() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "2px solid #fff", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>지금 업데이트</button>
-  </div>) : null;
-
-  if (!session) return <>{UpdateBanner}<LoginPage onLogin={handleLogin} accounts={accounts} /></>;
+  if (!session) return <LoginPage onLogin={handleLogin} accounts={accounts} />;
 
   // 축제 선택 안 된 상태
   if (!selectedFestival) {
     const isSysAdmin = session.role === "sysadmin";
     const myFests = isSysAdmin ? festivals : festivals.filter(f => (session.festivals || [session.festivalId || "default"]).includes(f.id));
 
-    return (<>{UpdateBanner}<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column", alignItems: "center", padding: updateAvailable ? "60px 20px 40px" : "40px 20px", fontFamily: "'Noto Sans KR',sans-serif" }}>
+    return (<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", fontFamily: "'Noto Sans KR',sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
       <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>🎪 축제 선택</h1>
       <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 24px" }}>{session.name}님, 관리할 축제를 선택하세요</p>
@@ -4930,10 +4956,10 @@ function AppMain({ onError }) {
       {isSysAdmin && <FestivalManager festivals={festivals} setFestivals={setFestivals} accounts={accounts} setAccounts={setAccounts} />}
 
       <button onClick={handleLogout} style={{ marginTop: 24, padding: "10px 24px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 14, cursor: "pointer" }}>로그아웃</button>
-    </div></>);
+    </div>);
   }
 
-  return <>{UpdateBanner}<AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} onForceSync={() => setSyncVersion(v => (typeof v === 'number' ? v : 0) + 1)} updateAvailable={updateAvailable} /></>;
+  return <AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} onForceSync={() => setSyncVersion(v => (typeof v === 'number' ? v : 0) + 1)} updateAvailable={updateAvailable} />;
 }
 
 // ─── Festival Manager (시스템관리자 전용) ────────────────────────
@@ -5226,17 +5252,12 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {navs.map(n => <button key={n.id} onClick={() => { setPage(n.id); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: page === n.id ? "#2196F3" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
         <span style={{ fontSize: 20 }}>{n.icon}</span><span style={{ fontSize: 14, fontWeight: page === n.id ? 700 : 400 }}>{n.label}</span>
         {n.id === "inbox" && unreadCount > 0 && <span style={{ position: "absolute", top: 6, right: "calc(50% - 18px)", width: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>}
+        {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 8, height: 8, borderRadius: 4, background: "#2196F3" }} />}
       </button>)}
     </nav>
 
     {/* Content */}
     <div style={{ paddingTop: 36, paddingBottom: 70 }}>
-      {/* PWA 업데이트 배너 */}
-      {updateAvailable && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "10px 16px", background: "linear-gradient(135deg, #2196F3, #1565C0)", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, boxShadow: "0 4px 20px rgba(33,150,243,0.3)" }}>
-        <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>🔄 새 버전이 있습니다</span>
-        <button onClick={() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "2px solid #fff", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>업데이트</button>
-      </div>}
-
       {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
@@ -5257,7 +5278,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           </div>
         </div>
       ) : page === "cms" && (
-        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} onForceSync={onForceSync} />
+        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} onForceSync={onForceSync} updateAvailable={updateAvailable} />
       )}
     </div>
   </div>);
