@@ -2544,7 +2544,7 @@ function OrgChartTab({ settings, setSettings }) {
 }
 
 // ─── CMS Page ────────────────────────────────────────────────────
-function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset }) {
+function CMSPage({ categories, setCategories, settings, setSettings, alerts, setAlerts, smsLog, initialTab, initialCatId, extraTabs, onExtraTab, userRole, accounts, setAccounts, onDataReset, onForceSync }) {
   const [tab, setTab] = useState(initialTab || "monitor");
   const [focusCat, setFocusCat] = useState(initialCatId || null);
   const [editWorker, setEditWorker] = useState(null); // {siteId, workerId}
@@ -4569,10 +4569,45 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                 </>}
                 {!editable && !isSelf && <span style={{ color: "#556", fontSize: 12 }}>🔒 상위 관리자</span>}
               </div>
+              {editable && (() => {
+                const allPages = [
+                  { id: "dashboard", icon: "📊", label: "대시보드" },
+                  { id: "counter", icon: "👥", label: "인파계수" },
+                  { id: "congestion", icon: "🚦", label: "혼잡도" },
+                  { id: "status", icon: "🎪", label: "축제관리" },
+                  { id: "program", icon: "🎭", label: "프로그램" },
+                  { id: "parking", icon: "🅿️", label: "주차" },
+                  { id: "shuttle", icon: "🚌", label: "셔틀" },
+                  { id: "chat", icon: "💬", label: "메시지" },
+                  { id: "cms", icon: "⚙️", label: "관리" },
+                ];
+                const rolePg = (ROLES[acc.role] || ROLES.viewer).pages;
+                const enabled = acc.enabledPages || rolePg;
+                return (<div style={{ marginTop: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: "#556", fontSize: 12 }}>하단바 기능</span>
+                    <button onClick={() => setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: undefined } : a))} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 11, cursor: "pointer" }}>기본값</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {allPages.map(p => {
+                      const on = enabled.includes(p.id);
+                      const isDefault = rolePg.includes(p.id);
+                      return (<button key={p.id} onClick={() => {
+                        const cur = [...(acc.enabledPages || rolePg)];
+                        const next = on ? cur.filter(x => x !== p.id) : [...cur, p.id];
+                        setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: next } : a));
+                      }} style={{ padding: "5px 10px", borderRadius: 6, border: on ? "1.5px solid #4CAF50" : "1px solid #333", background: on ? "rgba(76,175,80,0.08)" : "transparent", color: on ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        {p.icon} {p.label}{!isDefault && on ? " +" : ""}
+                      </button>);
+                    })}
+                  </div>
+                </div>);
+              })()}
             </div>
           );
         })}
       </Card>
+      {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <button onClick={() => { if (confirm("모든 접속 기기에 설정을 동기화합니다.\n다른 기기는 자동으로 새로고침됩니다.")) { onForceSync?.(); alert("✅ 전체 동기화 완료\n다른 기기가 자동으로 새로고침됩니다."); } }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "2px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>🔄 전체 기기 동기화</button>}
       {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>➕ 계정 추가</h3>
         <div style={{ display: "grid", gap: 10 }}>
@@ -4638,6 +4673,8 @@ export default function App() {
 function AppMain({ onError }) {
   const [accounts, setAccounts] = usePersist("fest_accounts_v2", DEFAULT_ACCOUNTS);
   const [festivals, setFestivals] = usePersist("fest_festivals_v1", DEFAULT_FESTIVALS);
+  const [syncVersion, setSyncVersion] = usePersist("fest_sync_v1", 0);
+  const syncRef = useRef(syncVersion);
   const [session, setSession] = useState(null);
   const [selectedFestival, setSelectedFestival] = useState(null);
   const [page, setPage] = useState("dashboard");
@@ -4659,6 +4696,15 @@ function AppMain({ onError }) {
       }
     } catch {}
   }, []);
+
+  // 동기화 감지: 다른 기기에서 동기화 시 자동 새로고침
+  useEffect(() => {
+    if (syncRef.current !== 0 && syncVersion !== syncRef.current) {
+      syncRef.current = syncVersion;
+      window.location.reload();
+    }
+    syncRef.current = syncVersion;
+  }, [syncVersion]);
 
   const handleLogin = (acc) => {
     setSession(acc);
@@ -4719,7 +4765,7 @@ function AppMain({ onError }) {
     </div>);
   }
 
-  return <AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} />;
+  return <AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} onForceSync={() => setSyncVersion(v => (typeof v === 'number' ? v : 0) + 1)} />;
 }
 
 // ─── Festival Manager (시스템관리자 전용) ────────────────────────
@@ -4794,7 +4840,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
   </div>);
 }
 
-function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt }) {
+function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt, onForceSync }) {
   const [page, setPageInternal] = useState(initialPage);
   const setPage = (p) => { setPageInternal(p); setPageExt(p); };
 
@@ -4811,7 +4857,8 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   const active = isActive(settings);
   const role = ROLES[session.role] || ROLES.viewer;
-  const allowedPages = role.pages;
+  const myAccount = accounts.find(a => a.id === session.id);
+  const allowedPages = myAccount?.enabledPages || role.pages;
 
   // 접속 상태 추적 (localStorage, 리렌더 없음)
   useEffect(() => {
@@ -5036,7 +5083,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           </div>
         </div>
       ) : page === "cms" && (
-        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} />
+        <CMSPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} initialTab={cmsTab} initialCatId={cmsCatId} extraTabs={cmsExtraTabs} onExtraTab={(id) => setCmsTab(id)} userRole={session.role} accounts={accounts} setAccounts={setAccounts} onDataReset={() => setRefreshKey(k => k + 1)} onForceSync={onForceSync} />
       )}
     </div>
   </div>);
