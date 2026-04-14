@@ -4833,6 +4833,14 @@ function AppMain({ onError }) {
   const [session, setSession] = useState(null);
   const [selectedFestival, setSelectedFestival] = useState(null);
   const [page, setPage] = useState("dashboard");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  // PWA 업데이트 감지
+  useEffect(() => {
+    const handler = () => setUpdateAvailable(true);
+    window.addEventListener("sw-update-available", handler);
+    return () => window.removeEventListener("sw-update-available", handler);
+  }, []);
 
   // Restore session
   useEffect(() => {
@@ -4891,14 +4899,19 @@ function AppMain({ onError }) {
     sessionStorage.setItem("fest_session_v2", JSON.stringify({ id: session.id }));
   };
 
-  if (!session) return <LoginPage onLogin={handleLogin} accounts={accounts} />;
+  const UpdateBanner = updateAvailable ? (<div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "12px 16px", background: "linear-gradient(135deg, #2196F3, #1565C0)", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, boxShadow: "0 4px 20px rgba(33,150,243,0.3)" }}>
+    <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>🔄 새 버전이 있습니다</span>
+    <button onClick={() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "2px solid #fff", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>지금 업데이트</button>
+  </div>) : null;
+
+  if (!session) return <>{UpdateBanner}<LoginPage onLogin={handleLogin} accounts={accounts} /></>;
 
   // 축제 선택 안 된 상태
   if (!selectedFestival) {
     const isSysAdmin = session.role === "sysadmin";
     const myFests = isSysAdmin ? festivals : festivals.filter(f => (session.festivals || [session.festivalId || "default"]).includes(f.id));
 
-    return (<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", fontFamily: "'Noto Sans KR',sans-serif" }}>
+    return (<>{UpdateBanner}<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column", alignItems: "center", padding: updateAvailable ? "60px 20px 40px" : "40px 20px", fontFamily: "'Noto Sans KR',sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
       <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>🎪 축제 선택</h1>
       <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 24px" }}>{session.name}님, 관리할 축제를 선택하세요</p>
@@ -4917,10 +4930,10 @@ function AppMain({ onError }) {
       {isSysAdmin && <FestivalManager festivals={festivals} setFestivals={setFestivals} accounts={accounts} setAccounts={setAccounts} />}
 
       <button onClick={handleLogout} style={{ marginTop: 24, padding: "10px 24px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#556", fontSize: 14, cursor: "pointer" }}>로그아웃</button>
-    </div>);
+    </div></>);
   }
 
-  return <AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} onForceSync={() => setSyncVersion(v => (typeof v === 'number' ? v : 0) + 1)} />;
+  return <>{UpdateBanner}<AuthenticatedApp session={{ ...session, festivalId: selectedFestival.id }} accounts={accounts} setAccounts={setAccounts} festivals={festivals} onLogout={handleLogout} onBackToFestivalSelect={handleBackToFestivalSelect} initialPage={page} setPage={setPage} onForceSync={() => setSyncVersion(v => (typeof v === 'number' ? v : 0) + 1)} updateAvailable={updateAvailable} /></>;
 }
 
 // ─── Festival Manager (시스템관리자 전용) ────────────────────────
@@ -4995,7 +5008,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
   </div>);
 }
 
-function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt, onForceSync }) {
+function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt, onForceSync, updateAvailable }) {
   const [page, setPageInternal] = useState(initialPage);
   const setPage = (p) => { setPageInternal(p); setPageExt(p); };
 
@@ -5218,6 +5231,12 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
     {/* Content */}
     <div style={{ paddingTop: 36, paddingBottom: 70 }}>
+      {/* PWA 업데이트 배너 */}
+      {updateAvailable && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, padding: "10px 16px", background: "linear-gradient(135deg, #2196F3, #1565C0)", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, boxShadow: "0 4px 20px rgba(33,150,243,0.3)" }}>
+        <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>🔄 새 버전이 있습니다</span>
+        <button onClick={() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "2px solid #fff", background: "rgba(255,255,255,0.2)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>업데이트</button>
+      </div>}
+
       {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
