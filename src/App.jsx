@@ -1898,9 +1898,10 @@ function FestivalStatusPage({ settings, setSettings, session }) {
               {pgCatOpen.always && alwaysPgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
                 const pc = PGCAT[p.category] || { l: "", c: "#556", icon: "" };
                 const isEnded3 = p.pgStatus === "ended";
-                const isNow3 = !isEnded3 && isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
-                const isTimePast3 = !isEnded3 && isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })();
-                const inactive3 = isEnded3 || isTimePast3;
+                const [sh3,sm3] = (p.time||"00:00").split(":").map(Number);
+                const [eh3,em3] = (p.endTime||"23:59").split(":").map(Number);
+                const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
+                const inactive3 = isEnded3 || nowMin3 > eh3*60+em3;
                 return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid #1a1a2e", display: "flex", alignItems: "center", gap: 8, opacity: inactive3 ? 0.3 : 1, filter: inactive3 ? "grayscale(0.8)" : "none" }}>
                   {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
                   {inactive3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
@@ -1924,8 +1925,10 @@ function FestivalStatusPage({ settings, setSettings, session }) {
                 </div>
                 {catOpen && items.map(p => {
                   const isEnded3 = p.pgStatus === "ended";
-                  const isNow3 = !isEnded3 && isToday3 && (() => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; })();
-                  const isPast3 = isEnded3 || (isToday3 && (() => { const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>eh*60+em; })());
+                  const [sh3,sm3] = (p.time||"00:00").split(":").map(Number);
+                  const [eh3,em3] = (p.endTime||"23:59").split(":").map(Number);
+                  const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
+                  const isPast3 = isEnded3 || nowMin3 > eh3*60+em3;
                   return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.3 : 1, filter: isPast3 ? "grayscale(0.8)" : "none" }}>
                     {isNow3 && <span style={{ color: "#4CAF50", fontSize: 11 }}>🟢</span>}
                     {isPast3 && <span style={{ padding: "1px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 10, fontWeight: 700 }}>종료</span>}
@@ -2131,9 +2134,12 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
             const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
             const pgDate = pg.date && pg.date !== "always" ? new Date(pg.date) : null;
             const dateLabel = pgDate ? `${pgDate.getMonth()+1}/${pgDate.getDate()}` : "";
-            const isNow = pg.pgStatus !== "ended" && pg.date !== "always" && pg.date === todayStr && nowMin >= sh*60+sm && nowMin <= eh*60+em;
-            const isPast = (pg.pgStatus === "ended") || (pg.date === todayStr && nowMin > eh*60+em) || (pg.date && pg.date !== "always" && pg.date < todayStr);
-            const isDelayed = pg.pgStatus === "delayed";
+            const isEnded = pg.pgStatus === "ended";
+            const isDatePast = !isEnded && pg.date && pg.date !== "always" && pg.date < todayStr;
+            const isTimePast = !isEnded && !isDatePast && pg.date !== "always" && nowMin > eh*60+em;
+            const isPast = isEnded || isTimePast || isDatePast;
+            const isNow = !isPast && pg.date !== "always" && nowMin >= sh*60+sm && nowMin <= eh*60+em;
+            const isDelayed = !isPast && pg.pgStatus === "delayed";
             const cat = CATS[pg.category] || CATS.all;
             const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
             const setPgStatus = (status) => setSettings(prev => ({ ...prev, programs: (prev.programs||[]).map(p => p.id === pg.id ? { ...p, pgStatus: p.pgStatus === status ? null : status } : p) }));
@@ -2182,10 +2188,12 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
         </div>
         {alwaysOpen && alwaysPgs.sort((a,b) => (a.time||"").localeCompare(b.time||"")).map(pg => {
           const cat = CATS[pg.category] || CATS.all;
-          const isNow = pg.pgStatus !== "ended" && (() => { const [sh,sm]=(pg.time||"00:00").split(":").map(Number); const [eh,em]=(pg.endTime||"23:59").split(":").map(Number); return nowMin>=sh*60+sm && nowMin<=eh*60+em; })();
+          const [sh2,sm2] = (pg.time||"00:00").split(":").map(Number);
+          const [eh2,em2] = (pg.endTime||"23:59").split(":").map(Number);
           const isEnded = pg.pgStatus === "ended";
-          const isTimePast = !isEnded && todayStr === (pg.date === "always" ? todayStr : pg.date) && (() => { const [eh,em]=(pg.endTime||"23:59").split(":").map(Number); return nowMin>eh*60+em; })();
+          const isTimePast = !isEnded && nowMin > eh2*60+em2;
           const inactive = isEnded || isTimePast;
+          const isNow = !inactive && nowMin >= sh2*60+sm2 && nowMin <= eh2*60+em2;
           return (<div key={pg.id} style={{ padding: "10px 16px", borderTop: "1px solid rgba(0,150,136,0.1)", display: "flex", alignItems: "center", gap: 8, opacity: inactive ? 0.3 : 1, filter: inactive ? "grayscale(0.8)" : "none" }}>
             {isNow && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
             {isEnded && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(244,67,54,0.15)", color: "#F44336", fontSize: 11, fontWeight: 700 }}>종료</span>}
