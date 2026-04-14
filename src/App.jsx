@@ -2124,106 +2124,164 @@ function CongestionPage({ settings, setSettings, session }) {
 
 // ─── Message Page ───────────────────────────────────────────────
 // ─── Chat Page (메시지) ──────────────────────────────────────────
+// ─── Chat Page (메시지) ──────────────────────────────────────────
 function ChatPage({ settings, setSettings, accounts, session }) {
   const [channel, setChannel] = useState("all");
   const [msg, setMsg] = useState("");
+  const [showMention, setShowMention] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
   const [readIds, setReadIds] = useState(() => { try { return JSON.parse(sessionStorage.getItem("read_msgs") || "[]"); } catch { return []; } });
   const chatRef = useRef(null);
+  const inputRef = useRef(null);
 
   const allMessages = settings.messages || [];
-  const isAdmin = ["admin", "manager", "sysadmin"].includes(session?.role);
-
-  // Get channels: all + individual accounts that have conversations
   const chatAccounts = (accounts || []).filter(a => a.id !== session?.id);
-  const channelList = [
-    { id: "all", label: "📣 전체", color: "#2196F3" },
-    { id: "notice", label: "📢 공지", color: "#9C27B0" },
-    ...chatAccounts.map(a => ({
-      id: a.id, label: a.name, color: ROLES[a.role]?.color || "#556",
-      unread: allMessages.filter(m => m.type === "target" && ((m.to === session?.id && m.createdById === a.id) || (m.createdById === session?.id && m.to === a.id)) && !readIds.includes(m.id)).length
-    }))
-  ];
 
-  // Filter messages for current channel
-  const channelMessages = allMessages.filter(m => {
-    if (channel === "all") return m.type === "all";
+  const myMessages = allMessages.filter(m => {
+    if (channel === "all") return m.type === "all" || m.type === "notice";
     if (channel === "notice") return m.type === "notice";
-    return m.type === "target" && ((m.to === channel && m.createdById === session?.id) || (m.to === session?.id && m.createdById === channel));
+    return m.type === "target" && ((m.to === session?.id && m.createdById === channel) || (m.createdById === session?.id && m.to === channel));
   }).slice().reverse();
 
-  // Mark as read
+  // Mark read
   useEffect(() => {
-    const unread = channelMessages.filter(m => !readIds.includes(m.id) && m.createdById !== session?.id).map(m => m.id);
-    if (unread.length > 0) {
-      const next = [...new Set([...readIds, ...unread])];
-      setReadIds(next);
-      sessionStorage.setItem("read_msgs", JSON.stringify(next));
-    }
-  }, [channel, channelMessages.length]);
+    const unread = myMessages.filter(m => !readIds.includes(m.id) && m.createdById !== session?.id).map(m => m.id);
+    if (unread.length > 0) { const next = [...new Set([...readIds, ...unread])]; setReadIds(next); sessionStorage.setItem("read_msgs", JSON.stringify(next)); }
+  }, [channel, myMessages.length]);
+  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [channel, myMessages.length]);
 
-  // Scroll to bottom
-  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [channel, channelMessages.length]);
+  // @mention handler
+  const handleInput = (val) => {
+    setMsg(val);
+    const lastAt = val.lastIndexOf("@");
+    if (lastAt >= 0 && lastAt === val.length - 1 - (val.length - 1 - lastAt)) {
+      const afterAt = val.slice(lastAt + 1);
+      if (!afterAt.includes(" ") && afterAt.length < 20) {
+        setShowMention(true);
+        setMentionFilter(afterAt);
+        return;
+      }
+    }
+    setShowMention(false);
+  };
+
+  const insertMention = (acc) => {
+    const lastAt = msg.lastIndexOf("@");
+    setMsg(msg.slice(0, lastAt) + "@" + acc.name + " ");
+    setShowMention(false);
+    inputRef.current?.focus();
+  };
 
   const sendMsg = () => {
     if (!msg.trim()) return;
     const time = new Date().toLocaleString("ko-KR");
     const base = { id: "m" + Date.now(), content: msg.trim(), createdAt: time, createdBy: session.name, createdById: session.id };
 
+    // Check for @mentions → send as target messages too
+    const mentions = [];
+    const mentionRegex = /@(\S+)/g;
+    let match;
+    while ((match = mentionRegex.exec(msg)) !== null) {
+      const acc = chatAccounts.find(a => a.name === match[1]);
+      if (acc) mentions.push(acc);
+    }
+
     if (channel === "notice") {
       setSettings(prev => ({ ...prev,
         notices: [{ id: "n" + Date.now(), content: msg.trim(), createdAt: time, createdBy: session.name }, ...(prev.notices || [])],
         messages: [{ ...base, type: "notice" }, ...(prev.messages || [])].slice(0, 200)
       }));
-    } else if (channel === "all") {
-      setSettings(prev => ({ ...prev, messages: [{ ...base, type: "all", to: "전체" }, ...(prev.messages || [])].slice(0, 200) }));
-    } else {
+    } else if (channel !== "all" && channel !== "notice") {
+      // 1:1 DM
       setSettings(prev => ({ ...prev, messages: [{ ...base, type: "target", to: channel }, ...(prev.messages || [])].slice(0, 200) }));
+    } else {
+      // 전체 + @mention targets
+      const newMsgs = [{ ...base, type: "all", to: "전체" }];
+      mentions.forEach(acc => {
+        newMsgs.push({ ...base, id: base.id + "_" + acc.id, type: "target", to: acc.id, content: msg.trim() });
+      });
+      setSettings(prev => ({ ...prev, messages: [...newMsgs, ...(prev.messages || [])].slice(0, 200) }));
     }
     setMsg("");
+    setShowMention(false);
   };
 
-  const totalUnread = allMessages.filter(m => !readIds.includes(m.id) && m.createdById !== session?.id && (m.type === "all" || m.type === "notice" || (m.type === "target" && m.to === session?.id))).length;
+  const filteredAccounts = chatAccounts.filter(a => !mentionFilter || a.name.includes(mentionFilter));
+
+  // Unread per channel
+  const getUnread = (chId) => {
+    if (chId === "all") return allMessages.filter(m => m.type === "all" && !readIds.includes(m.id) && m.createdById !== session?.id).length;
+    return allMessages.filter(m => m.type === "target" && m.to === session?.id && m.createdById === chId && !readIds.includes(m.id)).length;
+  };
+  const dmAccounts = chatAccounts.filter(a => allMessages.some(m => m.type === "target" && ((m.to === session?.id && m.createdById === a.id) || (m.createdById === session?.id && m.to === a.id))));
 
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column" }}>
-    {/* 헤더 */}
-    <div style={{ padding: "16px 16px 10px", background: "#0d1117", borderBottom: "1px solid #222" }}>
-      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 10px" }}>💬 메시지</h2>
-      {/* 채널 목록 */}
+    <div style={{ padding: "14px 16px 8px", background: "#0d1117", borderBottom: "1px solid #222" }}>
+      <h2 style={{ color: "#fff", fontSize: 18, fontWeight: 800, textAlign: "center", margin: "0 0 8px" }}>💬 메시지</h2>
       <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
-        {channelList.map(ch => {
-          const active = channel === ch.id;
-          const unread = ch.id === "all" ? allMessages.filter(m => m.type === "all" && !readIds.includes(m.id) && m.createdById !== session?.id).length : ch.unread || 0;
-          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "8px 14px", borderRadius: 20, border: active ? `2px solid ${ch.color}` : "1px solid #333", background: active ? `${ch.color}15` : "transparent", color: active ? ch.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
+        {[{ id: "all", label: "📣 전체" }, { id: "notice", label: "📢 공지" }].map(ch => {
+          const unread = getUnread(ch.id);
+          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#2196F3" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {ch.label}
-            {unread > 0 && <span style={{ position: "absolute", top: -2, right: -2, width: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
+          </button>);
+        })}
+        {dmAccounts.map(a => {
+          const unread = getUnread(a.id);
+          const rl = ROLES[a.role] || {};
+          return (<button key={a.id} onClick={() => setChannel(a.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === a.id ? `2px solid ${rl.color || "#556"}` : "1px solid #333", background: channel === a.id ? `${rl.color || "#556"}15` : "transparent", color: channel === a.id ? (rl.color || "#ccd6f6") : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
+            {a.name}
+            {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
         })}
       </div>
     </div>
 
-    {/* 채팅 영역 */}
-    <div ref={chatRef} style={{ flex: 1, padding: "16px", overflowY: "auto", maxWidth: 600, width: "100%", margin: "0 auto" }}>
-      {channelMessages.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#445" }}>
-        <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
-        <div>메시지가 없습니다</div>
+    {/* 채팅 */}
+    <div ref={chatRef} style={{ flex: 1, padding: "12px 16px", overflowY: "auto", maxWidth: 600, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+      {myMessages.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#445" }}>
+        <div style={{ fontSize: 36, marginBottom: 8 }}>💬</div>
+        <div style={{ fontSize: 14 }}>{channel === "all" ? "전체 채팅에 메시지를 보내보세요" : "대화를 시작하세요"}</div>
+        {channel === "all" && <div style={{ color: "#556", fontSize: 13, marginTop: 8 }}>@이름 으로 특정 사람에게 알림을 보낼 수 있습니다</div>}
       </div>}
-      {channelMessages.map(m => {
+      {myMessages.map(m => {
         const isMine = m.createdById === session?.id;
-        return (<div key={m.id} style={{ display: "flex", justifyContent: isMine ? "flex-end" : "flex-start", marginBottom: 8 }}>
-          <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMine ? "rgba(33,150,243,0.15)" : "rgba(255,255,255,0.05)", border: isMine ? "1px solid rgba(33,150,243,0.2)" : "1px solid #222" }}>
-            {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{m.createdBy}</div>}
-            <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{m.content}</div>
-            <div style={{ color: "#445", fontSize: 11, marginTop: 4, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
-          </div>
+        const isNotice = m.type === "notice";
+        // Highlight @mentions
+        const parts = m.content.split(/(@\S+)/g);
+        return (<div key={m.id} style={{ display: "flex", justifyContent: isNotice ? "center" : isMine ? "flex-end" : "flex-start", marginBottom: 8 }}>
+          {isNotice ? (
+            <div style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(156,39,176,0.1)", border: "1px solid rgba(156,39,176,0.15)", maxWidth: "90%" }}>
+              <div style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>📢 공지</div>
+              <div style={{ color: "#ccd6f6", fontSize: 14, whiteSpace: "pre-wrap" }}>{m.content}</div>
+              <div style={{ color: "#556", fontSize: 11, marginTop: 4 }}>{m.createdBy} · {m.createdAt}</div>
+            </div>
+          ) : (
+            <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMine ? "rgba(33,150,243,0.12)" : "rgba(255,255,255,0.04)", border: isMine ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222" }}>
+              {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{m.createdBy}</div>}
+              <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{parts.map((p, i) => p.startsWith("@") ? <span key={i} style={{ color: "#2196F3", fontWeight: 700 }}>{p}</span> : p)}</div>
+              <div style={{ color: "#445", fontSize: 11, marginTop: 3, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
+            </div>
+          )}
         </div>);
       })}
     </div>
 
-    {/* 입력 영역 */}
-    <div style={{ padding: "12px 16px 80px", background: "#0d1117", borderTop: "1px solid #222" }}>
-      <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", gap: 8 }}>
-        <textarea value={msg} onChange={e => setMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} placeholder={channel === "notice" ? "공지사항 입력..." : channel === "all" ? "전체 메시지..." : `${channelList.find(c=>c.id===channel)?.label || ""}에게...`} rows={1} style={{ flex: 1, padding: "12px 14px", borderRadius: 20, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-        <button onClick={sendMsg} style={{ width: 48, height: 48, borderRadius: 24, border: "none", background: msg.trim() ? "#2196F3" : "#333", color: "#fff", fontSize: 18, cursor: msg.trim() ? "pointer" : "default", flexShrink: 0 }}>↑</button>
+    {/* @mention 자동완성 */}
+    {showMention && filteredAccounts.length > 0 && <div style={{ position: "fixed", bottom: 130, left: 16, right: 16, maxWidth: 600, margin: "0 auto", background: "#1a1a2e", border: "1px solid #333", borderRadius: 12, padding: 6, zIndex: 100, maxHeight: 200, overflowY: "auto" }}>
+      {filteredAccounts.map(a => (
+        <div key={a.id} onClick={() => insertMention(a)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, cursor: "pointer", background: "transparent" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(33,150,243,0.1)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+          <span style={{ color: ROLES[a.role]?.color || "#556", fontSize: 13, fontWeight: 700 }}>@{a.name}</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{ROLES[a.role]?.label}</span>
+        </div>
+      ))}
+    </div>}
+
+    {/* 입력 */}
+    <div style={{ padding: "10px 16px 80px", background: "#0d1117", borderTop: "1px solid #222" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <textarea ref={inputRef} value={msg} onChange={e => handleInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} placeholder={channel === "notice" ? "📢 공지사항..." : "@이름 으로 지정, Enter 전송"} rows={1} style={{ flex: 1, padding: "12px 14px", borderRadius: 20, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "none", boxSizing: "border-box", fontFamily: "inherit", maxHeight: 80 }} />
+        <button onClick={sendMsg} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: msg.trim() ? "#2196F3" : "#333", color: "#fff", fontSize: 18, cursor: msg.trim() ? "pointer" : "default", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>↑</button>
       </div>
     </div>
   </div>);
@@ -4377,17 +4435,23 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
     <div>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>👤 계정 목록</h3>
+        {(() => { let presence = {}; try { presence = JSON.parse(localStorage.getItem("fest_presence") || "{}"); } catch {} return null; })()}
         {accounts.map(acc => {
           const rl = ROLES[acc.role] || ROLES.viewer;
           const editable = canManage(acc);
           const isSelf = acc.id === currentUser.id;
+          let isOnline = false; let lastSeenLabel = "";
+          try { const p = JSON.parse(localStorage.getItem("fest_presence") || "{}"); if (p[acc.id]) { const diff = Date.now() - p[acc.id].lastSeen; isOnline = diff < 120000; if (!isOnline) { const min = Math.floor(diff/60000); lastSeenLabel = min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; } } } catch {}
           return (
             <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: isOnline ? "#4CAF50" : "#556", flexShrink: 0 }} />
                   <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{acc.name}</span>
                   <span style={{ color: "#556", fontSize: 14 }}>({acc.id})</span>
                   <span style={{ padding: "2px 8px", borderRadius: 10, background: `${rl.color}22`, border: `1px solid ${rl.color}44`, color: rl.color, fontSize: 14, fontWeight: 700 }}>{rl.label}</span>
+                  {isOnline && <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>● 접속중</span>}
+                  {!isOnline && lastSeenLabel && <span style={{ color: "#556", fontSize: 11 }}>{lastSeenLabel}</span>}
                   {isSelf && <span style={{ color: "#2196F3", fontSize: 14 }}>← 현재</span>}
                 </div>
                 {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>}
@@ -4648,6 +4712,20 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const active = isActive(settings);
   const role = ROLES[session.role] || ROLES.viewer;
   const allowedPages = role.pages;
+
+  // 접속 상태 추적
+  useEffect(() => {
+    const updatePresence = () => {
+      try {
+        const presence = JSON.parse(localStorage.getItem("fest_presence") || "{}");
+        presence[session.id] = { name: session.name, role: session.role, lastSeen: Date.now() };
+        localStorage.setItem("fest_presence", JSON.stringify(presence));
+      } catch {}
+    };
+    updatePresence();
+    const iv = setInterval(updatePresence, 30000);
+    return () => { clearInterval(iv); try { const p = JSON.parse(localStorage.getItem("fest_presence") || "{}"); delete p[session.id]; localStorage.setItem("fest_presence", JSON.stringify(p)); } catch {} };
+  }, [session.id]);
 
   const handleRefresh = () => setRefreshKey(k => k + 1);
   const handleAction = (catId, status) => {
