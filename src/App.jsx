@@ -114,7 +114,29 @@ const DEFAULT_SETTINGS = {
   orgChart: [],
   zoneCongestion: [],
   workTypes: ["일용근로", "자원봉사", "파견", "공무원"],
-  workSites: [],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
+  workSites: [],
+  zoneRequests: [],
+  checklists: [
+    { id: "cl_pre", title: "개장 전 점검", category: "pre", items: [
+      { id: "ci1", text: "무대 구조물 안전점검", checked: false }, { id: "ci2", text: "소화기 비치 확인", checked: false },
+      { id: "ci3", text: "비상방송 시스템 테스트", checked: false }, { id: "ci4", text: "대피경로 안내판 확인", checked: false },
+      { id: "ci5", text: "전기시설 안전점검", checked: false }, { id: "ci6", text: "의료진 배치 확인", checked: false },
+    ]},
+    { id: "cl_dur", title: "운영 중 점검", category: "during", items: [
+      { id: "ci7", text: "출입구 통제 인력 확인", checked: false }, { id: "ci8", text: "음향/조명 장비 상태", checked: false },
+      { id: "ci9", text: "쓰레기 수거 상태", checked: false }, { id: "ci10", text: "화장실 청소 상태", checked: false },
+    ]},
+    { id: "cl_post", title: "폐장 후 점검", category: "post", items: [
+      { id: "ci11", text: "관람객 퇴장 완료 확인", checked: false }, { id: "ci12", text: "전기/가스 차단 확인", checked: false },
+      { id: "ci13", text: "시설물 파손 점검", checked: false }, { id: "ci14", text: "분실물 수거", checked: false },
+    ]},
+  ],
+  timeline: [],
+  emergencyLevel: 0,
+  emergencyMessage: "",
+  emergencyAt: null,
+  medicalRecords: [],
+  programs: [],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
   navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "cms"],
   features: {
     crowd: true,
@@ -719,6 +741,13 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </button>
       </div>
     </div>
+
+    {/* 긴급상황 배너 */}
+    {settings.emergencyLevel > 0 && <div style={{ maxWidth: 900, margin: "0 auto 8px", padding: "12px 16px", borderRadius: 10, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800"}`, textAlign: "center", animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
+      <span style={{ fontSize: 20 }}>🚨</span>
+      <span style={{ color: settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800", fontWeight: 900, fontSize: 18, marginLeft: 8 }}>{["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</span>
+      {settings.emergencyMessage && <div style={{ color: "#ccd6f6", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
+    </div>}
 
     {/* 종합 상태 */}
     <div style={{ maxWidth: 900, margin: "0 auto 8px", padding: "8px 16px", borderRadius: 10, background: olv.bg, border: `1.5px solid ${olv.border}`, textAlign: "center" }}>
@@ -1478,13 +1507,14 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FF9800", icon: "🚗" }, supporting: { label: "현장지원중", color: "#4CAF50", icon: "🚑" } };
   const getStatusMap = (zone) => zone?.zoneType === "safety" ? STATUS_SAFETY : zone?.zoneType === "support" ? STATUS_SUPPORT : STATUS_NORMAL;
 
-  const setStatus = (siteId, status) => setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s) }));
+  const setStatus = (siteId, status) => { const site = workSites.find(s => s.id === siteId); setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s), timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "status", message: `📊 ${site?.name || ""} 상태 → ${status}`, actor: session?.name }] })); };
   const sendRequest = () => {
     if (!reqTarget || !reqMsg) { alert("대상과 내용을 입력하세요."); return; }
-    setSettings(prev => ({ ...prev, zoneRequests: [...(prev.zoneRequests || []), { id: "req_" + Date.now(), fromZoneId: myZone?.id, fromZoneName: myZone?.name || session?.name, targetZoneId: reqTarget, message: reqMsg, status: "pending", createdAt: new Date().toLocaleString("ko-KR") }] }));
+    const tZone = zones.find(z => z.id === reqTarget);
+    setSettings(prev => ({ ...prev, zoneRequests: [...(prev.zoneRequests || []), { id: "req_" + Date.now(), fromZoneId: myZone?.id, fromZoneName: myZone?.name || session?.name, targetZoneId: reqTarget, message: reqMsg, status: "pending", createdAt: new Date().toLocaleString("ko-KR") }], timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "request", message: `📨 요청 전송 → ${tZone?.name}: ${reqMsg.slice(0,30)}`, actor: session?.name }] }));
     setReqMsg(""); setReqTarget(""); alert("✅ 요청 전송 완료");
   };
-  const updateReqStatus = (reqId, status) => setSettings(prev => ({ ...prev, zoneRequests: (prev.zoneRequests || []).map(r => r.id === reqId ? { ...r, status, [status === "accepted" ? "acceptedAt" : "completedAt"]: new Date().toLocaleString("ko-KR") } : r) }));
+  const updateReqStatus = (reqId, status) => { const stLabel = { accepted: "접수완료", completed: "조치완료" }[status] || status; setSettings(prev => ({ ...prev, zoneRequests: (prev.zoneRequests || []).map(r => r.id === reqId ? { ...r, status, [status === "accepted" ? "acceptedAt" : "completedAt"]: new Date().toLocaleString("ko-KR") } : r), timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "request", message: `📨 요청 ${stLabel}`, actor: session?.name }] })); };
 
   const now = new Date();
   const opStart = settings.operatingStart || "08:00";
@@ -1545,6 +1575,18 @@ function FestivalStatusPage({ settings, setSettings, session }) {
         <div style={{ color: "#8892b0", fontSize: 13 }}>🕐 {opStart}~{opEnd} · 현재 {now.toLocaleTimeString("ko-KR")}</div>
       </div>
 
+      {/* 긴급상황 배너 */}
+      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 22 }}>{["", "🔵", "🟡", "🟠", "🔴"][settings.emergencyLevel]}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
+            {settings.emergencyMessage && <div style={{ color: "#ccd6f6", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
+          </div>
+          <span style={{ color: "#556", fontSize: 11 }}>{settings.emergencyAt}</span>
+        </div>
+      </div>}
+
       {/* 종합 현황 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
         {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#2196F3", icon: "📍" },
@@ -1580,6 +1622,27 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
       {/* 축제관리 모드 */}
       {mode === "festival" && <>
+        {/* 프로그램 일정 */}
+        {(settings.programs || []).length > 0 && (() => {
+          const now3 = new Date(); const nowMin = now3.getHours()*60+now3.getMinutes();
+          const sorted = [...(settings.programs||[])].sort((a,b) => (a.time||"").localeCompare(b.time||""));
+          const current = sorted.find(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin>=sh*60+sm && nowMin<=eh*60+em; });
+          const next = sorted.find(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); return sh*60+sm > nowMin; });
+          return (<div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.15)", marginBottom: 12 }}>
+            <div style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🎭 프로그램</div>
+            {current && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(76,175,80,0.06)", marginBottom: 4 }}>
+              <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>🟢 진행중</span>
+              <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{current.title}</span>
+              <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{current.time}~{current.endTime} {current.location}</span>
+            </div>}
+            {next && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px" }}>
+              <span style={{ color: "#8892b0", fontSize: 12 }}>⏭ 다음</span>
+              <span style={{ color: "#8892b0", fontSize: 13 }}>{next.title}</span>
+              <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{next.time}~ {next.location}</span>
+            </div>}
+            {!current && !next && <div style={{ color: "#556", fontSize: 12 }}>진행중/예정 프로그램 없음</div>}
+          </div>);
+        })()}
         {normalZones.map(zone => {
           const sites = workSites.filter(s => s.zoneId === zone.id);
           const cg = congestionData.find(c => c.zoneId === zone.id);
@@ -1604,6 +1667,36 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
       {/* 안전관리 모드 */}
       {mode === "safety" && <>
+        {/* 긴급상황 발령 */}
+        {isAdmin && <div style={{ padding: "14px", borderRadius: 12, background: "rgba(244,67,54,0.04)", border: "1px solid rgba(244,67,54,0.15)", marginBottom: 14 }}>
+          <div style={{ color: "#F44336", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🚨 긴급상황 발령</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 8 }}>
+            {[{ lv: 0, label: "해제", color: "#4CAF50" }, { lv: 1, label: "관심", color: "#2196F3" }, { lv: 2, label: "주의", color: "#FFC107" }, { lv: 3, label: "경계", color: "#FF9800" }, { lv: 4, label: "심각", color: "#F44336" }].map(e => (
+              <button key={e.lv} onClick={() => {
+                setSettings(prev => ({ ...prev, emergencyLevel: e.lv, emergencyAt: e.lv > 0 ? new Date().toLocaleString("ko-KR") : null, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "emergency", message: e.lv > 0 ? `🚨 긴급상황 ${e.lv}단계(${e.label}) 발령` : "✅ 긴급상황 해제", actor: session?.name }] }));
+              }} style={{ padding: "10px 2px", borderRadius: 8, border: settings.emergencyLevel === e.lv ? `2px solid ${e.color}` : "1px solid #333", background: settings.emergencyLevel === e.lv ? `${e.color}20` : "transparent", color: e.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{e.lv === 0 ? "✅" : e.lv+"단계"}<br/>{e.label}</button>
+            ))}
+          </div>
+          {settings.emergencyLevel > 0 && <Input value={settings.emergencyMessage || ""} onChange={e => setSettings(prev => ({ ...prev, emergencyMessage: e.target.value }))} placeholder="긴급상황 내용 입력" style={{ marginBottom: 6 }} />}
+        </div>}
+
+        {/* 의료 현황 요약 */}
+        {(settings.medicalRecords || []).length > 0 && <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,152,0,0.04)", border: "1px solid rgba(255,152,0,0.15)", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 800 }}>🏥 의료 현황</span>
+            <span style={{ color: "#FF9800", fontSize: 13 }}>치료중 {(settings.medicalRecords||[]).filter(m=>m.status==="treating").length}</span>
+            <span style={{ color: "#2196F3", fontSize: 13 }}>이송 {(settings.medicalRecords||[]).filter(m=>m.status==="transferred").length}</span>
+            <span style={{ color: "#4CAF50", fontSize: 13 }}>귀가 {(settings.medicalRecords||[]).filter(m=>m.status==="discharged").length}</span>
+          </div>
+          {(settings.medicalRecords||[]).filter(m=>m.status==="treating").map((mr,i) => (
+            <div key={mr.id} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, fontSize: 13, display: "flex", gap: 6 }}>
+              <span style={{ color: "#FF9800", fontWeight: 700 }}>🆘</span>
+              <span style={{ color: "#ccd6f6" }}>{mr.patient || "환자"} — {mr.symptoms}</span>
+              <span style={{ color: "#556", marginLeft: "auto", fontSize: 11 }}>{mr.location}</span>
+            </div>
+          ))}
+        </div>}
+
         {myRequests.length > 0 && <div style={{ marginBottom: 14 }}>
           <div style={{ color: "#F44336", fontSize: 15, fontWeight: 800, marginBottom: 8 }}>🔔 수신 요청 ({myRequests.length}건)</div>
           {myRequests.map(req => {
@@ -1713,7 +1806,8 @@ function CongestionPage({ settings, setSettings, session }) {
     const report = { zoneId, zoneName: zone?.name || "", level, reportedBy: session.id, reportedByName: session.name, reportedAt: new Date().toLocaleString("ko-KR"), photos: photos.map(p => ({ ...p })), memo };
     setSettings(prev => ({
       ...prev,
-      zoneCongestion: [...(prev.zoneCongestion || []).filter(c => c.zoneId !== zoneId), report]
+      zoneCongestion: [...(prev.zoneCongestion || []).filter(c => c.zoneId !== zoneId), report],
+      timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "congestion", message: `🚦 ${zone?.name} 혼잡도 → ${CONG_LEVELS[level]?.label} ${memo ? "("+memo+")" : ""}`, actor: session?.name }]
     }));
     setZonePhotos(p => ({ ...p, [zoneId]: [] }));
     setMemos(p => ({ ...p, [zoneId]: "" }));
@@ -2261,6 +2355,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       { id: "zonesetup", label: "구역설정" },
       { id: "staffmgmt", label: "인력관리" },
       { id: "orgchart", label: "조직도" },
+      { id: "checklist", label: "체크리스트" },
+      { id: "programs", label: "프로그램" },
       ft.crowd !== false && { id: "gates", label: "출입구" },
       ft.parking !== false && { id: "parking", label: "주차장" },
       ft.shuttle !== false && { id: "shuttlecms", label: "셔틀버스" },
@@ -2274,6 +2370,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       ft.customApi !== false && { id: "apiconfig", label: "커스텀API" },
       { id: "thresholds", label: "안전관리기준" },
       ft.crowd !== false && { id: "crowdcms", label: "인파데이터" },
+      { id: "medical", label: "의료기록" },
+      { id: "timeline", label: "상황일지" },
       { id: "custom", label: "항목추가" },
     ].filter(Boolean) },
   ];
@@ -3230,6 +3328,136 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       </Card>
     </div>}
 
+
+    {/* 체크리스트 */}
+    {tab === "checklist" && <div>
+      {(settings.checklists || []).map((cl, ci) => {
+        const done = cl.items.filter(i => i.checked).length;
+        const total = cl.items.length;
+        const pct = total > 0 ? Math.round(done / total * 100) : 0;
+        const catColor = cl.category === "pre" ? "#2196F3" : cl.category === "during" ? "#4CAF50" : "#FF9800";
+        const catLabel = cl.category === "pre" ? "개장 전" : cl.category === "during" ? "운영 중" : "폐장 후";
+        return (<Card key={cl.id}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ padding: "2px 8px", borderRadius: 4, background: `${catColor}15`, color: catColor, fontSize: 12, fontWeight: 700 }}>{catLabel}</span>
+            <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
+            <span style={{ color: pct === 100 ? "#4CAF50" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{done}/{total}</span>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", marginBottom: 10 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 2, transition: "width .3s" }} /></div>
+          {cl.items.map((item, ii) => (
+            <div key={item.id} onClick={() => { const cls = [...(settings.checklists || [])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name || "") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: `✅ ${cl.title} - "${item.text}" 점검완료`, actor: session?.name }] })); } }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.checked ? "rgba(76,175,80,0.12)" : "#222"}`, marginBottom: 4, cursor: "pointer" }}>
+              <div style={{ width: 22, height: 22, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{item.checked && <span style={{ color: "#fff", fontSize: 14 }}>✓</span>}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, textDecoration: item.checked ? "line-through" : "none" }}>{item.text}</div>
+                {item.checkedBy && <div style={{ color: "#556", fontSize: 11 }}>{item.checkedBy} · {item.checkedAt}</div>}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <Input id={`nci_${cl.id}`} placeholder="새 점검항목 추가" style={{ flex: 1 }} />
+            <button onClick={() => { const inp = document.getElementById(`nci_${cl.id}`); if (!inp?.value) return; const cls = [...(settings.checklists || [])]; cls[ci] = { ...cls[ci], items: [...cls[ci].items, { id: "ci_"+Date.now(), text: inp.value, checked: false }] }; setSettings(prev => ({ ...prev, checklists: cls })); inp.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: catColor, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+</button>
+          </div>
+        </Card>);
+      })}
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>➕ 체크리스트 추가</h3>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input id="new_cl_title" placeholder="체크리스트 제목" style={{ flex: 1 }} />
+          <select id="new_cl_cat" style={{ padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
+            <option value="pre">개장 전</option><option value="during">운영 중</option><option value="post">폐장 후</option>
+          </select>
+          <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists || []), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+        </div>
+      </Card>
+      <button onClick={() => { if (confirm("모든 체크리스트 체크를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, checklists: (prev.checklists || []).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 체크리스트 전체 초기화</button>
+    </div>}
+
+    {/* 프로그램/일정 */}
+    {tab === "programs" && <div>
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>🎭 축제 프로그램</h3>
+        {(settings.programs || []).map((pg, pi) => {
+          const now2 = new Date(); const [sh,sm] = (pg.time||"00:00").split(":").map(Number); const [eh,em] = (pg.endTime||"23:59").split(":").map(Number);
+          const isNow = now2.getHours()*60+now2.getMinutes() >= sh*60+sm && now2.getHours()*60+now2.getMinutes() <= eh*60+em;
+          return (<div key={pg.id} style={{ padding: 12, borderRadius: 10, background: isNow ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", border: isNow ? "1px solid rgba(76,175,80,0.2)" : "1px solid #222", marginBottom: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "80px 80px 1fr auto", gap: 8, alignItems: "center" }}>
+              <Input type="time" value={pg.time || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, time: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} style={{ fontSize: 13 }} />
+              <Input type="time" value={pg.endTime || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, endTime: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} style={{ fontSize: 13 }} />
+              <Input value={pg.title || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, title: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} placeholder="프로그램명" />
+              <button onClick={() => setSettings(prev => ({ ...prev, programs: prev.programs.filter((_,i) => i !== pi) }))} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            </div>
+            <Input value={pg.location || ""} onChange={e => { const p = [...(settings.programs||[])]; p[pi] = { ...pg, location: e.target.value }; setSettings(prev => ({ ...prev, programs: p })); }} placeholder="장소 (예: 주무대)" style={{ marginTop: 6 }} />
+          </div>);
+        })}
+        <button onClick={() => setSettings(prev => ({ ...prev, programs: [...(prev.programs||[]), { id: "pg_"+Date.now(), title: "", time: "", endTime: "", location: "" }] }))} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 프로그램 추가</button>
+      </Card>
+      <button onClick={() => { if (confirm("프로그램 목록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
+    </div>}
+
+    {/* 의료/응급 기록 */}
+    {tab === "medical" && <div>
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>🏥 응급환자 기록</h3>
+        <button onClick={() => setSettings(prev => ({ ...prev, medicalRecords: [{ id: "med_"+Date.now(), time: new Date().toLocaleString("ko-KR"), location: "", symptoms: "", action: "", status: "treating", patient: "", responder: session?.name || "" }, ...(prev.medicalRecords||[])] }))} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "#F44336", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 14 }}>🆘 응급환자 발생 등록</button>
+        {(settings.medicalRecords || []).map((mr, mi) => {
+          const stMap = { treating: { label: "치료중", color: "#FF9800" }, transferred: { label: "이송완료", color: "#2196F3" }, discharged: { label: "귀가", color: "#4CAF50" } };
+          const mst = stMap[mr.status] || stMap.treating;
+          const upMed = (field, val) => { const m = [...(settings.medicalRecords||[])]; m[mi] = { ...mr, [field]: val }; setSettings(prev => ({ ...prev, medicalRecords: m })); };
+          return (<div key={mr.id} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${mst.color}33`, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ color: "#F44336", fontSize: 14, fontWeight: 700 }}>🏥 #{mi+1}</span>
+              <span style={{ color: "#556", fontSize: 12, flex: 1 }}>{mr.time}</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                {Object.entries(stMap).map(([k, v]) => (
+                  <button key={k} onClick={() => { upMed("status", k); if (k !== mr.status) setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "medical", message: `🏥 응급환자 #${mi+1} → ${v.label}`, actor: session?.name }] })); }} style={{ padding: "4px 8px", borderRadius: 6, border: mr.status === k ? `2px solid ${v.color}` : "1px solid #333", background: mr.status === k ? `${v.color}15` : "transparent", color: v.color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{v.label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div><Label>환자명</Label><Input value={mr.patient} onChange={e => upMed("patient", e.target.value)} placeholder="이름/인상착의" /></div>
+              <div><Label>발생장소</Label><Input value={mr.location} onChange={e => upMed("location", e.target.value)} placeholder="B구역 무대 앞" /></div>
+            </div>
+            <div style={{ marginTop: 6 }}><Label>증상</Label><Input value={mr.symptoms} onChange={e => upMed("symptoms", e.target.value)} placeholder="탈수, 열사병, 골절 등" /></div>
+            <div style={{ marginTop: 6 }}><Label>조치사항</Label><Input value={mr.action} onChange={e => upMed("action", e.target.value)} placeholder="응급처치 후 119 이송" /></div>
+            <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
+              <span style={{ color: "#556", fontSize: 12 }}>담당: {mr.responder}</span>
+              <button onClick={() => { if (confirm("이 기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: prev.medicalRecords.filter((_,i)=>i!==mi) })); }} style={{ marginLeft: "auto", padding: "2px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>삭제</button>
+            </div>
+          </div>);
+        })}
+        {(settings.medicalRecords||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>응급환자 기록이 없습니다.</div>}
+      </Card>
+      <button onClick={() => { if (confirm("모든 의료기록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 의료기록 초기화</button>
+    </div>}
+
+    {/* 상황일지 */}
+    {tab === "timeline" && <div>
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>📋 상황일지</h3>
+          <span style={{ color: "#556", fontSize: 13 }}>{(settings.timeline||[]).length}건</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <Input id="tl_manual" placeholder="수동 기록 입력" style={{ flex: 1 }} />
+          <button onClick={() => { const inp = document.getElementById("tl_manual"); if (!inp?.value) return; setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "manual", message: inp.value, actor: session?.name }] })); inp.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>기록</button>
+        </div>
+        {(settings.timeline || []).slice().reverse().map(tl => {
+          const typeIcon = { check: "✅", emergency: "🚨", medical: "🏥", request: "📨", manual: "📝", congestion: "🚦", status: "📊" }[tl.type] || "📌";
+          const typeColor = { emergency: "#F44336", medical: "#FF9800", manual: "#2196F3" }[tl.type] || "#8892b0";
+          return (<div key={tl.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid #1a1a2e" }}>
+            <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}><div style={{ color: "#556", fontSize: 11 }}>{tl.time?.split(" ")[0]}</div><div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{tl.time?.split(" ")[1]}</div></div>
+            <div style={{ width: 3, background: typeColor, borderRadius: 2, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#ccd6f6", fontSize: 13 }}>{typeIcon} {tl.message}</div>
+              {tl.actor && <div style={{ color: "#556", fontSize: 11 }}>👤 {tl.actor}</div>}
+            </div>
+          </div>);
+        })}
+        {(settings.timeline||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>기록이 없습니다.</div>}
+      </Card>
+      <button onClick={() => { if (confirm("상황일지를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, timeline: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 상황일지 초기화</button>
+    </div>}
+
     {tab === "custom" && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>➕ 항목 추가</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "항목명", k: "name" }, { l: "단위", k: "unit" }, { l: "아이콘", k: "icon" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={newCat[f.k]} onChange={e => setNewCat({ ...newCat, [f.k]: e.target.value })} /></div>))}<div><Label>기상청 카테고리</Label><select value={newCat.kmaCategory || ""} onChange={e => setNewCat({ ...newCat, kmaCategory: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff" }}><option value="">없음</option>{Object.entries(KMA_CODES).map(([code, info]) => <option key={code} value={code}>{code} — {info.name}</option>)}</select></div>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ color: lv.color, fontSize: 13, fontWeight: 700, minWidth: 36 }}>{lv.label}</span><input type="number" value={newCat.thresholds[lk][0]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [parseFloat(e.target.value) || 0, t[lk][1]]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={newCat.thresholds[lk][1] === Infinity ? "∞" : newCat.thresholds[lk][1]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [t[lk][0], e.target.value === "∞" ? Infinity : parseFloat(e.target.value) || 0]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "3px 6px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }} /></div>))}<button onClick={() => { if (!newCat.name) return; setCategories(p => [...p, { ...newCat, id: "c_" + Date.now(), source: newCat.kmaCategory ? "api" : "manual" }]); }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button></div></Card>}
 
     {/* Settings */}
@@ -3374,6 +3602,30 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
           </div>);
         })}
+      </Card>
+
+      <Card>
+        <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🔄 데이터 개별 초기화</h3>
+        <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>각 기능의 데이터를 개별적으로 초기화합니다.</p>
+        <div style={{ display: "grid", gap: 4 }}>
+          {[
+            { label: "혼잡도 보고", icon: "🚦", action: () => setSettings(prev => ({ ...prev, zoneCongestion: [] })) },
+            { label: "요청 기록", icon: "📨", action: () => setSettings(prev => ({ ...prev, zoneRequests: [] })) },
+            { label: "상황일지", icon: "📋", action: () => setSettings(prev => ({ ...prev, timeline: [] })) },
+            { label: "의료기록", icon: "🏥", action: () => setSettings(prev => ({ ...prev, medicalRecords: [] })) },
+            { label: "체크리스트 체크", icon: "✅", action: () => setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })) },
+            { label: "긴급상황 발령", icon: "🚨", action: () => setSettings(prev => ({ ...prev, emergencyLevel: 0, emergencyMessage: "", emergencyAt: null })) },
+            { label: "근무지 상태", icon: "🏠", action: () => setSettings(prev => ({ ...prev, workSites: (prev.workSites||[]).map(s => ({ ...s, status: "standby", congestion: null })) })) },
+            { label: "알림 이력", icon: "🔔", action: () => setAlerts([]) },
+            { label: "메시지", icon: "💬", action: () => setSettings(prev => ({ ...prev, messages: [], notices: [] })) },
+          ].map(r => (
+            <button key={r.label} onClick={() => { if (confirm(`${r.label} 데이터를 초기화하시겠습니까?`)) r.action(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "1px solid #222", background: "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ fontSize: 16 }}>{r.icon}</span>
+              <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{r.label}</span>
+              <span style={{ color: "#F44336", fontSize: 12, fontWeight: 700 }}>초기화</span>
+            </button>
+          ))}
+        </div>
       </Card>
 
       <Card>
