@@ -541,7 +541,7 @@ function DashboardOrgChart({ settings, show, onToggle }) {
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────
-function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh, alerts, onAction, onActionReport, onDeleteAlert, onDeleteNotice, userRole }) {
+function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh, alerts, onAction, onActionReport, onDeleteAlert, onDeleteNotice, userRole, updateAvailable }) {
   const now = useNow();
   const [spinning, setSpinning] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
@@ -836,6 +836,12 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         <button onClick={handleRefresh} disabled={spinning} style={{ padding: "4px 12px", borderRadius: 16, border: "1px solid rgba(33,150,243,0.2)", background: "transparent", color: "#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
           <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none" }}>🔄</span> {spinning ? "..." : "최신화"}
         </button>
+        {updateAvailable && <button onClick={() => {
+          const overlay = document.createElement("div");
+          overlay.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999"><div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#ccd6f6;margin-top:16px;font-size:16px;font-weight:700">업데이트 적용 중...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
+          document.body.appendChild(overlay);
+          setTimeout(() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }, 500);
+        }} style={{ padding: "4px 12px", borderRadius: 16, border: "none", background: "#2196F3", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", animation: "blink 2s infinite" }}>📲 업데이트</button>}
       </div>
     </div>
 
@@ -1798,23 +1804,29 @@ function FestivalStatusPage({ settings, setSettings, session }) {
       {mode === "festival" && <>
         {/* 프로그램 일정 */}
         {(settings.programs || []).length > 0 && (() => {
-          const now3 = new Date(); const nowMin = now3.getHours()*60+now3.getMinutes();
-          const sorted = [...(settings.programs||[])].sort((a,b) => (a.time||"").localeCompare(b.time||""));
-          const current = sorted.find(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin>=sh*60+sm && nowMin<=eh*60+em; });
-          const next = sorted.find(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); return sh*60+sm > nowMin; });
+          const now3 = new Date(); const nowMin3 = now3.getHours()*60+now3.getMinutes();
+          const todayPgs = (settings.programs||[]).filter(p => p.pgStatus !== "ended" && p.date !== "always");
+          const currentPgs = todayPgs.filter(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); const [eh,em]=(p.endTime||"23:59").split(":").map(Number); return nowMin3>=sh*60+sm && nowMin3<=eh*60+em; });
+          const nextPgs = todayPgs.filter(p => { const [sh,sm]=(p.time||"00:00").split(":").map(Number); return sh*60+sm > nowMin3 && !currentPgs.includes(p); }).sort((a,b) => (a.time||"").localeCompare(b.time||"")).slice(0, 3);
+          const PGCAT = { O: { l: "공식", c: "#2196F3" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#4CAF50" }, S: { l: "부대", c: "#FF9800" } };
           return (<div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.15)", marginBottom: 12 }}>
-            <div style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🎭 프로그램</div>
-            {current && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(76,175,80,0.06)", marginBottom: 4 }}>
-              <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>🟢 진행중</span>
-              <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{current.title}</span>
-              <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{current.time}~{current.endTime} {current.location}</span>
+            <div style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🎭 프로그램 현황 <span style={{ color: "#556", fontSize: 12, fontWeight: 400 }}>진행 {currentPgs.length} · 예정 {nextPgs.length}</span></div>
+            {currentPgs.length > 0 && currentPgs.map(p => { const pc = PGCAT[p.category] || { l: "", c: "#556" }; return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(76,175,80,0.06)", marginBottom: 3 }}>
+                <span style={{ color: "#4CAF50", fontSize: 11, fontWeight: 700 }}>🟢</span>
+                <span style={{ padding: "1px 6px", borderRadius: 4, background: `${pc.c}15`, color: pc.c, fontSize: 11 }}>{pc.l}</span>
+                <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{p.title}</span>
+                <span style={{ color: "#556", fontSize: 11 }}>{p.time}~{p.endTime}</span>
+                {p.location && <span style={{ color: "#445", fontSize: 11 }}>📍{p.location}</span>}
+              </div>); })}
+            {currentPgs.length === 0 && <div style={{ color: "#556", fontSize: 12, marginBottom: 4 }}>현재 진행중 프로그램 없음</div>}
+            {nextPgs.length > 0 && <div style={{ marginTop: 4 }}>
+              {nextPgs.map(p => (<div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", fontSize: 12 }}>
+                <span style={{ color: "#556" }}>⏭</span>
+                <span style={{ color: "#8892b0", flex: 1 }}>{p.title}</span>
+                <span style={{ color: "#556" }}>{p.time}~ {p.location}</span>
+              </div>))}
             </div>}
-            {next && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px" }}>
-              <span style={{ color: "#8892b0", fontSize: 12 }}>⏭ 다음</span>
-              <span style={{ color: "#8892b0", fontSize: 13 }}>{next.title}</span>
-              <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{next.time}~ {next.location}</span>
-            </div>}
-            {!current && !next && <div style={{ color: "#556", fontSize: 12 }}>진행중/예정 프로그램 없음</div>}
           </div>);
         })()}
         {normalZones.map(zone => {
@@ -1945,6 +1957,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
   const dates = rawDates.length > 0 ? rawDates : [...new Set(programs.map(p => p.date).filter(d => d && d !== "always"))].sort();
   const [selDate, setSelDate] = useState("all");
   const [selCat, setSelCat] = useState("all");
+  const [alwaysOpen, setAlwaysOpen] = useState(false);
   const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#2196F3" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#4CAF50" }, S: { label: "부대", color: "#FF9800" } };
 
   const now = new Date();
@@ -2003,10 +2016,21 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
 
       {/* 프로그램 목록 */}
       {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>해당 조건의 프로그램이 없습니다.</div>}
-      {Object.entries(timeGroups).map(([timeKey, items]) => (
+      {Object.entries(timeGroups).map(([timeKey, items]) => {
+        const isAlways = timeKey === "상시";
+        const isOpen = isAlways ? alwaysOpen : true;
+        return (
         <div key={timeKey} style={{ marginBottom: 12 }}>
-          <div style={{ color: "#556", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>{timeKey === "상시" ? "🔄 상시 프로그램" : `⏰ ${timeKey}`}</div>
-          {items.map(pg => {
+          {isAlways ? (
+            <div onClick={() => setAlwaysOpen(!alwaysOpen)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: "rgba(0,150,136,0.06)", border: "1px solid rgba(0,150,136,0.15)", cursor: "pointer", marginBottom: 6 }}>
+              <span style={{ color: "#009688", fontSize: 14 }}>{alwaysOpen ? "▼" : "▶"}</span>
+              <span style={{ color: "#009688", fontSize: 14, fontWeight: 700 }}>🔄 상시 프로그램</span>
+              <span style={{ color: "#556", fontSize: 12, marginLeft: "auto" }}>{items.length}개</span>
+            </div>
+          ) : (
+            <div style={{ color: "#556", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>⏰ {timeKey}</div>
+          )}
+          {isOpen && items.map(pg => {
             const [sh, sm] = (pg.time || "00:00").split(":").map(Number);
             const [eh, em] = (pg.endTime || "23:59").split(":").map(Number);
             const pgDate = pg.date && pg.date !== "always" ? new Date(pg.date) : null;
@@ -2050,7 +2074,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
             </div>);
           })}
         </div>
-      ))}
+      ); })}
     </div>
   </div>);
 }
@@ -4128,33 +4152,23 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
       {/* 앱 업데이트 */}
       <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 24 }}>📲</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 22 }}>📲</span>
           <div style={{ flex: 1 }}>
-            <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 2px", fontWeight: 800 }}>앱 업데이트</h3>
-            <p style={{ color: "#556", fontSize: 12, margin: 0 }}>{updateAvailable ? "새 버전이 준비되었습니다" : "현재 최신 버전입니다"}</p>
+            <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{updateAvailable ? "새 버전 준비됨" : "최신 버전"}</div>
+            <div style={{ color: "#556", fontSize: 12 }}>대시보드 상단에서도 확인 가능</div>
           </div>
-          {updateAvailable && <span style={{ width: 10, height: 10, borderRadius: 5, background: "#F44336", flexShrink: 0 }} />}
+          <button onClick={() => {
+            if (updateAvailable) {
+              const o = document.createElement("div");
+              o.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999"><div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#ccd6f6;margin-top:16px;font-size:16px;font-weight:700">업데이트 중...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
+              document.body.appendChild(o);
+              setTimeout(() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }, 500);
+            } else {
+              navigator.serviceWorker?.getRegistration().then(r => { if (r) r.update().then(() => setTimeout(() => alert("✅ 최신 버전입니다."), 2000)); }).catch(() => alert("✅ 최신 버전입니다."));
+            }
+          }} style={{ padding: "10px 20px", borderRadius: 10, border: updateAvailable ? "none" : "1px solid #333", background: updateAvailable ? "#2196F3" : "transparent", color: updateAvailable ? "#fff" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{updateAvailable ? "🔄 업데이트" : "🔍 확인"}</button>
         </div>
-        <button onClick={() => {
-          if (updateAvailable) {
-            const overlay = document.createElement("div");
-            overlay.id = "update-overlay";
-            overlay.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999"><div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#ccd6f6;margin-top:16px;font-size:16px;font-weight:700">업데이트 적용 중...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
-            document.body.appendChild(overlay);
-            setTimeout(() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }, 500);
-          } else {
-            if (navigator.serviceWorker?.controller) {
-              navigator.serviceWorker.getRegistration().then(reg => {
-                if (reg) reg.update().then(() => {
-                  setTimeout(() => { if (!updateAvailable) alert("✅ 현재 최신 버전입니다."); }, 2000);
-                });
-              });
-            } else { alert("✅ 현재 최신 버전입니다."); }
-          }
-        }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: updateAvailable ? "none" : "1px solid #333", background: updateAvailable ? "linear-gradient(135deg, #2196F3, #1565C0)" : "transparent", color: updateAvailable ? "#fff" : "#8892b0", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-          {updateAvailable ? "🔄 지금 업데이트" : "🔍 업데이트 확인"}
-        </button>
       </Card>
 
       <Card>
@@ -5214,7 +5228,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = 0; const _unused_unread = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","chat","status","program","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
@@ -5262,7 +5276,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
     {/* Content */}
     <div style={{ paddingTop: 36, paddingBottom: 70 }}>
-      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} /> : <InactiveOverlay settings={settings} />)}
+      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shuttle" && <ShuttlePage settings={settings} setSettings={setSettings} session={session} />}
