@@ -229,7 +229,7 @@ const DEFAULT_SETTINGS = {
     {id:"pg47",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:""},
     {id:"pg48",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"옛다! 에나-캐시",location:"진주성 내",category:"S",memo:""},
   ],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
-  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "program", "cms"],
+  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"],
   features: {
     crowd: true,
     parking: true,
@@ -2123,145 +2123,112 @@ function CongestionPage({ settings, setSettings, session }) {
 }
 
 // ─── Message Page ───────────────────────────────────────────────
-function MessagePage({ settings, setSettings, accounts, session }) {
-  const [msgType, setMsgType] = useState("all");
+// ─── Chat Page (메시지) ──────────────────────────────────────────
+function ChatPage({ settings, setSettings, accounts, session }) {
+  const [channel, setChannel] = useState("all");
+  const [msg, setMsg] = useState("");
+  const [readIds, setReadIds] = useState(() => { try { return JSON.parse(sessionStorage.getItem("read_msgs") || "[]"); } catch { return []; } });
+  const chatRef = useRef(null);
 
-  const doSend = () => {
-    const content = document.getElementById("mp-content")?.value;
-    if (!content) { alert("내용을 입력하세요."); return; }
-    const time = new Date().toLocaleString("ko-KR");
+  const allMessages = settings.messages || [];
+  const isAdmin = ["admin", "manager", "sysadmin"].includes(session?.role);
 
-    if (msgType === "notice") {
-      setSettings(prev => ({ ...prev, notices: [{ id: "n" + Date.now(), content, createdAt: time, createdBy: session.name }, ...(prev.notices || [])], messages: [{ id: "m" + Date.now(), type: "notice", content, createdAt: time, createdBy: session.name }, ...(prev.messages || [])].slice(0, 100) }));
-      document.getElementById("mp-content").value = "";
-      alert("✅ 공지가 등록되었습니다.");
-    } else {
-      const target = msgType === "target" ? document.getElementById("mp-target")?.value : "전체";
-      setSettings(prev => ({ ...prev, messages: [{ id: "m" + Date.now(), type: msgType, content, to: target, createdAt: time, createdBy: session.name }, ...(prev.messages || [])].slice(0, 100) }));
-      if (settings.smsEnabled) {
-        let contacts = [...(settings.smsManagers || []), ...(settings.smsStaff || [])];
-        if (msgType === "target") {
-          const acc = (accounts || []).find(a => a.id === target);
-          const worker = (settings.workers || []).find(w => w.name === acc?.name);
-          if (worker?.phone) contacts = [{ name: worker.name, phone: worker.phone }];
-        }
-        sendSolapi(settings, `[${settings.festivalName}] 📢\n\n${content}\n\n${time}`, contacts);
-      }
-      document.getElementById("mp-content").value = "";
-      alert(`✅ ${msgType === "all" ? "전체" : target}에게 발송 완료`);
-    }
-  };
+  // Get channels: all + individual accounts that have conversations
+  const chatAccounts = (accounts || []).filter(a => a.id !== session?.id);
+  const channelList = [
+    { id: "all", label: "📣 전체", color: "#2196F3" },
+    { id: "notice", label: "📢 공지", color: "#9C27B0" },
+    ...chatAccounts.map(a => ({
+      id: a.id, label: a.name, color: ROLES[a.role]?.color || "#556",
+      unread: allMessages.filter(m => m.type === "target" && ((m.to === session?.id && m.createdById === a.id) || (m.createdById === session?.id && m.to === a.id)) && !readIds.includes(m.id)).length
+    }))
+  ];
 
-  return (<div style={{ minHeight: "100vh", background: "#0d1117", padding: "24px 16px" }}>
-    <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 20px" }}>📢 메시지 / 공지</h2>
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+  // Filter messages for current channel
+  const channelMessages = allMessages.filter(m => {
+    if (channel === "all") return m.type === "all";
+    if (channel === "notice") return m.type === "notice";
+    return m.type === "target" && ((m.to === channel && m.createdById === session?.id) || (m.to === session?.id && m.createdById === channel));
+  }).slice().reverse();
 
-      {/* 발송 유형 */}
-      <Card>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {[{ id: "all", icon: "📣", label: "전체 메시지", desc: "전 요원 SMS" }, { id: "target", icon: "👤", label: "계정별 지정", desc: "특정 대상" }, { id: "notice", icon: "📢", label: "공지 등록", desc: "대시보드 고정" }].map(t => (
-            <button key={t.id} onClick={() => setMsgType(t.id)} style={{ padding: "14px 8px", borderRadius: 12, border: msgType === t.id ? "2px solid #2196F3" : "1px solid #333", background: msgType === t.id ? "rgba(33,150,243,0.1)" : "transparent", color: msgType === t.id ? "#2196F3" : "#8892b0", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>{t.icon}</div>{t.label}<div style={{ fontSize: 13, color: "#556", marginTop: 2 }}>{t.desc}</div>
-            </button>
-          ))}
-        </div>
-
-        {msgType === "target" && <div style={{ marginBottom: 12 }}>
-          <Label>수신 대상</Label>
-          <select id="mp-target" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-            {(accounts || []).map(a => <option key={a.id} value={a.id}>{a.name} ({a.id}) — {ROLES[a.role]?.label}</option>)}
-          </select>
-        </div>}
-
-        <div style={{ marginBottom: 12 }}>
-          <Label>{msgType === "notice" ? "공지 내용" : "메시지 내용"}</Label>
-          <textarea id="mp-content" rows={4} placeholder={msgType === "notice" ? "대시보드 상단에 표시될 공지사항..." : "전송할 메시지 내용..."} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} />
-        </div>
-
-        <button onClick={doSend} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: msgType === "notice" ? "linear-gradient(135deg,#9C27B0,#7B1FA2)" : msgType === "target" ? "linear-gradient(135deg,#FF9800,#E65100)" : "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-          {msgType === "notice" ? "📢 공지 등록" : msgType === "target" ? "👤 지정 발송" : "📣 전체 발송"}
-        </button>
-      </Card>
-
-      {/* 현재 공지 */}
-      {(settings.notices || []).length > 0 && <Card>
-        <h3 style={{ color: "#9C27B0", fontSize: 15, margin: "0 0 10px" }}>📢 현재 공지 ({settings.notices.length}건)</h3>
-        {settings.notices.map(n => (
-          <div key={n.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "rgba(156,39,176,0.05)", borderRadius: 8, marginBottom: 4, border: "1px solid rgba(156,39,176,0.1)" }}>
-            <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1, whiteSpace: "pre-wrap" }}>{n.content}</span>
-            <span style={{ color: "#556", fontSize: 13, flexShrink: 0 }}>{n.createdBy}<br/>{n.createdAt}</span>
-            <button onClick={() => setSettings(prev => ({ ...prev, notices: prev.notices.filter(x => x.id !== n.id) }))} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer", flexShrink: 0 }}>삭제</button>
-          </div>
-        ))}
-      </Card>}
-
-      {/* 발송 이력 */}
-      <Card>
-        <h3 style={{ color: "#8892b0", fontSize: 15, margin: "0 0 10px" }}>📋 발송 이력</h3>
-        {(settings.messages || []).length === 0 ? <p style={{ color: "#445", fontSize: 14 }}>이력 없음</p> : <div style={{ maxHeight: 250, overflow: "auto" }}>
-          {(settings.messages || []).slice(0, 30).map(m => (
-            <div key={m.id} style={{ padding: "8px 10px", borderBottom: "1px solid #1a1a2e", display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
-              <span style={{ padding: "2px 8px", borderRadius: 10, background: m.type === "notice" ? "rgba(156,39,176,0.15)" : m.type === "target" ? "rgba(255,152,0,0.15)" : "rgba(33,150,243,0.15)", color: m.type === "notice" ? "#9C27B0" : m.type === "target" ? "#FF9800" : "#2196F3", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{m.type === "notice" ? "공지" : m.type === "target" ? "지정" : "전체"}</span>
-              <span style={{ color: "#999", flex: 1 }}>{m.content.slice(0, 40)}{m.content.length > 40 ? "..." : ""}</span>
-              {m.to && m.type === "target" && <span style={{ color: "#FF9800", fontSize: 13 }}>→{m.to}</span>}
-              <span style={{ color: "#445", fontSize: 13, flexShrink: 0 }}>{m.createdAt}</span>
-            </div>
-          ))}
-        </div>}
-      </Card>
-    </div>
-  </div>);
-}
-
-// ─── Inbox Page (받은 메시지) ────────────────────────────────────
-function InboxPage({ settings, session }) {
-  const myMessages = (settings.messages || []).filter(m => m.type === "all" || m.type === "notice" || (m.type === "target" && m.to === session.id));
-  const [readIds, setReadIds] = useState(() => JSON.parse(sessionStorage.getItem("read_msgs") || "[]"));
-
-  const markRead = (id) => {
-    if (!readIds.includes(id)) {
-      const next = [...readIds, id];
+  // Mark as read
+  useEffect(() => {
+    const unread = channelMessages.filter(m => !readIds.includes(m.id) && m.createdById !== session?.id).map(m => m.id);
+    if (unread.length > 0) {
+      const next = [...new Set([...readIds, ...unread])];
       setReadIds(next);
       sessionStorage.setItem("read_msgs", JSON.stringify(next));
     }
+  }, [channel, channelMessages.length]);
+
+  // Scroll to bottom
+  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [channel, channelMessages.length]);
+
+  const sendMsg = () => {
+    if (!msg.trim()) return;
+    const time = new Date().toLocaleString("ko-KR");
+    const base = { id: "m" + Date.now(), content: msg.trim(), createdAt: time, createdBy: session.name, createdById: session.id };
+
+    if (channel === "notice") {
+      setSettings(prev => ({ ...prev,
+        notices: [{ id: "n" + Date.now(), content: msg.trim(), createdAt: time, createdBy: session.name }, ...(prev.notices || [])],
+        messages: [{ ...base, type: "notice" }, ...(prev.messages || [])].slice(0, 200)
+      }));
+    } else if (channel === "all") {
+      setSettings(prev => ({ ...prev, messages: [{ ...base, type: "all", to: "전체" }, ...(prev.messages || [])].slice(0, 200) }));
+    } else {
+      setSettings(prev => ({ ...prev, messages: [{ ...base, type: "target", to: channel }, ...(prev.messages || [])].slice(0, 200) }));
+    }
+    setMsg("");
   };
-  const markAllRead = () => {
-    const next = myMessages.map(m => m.id);
-    setReadIds(next);
-    sessionStorage.setItem("read_msgs", JSON.stringify(next));
-  };
 
-  return (<div style={{ minHeight: "100vh", background: "#0d1117", padding: "24px 16px" }}>
-    <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>💬 받은 메시지</h2>
-    <p style={{ color: "#8892b0", fontSize: 14, textAlign: "center", margin: "0 0 20px" }}>{session.name} ({ROLES[session.role]?.label})</p>
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+  const totalUnread = allMessages.filter(m => !readIds.includes(m.id) && m.createdById !== session?.id && (m.type === "all" || m.type === "notice" || (m.type === "target" && m.to === session?.id))).length;
 
-      {myMessages.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-        <button onClick={markAllRead} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>전체 읽음 처리</button>
+  return (<div style={{ minHeight: "100vh", background: "#0a0a1a", display: "flex", flexDirection: "column" }}>
+    {/* 헤더 */}
+    <div style={{ padding: "16px 16px 10px", background: "#0d1117", borderBottom: "1px solid #222" }}>
+      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 10px" }}>💬 메시지</h2>
+      {/* 채널 목록 */}
+      <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
+        {channelList.map(ch => {
+          const active = channel === ch.id;
+          const unread = ch.id === "all" ? allMessages.filter(m => m.type === "all" && !readIds.includes(m.id) && m.createdById !== session?.id).length : ch.unread || 0;
+          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "8px 14px", borderRadius: 20, border: active ? `2px solid ${ch.color}` : "1px solid #333", background: active ? `${ch.color}15` : "transparent", color: active ? ch.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
+            {ch.label}
+            {unread > 0 && <span style={{ position: "absolute", top: -2, right: -2, width: 16, height: 16, borderRadius: 8, background: "#F44336", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>}
+          </button>);
+        })}
+      </div>
+    </div>
+
+    {/* 채팅 영역 */}
+    <div ref={chatRef} style={{ flex: 1, padding: "16px", overflowY: "auto", maxWidth: 600, width: "100%", margin: "0 auto" }}>
+      {channelMessages.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#445" }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
+        <div>메시지가 없습니다</div>
       </div>}
-
-      {myMessages.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
-        <p style={{ fontSize: 14 }}>받은 메시지가 없습니다</p>
-      </div>}
-
-      {myMessages.map(m => {
-        const isRead = readIds.includes(m.id);
-        return (
-          <div key={m.id} onClick={() => markRead(m.id)} style={{ padding: "14px 16px", borderRadius: 12, background: isRead ? "rgba(255,255,255,0.02)" : "rgba(33,150,243,0.06)", border: isRead ? "1px solid #1a1a2e" : "1.5px solid rgba(33,150,243,0.2)", marginBottom: 8, cursor: "pointer", transition: "all .2s" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{ padding: "2px 8px", borderRadius: 10, background: m.type === "notice" ? "rgba(156,39,176,0.15)" : m.type === "target" ? "rgba(255,152,0,0.15)" : "rgba(33,150,243,0.15)", color: m.type === "notice" ? "#9C27B0" : m.type === "target" ? "#FF9800" : "#2196F3", fontSize: 13, fontWeight: 700 }}>{m.type === "notice" ? "📢 공지" : m.type === "target" ? "👤 개인" : "📣 전체"}</span>
-              {!isRead && <span style={{ width: 6, height: 6, borderRadius: 3, background: "#2196F3", flexShrink: 0 }} />}
-              <span style={{ color: "#445", fontSize: 13, marginLeft: "auto" }}>{m.createdAt}</span>
-            </div>
-            <div style={{ color: isRead ? "#999" : "#ccd6f6", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{m.content}</div>
-            {m.createdBy && <div style={{ color: "#556", fontSize: 14, marginTop: 6 }}>발신: {m.createdBy}</div>}
+      {channelMessages.map(m => {
+        const isMine = m.createdById === session?.id;
+        return (<div key={m.id} style={{ display: "flex", justifyContent: isMine ? "flex-end" : "flex-start", marginBottom: 8 }}>
+          <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMine ? "rgba(33,150,243,0.15)" : "rgba(255,255,255,0.05)", border: isMine ? "1px solid rgba(33,150,243,0.2)" : "1px solid #222" }}>
+            {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{m.createdBy}</div>}
+            <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{m.content}</div>
+            <div style={{ color: "#445", fontSize: 11, marginTop: 4, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
           </div>
-        );
+        </div>);
       })}
+    </div>
+
+    {/* 입력 영역 */}
+    <div style={{ padding: "12px 16px 80px", background: "#0d1117", borderTop: "1px solid #222" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", gap: 8 }}>
+        <textarea value={msg} onChange={e => setMsg(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} placeholder={channel === "notice" ? "공지사항 입력..." : channel === "all" ? "전체 메시지..." : `${channelList.find(c=>c.id===channel)?.label || ""}에게...`} rows={1} style={{ flex: 1, padding: "12px 14px", borderRadius: 20, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+        <button onClick={sendMsg} style={{ width: 48, height: 48, borderRadius: 24, border: "none", background: msg.trim() ? "#2196F3" : "#333", color: "#fff", fontSize: 18, cursor: msg.trim() ? "pointer" : "default", flexShrink: 0 }}>↑</button>
+      </div>
     </div>
   </div>);
 }
+
 
 // ─── CMS Page ────────────────────────────────────────────────────
 // ─── OrgChart Tab ────────────────────────────────────────────────
@@ -3989,8 +3956,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "congestion", icon: "🚦", label: "혼잡도", feat: "congestion" },
             { id: "parking", icon: "🅿️", label: "주차관리", feat: "parking" },
             { id: "shuttle", icon: "🚌", label: "셔틀버스", feat: "shuttle" },
-            { id: "inbox", icon: "💬", label: "수신함", feat: "message" },
-            { id: "message", icon: "📢", label: "발송", feat: "message" },
+            { id: "chat", icon: "💬", label: "메시지", feat: "message" },
             { id: "status", icon: "🎪", label: "축제관리" },
             { id: "program", icon: "🎭", label: "프로그램" },
             { id: "cms", icon: "⚙️", label: "관리" },
@@ -4291,14 +4257,14 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "message", "inbox", "status", "program", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
   zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "status", "program", "inbox"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
-  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "inbox", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "inbox", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
-  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "inbox", "status", "program", "program"], desc: "셔틀버스 위치 관리" },
-  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "inbox", "status", "program"], desc: "대시보드 조회만 가능" },
+  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "chat", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "chat", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
+  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "program"], desc: "셔틀버스 위치 관리" },
+  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "chat", "status", "program"], desc: "대시보드 조회만 가능" },
 };
 
 // ─── Login Page ──────────────────────────────────────────────────
@@ -4822,10 +4788,10 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   // 내 메시지 (전체 + 나에게 지정된 메시지 + 공지)
   const myMessages = (settings.messages || []).filter(m => m.type === "all" || m.type === "notice" || (m.type === "target" && m.to === session.id));
   const readIds = JSON.parse(sessionStorage.getItem("read_msgs") || "[]");
-  const unreadCount = myMessages.filter(m => !readIds.includes(m.id)).length;
+  const unreadCount = 0; const _unused_unread = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "inbox", "message", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","inbox","message","status","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
@@ -4834,8 +4800,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     { id: "program", icon: "🎭", label: "프로그램" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
-    ft.message !== false && { id: "inbox", icon: "💬", label: unreadCount > 0 ? `수신함(${unreadCount})` : "수신함" },
-    ft.message !== false && { id: "message", icon: "📢", label: "발송" },
+    ft.message !== false && { id: "chat", icon: "💬", label: "메시지" },
     { id: "cms", icon: "⚙️", label: "관리" },
   ].filter(Boolean);
   const navs = allNavs
@@ -4877,8 +4842,8 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shuttle" && <ShuttlePage settings={settings} setSettings={setSettings} session={session} />}
-      {page === "message" && <MessagePage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
-      {page === "inbox" && <InboxPage settings={settings} session={session} />}
+      {page === "chat" && <ChatPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} />}
+      
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "program" && <ProgramPage settings={settings} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} />}
