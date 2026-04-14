@@ -2460,7 +2460,7 @@ function CongestionPage({ settings, setSettings, session }) {
   };
 
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
-  const normalOnly = zones.filter(z => z.name && (!z.zoneType || z.zoneType === "normal"));
+  const normalOnly = zones.filter(z => z.name && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "none" || z.zoneType === "performance"));
   const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
   const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
@@ -3375,7 +3375,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 등록</h3>
         {(settings.zones || []).map((z, i) => {
-          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "일반관리", color: "#2196F3", icon: "📍" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, parking: { label: "주차관리", color: "#009688", icon: "🅿️" }, entry: { label: "출입관리", color: "#795548", icon: "🚪" } };
+          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "구역관리", color: "#2196F3", icon: "📍" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, parking: { label: "주차관리", color: "#009688", icon: "🅿️" }, entry: { label: "출입관리", color: "#795548", icon: "🚪" } };
           const zt = ZTYPES[z.zoneType] || ZTYPES.normal;
           return (
           <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
@@ -3392,7 +3392,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
               <div><Label>구역 속성</Label><select value={z.zoneType || "normal"} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, zoneType: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
                 <option value="none">⬜ 속성없음</option>
-                <option value="normal">📍 일반관리</option>
+                <option value="normal">📍 구역관리</option>
                 <option value="performance">🎭 공연관리</option>
                 <option value="safety">🛡️ 안전관리</option>
                 <option value="support">🚑 지원관리</option>
