@@ -117,18 +117,61 @@ const DEFAULT_SETTINGS = {
   workSites: [],
   zoneRequests: [],
   checklists: [
-    { id: "cl_pre", title: "개장 전 점검", category: "pre", items: [
-      { id: "ci1", text: "무대 구조물 안전점검", checked: false }, { id: "ci2", text: "소화기 비치 확인", checked: false },
-      { id: "ci3", text: "비상방송 시스템 테스트", checked: false }, { id: "ci4", text: "대피경로 안내판 확인", checked: false },
-      { id: "ci5", text: "전기시설 안전점검", checked: false }, { id: "ci6", text: "의료진 배치 확인", checked: false },
+    { id: "cl_plan", title: "축제 계획 단계", category: "plan", items: [
+      { id: "p1", text: "안전관리계획 수립 및 심의 완료", checked: false, enabled: true },
+      { id: "p2", text: "행사장 위치 위험요인 검토", checked: false, enabled: true },
+      { id: "p3", text: "비상 대피경로 및 대피장소 확보", checked: false, enabled: true },
+      { id: "p4", text: "안전관리 조직 구성 (총괄/부문별)", checked: false, enabled: true },
+      { id: "p5", text: "유관기관 비상연락체계 구축", checked: false, enabled: true },
+      { id: "p6", text: "안전관리비 확보 (전체비용 1% 이상)", checked: false, enabled: true },
+      { id: "p7", text: "보험가입 (참가자/관람객/진행자)", checked: false, enabled: true },
+      { id: "p8", text: "안전관리인력 배치계획 수립", checked: false, enabled: true },
+      { id: "p9", text: "의료지원 계획 수립", checked: false, enabled: true },
+      { id: "p10", text: "교통 및 주차 대책 수립", checked: false, enabled: true },
     ]},
-    { id: "cl_dur", title: "운영 중 점검", category: "during", items: [
-      { id: "ci7", text: "출입구 통제 인력 확인", checked: false }, { id: "ci8", text: "음향/조명 장비 상태", checked: false },
-      { id: "ci9", text: "쓰레기 수거 상태", checked: false }, { id: "ci10", text: "화장실 청소 상태", checked: false },
+    { id: "cl_pre", title: "축제 시작 전 (개장 전)", category: "pre", items: [
+      { id: "b1", text: "무대/구조물 안전점검 완료", checked: false, enabled: true },
+      { id: "b2", text: "전기시설 안전점검 (누전차단기 등)", checked: false, enabled: true },
+      { id: "b3", text: "가스시설 안전점검", checked: false, enabled: true },
+      { id: "b4", text: "소화기/소방시설 비치 확인", checked: false, enabled: true },
+      { id: "b5", text: "비상방송 시스템 테스트", checked: false, enabled: true },
+      { id: "b6", text: "대피경로 안내판 설치 확인", checked: false, enabled: true },
+      { id: "b7", text: "안전요원 배치 확인", checked: false, enabled: true },
+      { id: "b8", text: "의료진/구급장비 배치 확인", checked: false, enabled: true },
+      { id: "b9", text: "출입구 통제 시설 확인", checked: false, enabled: true },
+      { id: "b10", text: "CCTV/통신장비 작동 확인", checked: false, enabled: true },
+      { id: "b11", text: "기상상황 확인 (폭우/강풍/폭염)", checked: false, enabled: true },
+      { id: "b12", text: "화장실/편의시설 점검", checked: false, enabled: true },
+      { id: "b13", text: "비상차량 진입로 확보", checked: false, enabled: true },
+      { id: "b14", text: "안전관리요원 무전기/확성기 지급", checked: false, enabled: true },
     ]},
-    { id: "cl_post", title: "폐장 후 점검", category: "post", items: [
-      { id: "ci11", text: "관람객 퇴장 완료 확인", checked: false }, { id: "ci12", text: "전기/가스 차단 확인", checked: false },
-      { id: "ci13", text: "시설물 파손 점검", checked: false }, { id: "ci14", text: "분실물 수거", checked: false },
+    { id: "cl_dur", title: "축제 진행 중", category: "during", items: [
+      { id: "d1", text: "출입구 통제 인력 배치 확인", checked: false, enabled: true },
+      { id: "d2", text: "관람객 밀집도 수시 확인", checked: false, enabled: true },
+      { id: "d3", text: "안전관리요원 순찰 실시", checked: false, enabled: true },
+      { id: "d4", text: "기상변화 모니터링", checked: false, enabled: true },
+      { id: "d5", text: "음향/조명 장비 상태 확인", checked: false, enabled: true },
+      { id: "d6", text: "비상대피 안내방송 준비", checked: false, enabled: true },
+      { id: "d7", text: "화기취급 구역 안전관리", checked: false, enabled: true },
+      { id: "d8", text: "응급환자 발생 대비 의료진 대기", checked: false, enabled: true },
+      { id: "d9", text: "쓰레기 수거/위생 상태", checked: false, enabled: true },
+      { id: "d10", text: "주차장/교통 상황 점검", checked: false, enabled: true },
+    ]},
+    { id: "cl_post", title: "축제 종료 시", category: "post", items: [
+      { id: "e1", text: "관람객 안전 퇴장 유도 완료", checked: false, enabled: true },
+      { id: "e2", text: "전기/가스 차단 확인", checked: false, enabled: true },
+      { id: "e3", text: "시설물 파손 여부 점검", checked: false, enabled: true },
+      { id: "e4", text: "분실물 수거", checked: false, enabled: true },
+      { id: "e5", text: "안전관리 문제점 분석 기록", checked: false, enabled: true },
+      { id: "e6", text: "주차장 차량 소통 안전 관리", checked: false, enabled: true },
+    ]},
+    { id: "cl_emer", title: "사고 발생 시 대응", category: "emergency", items: [
+      { id: "em1", text: "119/112 신고", checked: false, enabled: true },
+      { id: "em2", text: "관람객 대피 유도", checked: false, enabled: true },
+      { id: "em3", text: "사고현장 통제", checked: false, enabled: true },
+      { id: "em4", text: "응급처치 실시", checked: false, enabled: true },
+      { id: "em5", text: "상급기관 보고", checked: false, enabled: true },
+      { id: "em6", text: "사고 수습 및 복구", checked: false, enabled: true },
     ]},
   ],
   timeline: [],
@@ -1962,7 +2005,9 @@ function CongestionPage({ settings, setSettings, session }) {
   };
 
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
-  const viewZones = isAdmin ? zones.filter(z => z.name) : myZone ? [myZone] : [];
+  const normalOnly = zones.filter(z => z.name && (!z.zoneType || z.zoneType === "normal"));
+  const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
+  const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
   return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "24px 16px" }}>
     <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 6px" }}>🚦 인파혼잡도 관리</h2>
@@ -2046,10 +2091,10 @@ function CongestionPage({ settings, setSettings, session }) {
     })}
 
     {/* 전체 현황 (관리자) */}
-    {isAdmin && zones.filter(z => z.name).length > 0 && <div style={{ maxWidth: 500, margin: "20px auto 0" }}>
+    {isAdmin && normalOnly.length > 0 && <div style={{ maxWidth: 500, margin: "20px auto 0" }}>
       <h3 style={{ color: "#8892b0", fontSize: 15, fontWeight: 700, marginBottom: 10, textAlign: "center" }}>📊 전체 구역 혼잡도 현황</h3>
       <div style={{ display: "grid", gap: 6 }}>
-        {zones.filter(z => z.name).map(z => {
+        {normalOnly.map(z => {
           const c = congestion.find(cc => cc.zoneId === z.id);
           const cl = c ? CONG_LEVELS[c.level] : { label: "미보고", color: "#556", icon: "⚪" };
           return (<div key={z.id} style={{ display: "flex", alignItems: "center", padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: `1px solid ${cl.color}33`, gap: 10 }}>
@@ -3493,48 +3538,68 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
     {/* 체크리스트 */}
     {tab === "checklist" && <div>
+      {/* 안전관리 매뉴얼 */}
+      <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 24 }}>📖</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#2196F3", fontSize: 15, fontWeight: 700 }}>지역축제장 안전관리 매뉴얼</div>
+            <div style={{ color: "#556", fontSize: 12 }}>행정안전부 · 2021</div>
+          </div>
+          <button onClick={() => window.open("/safety-manual.pdf", "_blank")} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📖 매뉴얼 보기</button>
+        </div>
+      </Card>
+
       {(settings.checklists || []).map((cl, ci) => {
-        const done = cl.items.filter(i => i.checked).length;
-        const total = cl.items.length;
+        const enabledItems = cl.items.filter(i => i.enabled !== false);
+        const done = enabledItems.filter(i => i.checked).length;
+        const total = enabledItems.length;
         const pct = total > 0 ? Math.round(done / total * 100) : 0;
-        const catColor = cl.category === "pre" ? "#2196F3" : cl.category === "during" ? "#4CAF50" : "#FF9800";
-        const catLabel = cl.category === "pre" ? "개장 전" : cl.category === "during" ? "운영 중" : "폐장 후";
+        const catColors = { plan: "#9C27B0", pre: "#2196F3", during: "#4CAF50", post: "#FF9800", emergency: "#F44336" };
+        const catLabels = { plan: "계획", pre: "시작 전", during: "진행 중", post: "종료", emergency: "사고대응" };
+        const catColor = catColors[cl.category] || "#8892b0";
         return (<Card key={cl.id}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ padding: "2px 8px", borderRadius: 4, background: `${catColor}15`, color: catColor, fontSize: 12, fontWeight: 700 }}>{catLabel}</span>
-            <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
-            <span style={{ color: pct === 100 ? "#4CAF50" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{done}/{total}</span>
+            <span style={{ padding: "3px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 12, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
+            <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: 0, flex: 1 }}>{cl.title}</h3>
+            <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 15, fontWeight: 800 }}>{done}/{total}</span>
           </div>
           <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", marginBottom: 10 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 2, transition: "width .3s" }} /></div>
-          {cl.items.map((item, ii) => (
-            <div key={item.id} onClick={() => { const cls = [...(settings.checklists || [])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name || "") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: `✅ ${cl.title} - "${item.text}" 점검완료`, actor: session?.name }] })); } }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.checked ? "rgba(76,175,80,0.12)" : "#222"}`, marginBottom: 4, cursor: "pointer" }}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{item.checked && <span style={{ color: "#fff", fontSize: 14 }}>✓</span>}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, textDecoration: item.checked ? "line-through" : "none" }}>{item.text}</div>
+          {cl.items.map((item, ii) => {
+            const isOff = item.enabled === false;
+            return (<div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 8, background: isOff ? "rgba(255,255,255,0.01)" : item.checked ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : item.checked ? "rgba(76,175,80,0.12)" : "#222"}`, marginBottom: 4, opacity: isOff ? 0.4 : 1 }}>
+              {/* ON/OFF 토글 */}
+              <div onClick={(e) => { e.stopPropagation(); const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, enabled: isOff ? true : false }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); }} style={{ width: 28, height: 16, borderRadius: 8, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 6, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 14, transition: "all .3s" }} />
+              </div>
+              {/* 체크박스 */}
+              {!isOff && <div onClick={() => { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, checked: !item.checked, checkedBy: !item.checked ? (session?.name||"") : "", checkedAt: !item.checked ? new Date().toLocaleString("ko-KR") : "" }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); if (!item.checked) { setSettings(prev => ({ ...prev, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "check", message: `✅ ${cl.title} - "${item.text}"`, actor: session?.name }] })); } }} style={{ width: 22, height: 22, borderRadius: 6, border: item.checked ? "2px solid #4CAF50" : "2px solid #444", background: item.checked ? "#4CAF50" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>{item.checked && <span style={{ color: "#fff", fontSize: 14 }}>✓</span>}</div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: isOff ? "#445" : item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, textDecoration: item.checked ? "line-through" : isOff ? "line-through" : "none" }}>{item.text}</div>
                 {item.checkedBy && <div style={{ color: "#556", fontSize: 11 }}>{item.checkedBy} · {item.checkedAt}</div>}
               </div>
-            </div>
-          ))}
+            </div>);
+          })}
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <Input id={`nci_${cl.id}`} placeholder="새 점검항목 추가" style={{ flex: 1 }} />
-            <button onClick={() => { const inp = document.getElementById(`nci_${cl.id}`); if (!inp?.value) return; const cls = [...(settings.checklists || [])]; cls[ci] = { ...cls[ci], items: [...cls[ci].items, { id: "ci_"+Date.now(), text: inp.value, checked: false }] }; setSettings(prev => ({ ...prev, checklists: cls })); inp.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: catColor, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+</button>
+            <Input id={`nci_${cl.id}`} placeholder="점검항목 추가" style={{ flex: 1 }} />
+            <button onClick={() => { const inp = document.getElementById(`nci_${cl.id}`); if (!inp?.value) return; const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: [...cls[ci].items, { id: "ci_"+Date.now(), text: inp.value, checked: false, enabled: true }] }; setSettings(prev => ({ ...prev, checklists: cls })); inp.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: catColor, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+</button>
           </div>
         </Card>);
       })}
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>➕ 체크리스트 추가</h3>
         <div style={{ display: "flex", gap: 8 }}>
-          <Input id="new_cl_title" placeholder="체크리스트 제목" style={{ flex: 1 }} />
+          <Input id="new_cl_title" placeholder="제목" style={{ flex: 1 }} />
           <select id="new_cl_cat" style={{ padding: "8px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 13 }}>
-            <option value="pre">개장 전</option><option value="during">운영 중</option><option value="post">폐장 후</option>
+            <option value="plan">계획</option><option value="pre">시작 전</option><option value="during">진행 중</option><option value="post">종료</option><option value="emergency">사고대응</option>
           </select>
-          <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists || []), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+          <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists||[]), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2196F3", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
         </div>
       </Card>
-      <button onClick={() => { if (confirm("모든 체크리스트 체크를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, checklists: (prev.checklists || []).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 체크리스트 전체 초기화</button>
+      <button onClick={() => { if (confirm("체크 초기화? (항목은 유지)")) setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 체크 초기화 (항목 유지)</button>
     </div>}
 
-    {/* 프로그램/일정 */}
+
     {tab === "programs" && <div>
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>📥 엑셀 일괄 등록</h3>
