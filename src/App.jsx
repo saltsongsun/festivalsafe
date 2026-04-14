@@ -229,7 +229,8 @@ const DEFAULT_SETTINGS = {
     {id:"pg47",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"진주성 옛 장터",location:"진주성 내",category:"S",memo:""},
     {id:"pg48",date:"2026-05-05",time:"11:00",endTime:"21:00",title:"옛다! 에나-캐시",location:"진주성 내",category:"S",memo:""},
   ],  // [{id, name, zoneId, status, order, workers:[{id,name,phone,type,duty}]}]
-  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"],
+  performances: [],
+  navOrder: ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "stage", "cms"],
   features: {
     crowd: true,
     parking: true,
@@ -927,8 +928,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>); })}
     </div>
     {/* 구역별 혼잡도 */}
-    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-      {(settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).map(z => {
+    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+      {(settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).map(z => {
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
@@ -2408,6 +2409,177 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
 }
 
 
+// ─── Stage Management Page (공연관리) ─────────────────────────────
+function StageMgmtPage({ settings, setSettings, session }) {
+  const perfs = settings.performances || [];
+  const [editId, setEditId] = useState(null);
+  const [addMode, setAddMode] = useState(false);
+  const [newPerf, setNewPerf] = useState({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], techrider: [
+    { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
+    { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
+  ]});
+  const GENRES = ["보컬","밴드","재즈","댄스","마술","퍼포먼스"];
+  const programs = (settings.programs || []).filter(p => p.category === "P");
+  const canEdit = ["admin","manager","sysadmin","stagemgr"].includes(session?.role);
+
+  const savePerf = (perf) => {
+    const id = perf.id || "pf_" + Date.now();
+    const exists = perfs.find(p => p.id === id);
+    const updated = exists ? perfs.map(p => p.id === id ? { ...perf, id } : p) : [...perfs, { ...perf, id }];
+    setSettings(prev => ({ ...prev, performances: updated }));
+    setEditId(null); setAddMode(false);
+  };
+  const delPerf = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(prev => ({ ...prev, performances: perfs.filter(p => p.id !== id) })); };
+  const autoImport = () => {
+    const existing = perfs.map(p => p.programId).filter(Boolean);
+    const newPgs = programs.filter(p => !existing.includes(p.id));
+    if (newPgs.length === 0) { alert("새로 가져올 공연 프로그램이 없습니다."); return; }
+    const imported = newPgs.map(p => ({
+      id: "pf_" + Date.now() + "_" + p.id, programId: p.id, artist: p.manager || p.title, phone: p.managerPhone || "",
+      genre: "보컬", programTitle: p.title, date: p.date, time: p.time, endTime: p.endTime, location: p.location,
+      setlist: [], techrider: [
+        { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
+        { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
+      ]
+    }));
+    setSettings(prev => ({ ...prev, performances: [...perfs, ...imported] }));
+    alert(`✅ ${imported.length}개 공연 가져오기 완료`);
+  };
+
+  const PerfForm = ({ perf, onSave, onCancel }) => {
+    const [f, setF] = useState({ ...perf });
+    const upF = (k, v) => setF(p => ({ ...p, [k]: v }));
+    const addSong = () => upF("setlist", [...(f.setlist||[]), { id: "sl_"+Date.now(), name: "", type: "MR", playtime: "3:30" }]);
+    const upSong = (i, k, v) => { const sl = [...(f.setlist||[])]; sl[i] = { ...sl[i], [k]: v }; upF("setlist", sl); };
+    const delSong = (i) => upF("setlist", (f.setlist||[]).filter((_,j)=>j!==i));
+    const moveSong = (i, d) => { const sl = [...(f.setlist||[])]; const ni = i+d; if (ni<0||ni>=sl.length) return; [sl[i],sl[ni]]=[sl[ni],sl[i]]; upF("setlist", sl); };
+    const addTech = () => upF("techrider", [...(f.techrider||[]), { id: "tr_"+Date.now(), item: "", qty: 1, model: "" }]);
+    const upTech = (i, k, v) => { const tr = [...(f.techrider||[])]; tr[i] = { ...tr[i], [k]: v }; upF("techrider", tr); };
+    const delTech = (i) => upF("techrider", (f.techrider||[]).filter((_,j)=>j!==i));
+
+    return (<div style={{ padding: "16px", borderRadius: 14, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 20 }}>🎤</span>
+        <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>{f.id ? "공연 수정" : "공연 등록"}</span>
+        <button onClick={onCancel} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
+      </div>
+
+      {/* 기본 정보 */}
+      <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>아티스트명 *</label><Input value={f.artist} onChange={e => upF("artist", e.target.value)} placeholder="아티스트/팀명" /></div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>연락처</label><Input value={f.phone} onChange={e => upF("phone", e.target.value)} placeholder="010-0000-0000" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>분류</label><select value={f.genre} onChange={e => upF("genre", e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+            {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+          </select></div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>연결 프로그램</label><select value={f.programId || ""} onChange={e => { const pg = programs.find(p=>p.id===e.target.value); upF("programId", e.target.value); if (pg) { upF("programTitle", pg.title); upF("date", pg.date); upF("time", pg.time); upF("endTime", pg.endTime); upF("location", pg.location); } }} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+            <option value="">수동 입력</option>
+            {programs.map(p => <option key={p.id} value={p.id}>{p.title} ({p.time})</option>)}
+          </select></div>
+        </div>
+        {!f.programId && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>공연시간</label><Input type="time" value={f.time||""} onChange={e => upF("time", e.target.value)} /></div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>종료</label><Input type="time" value={f.endTime||""} onChange={e => upF("endTime", e.target.value)} /></div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>장소</label><Input value={f.location||""} onChange={e => upF("location", e.target.value)} placeholder="야외공연장" /></div>
+        </div>}
+      </div>
+
+      {/* 셋리스트 */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700 }}>🎵 셋리스트</span>
+          <span style={{ color: "#556", fontSize: 12 }}>{(f.setlist||[]).length}곡</span>
+          <button onClick={addSong} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 곡 추가</button>
+        </div>
+        {(f.setlist||[]).map((song, si) => (
+          <div key={song.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
+            <span style={{ color: "#556", fontSize: 13, fontWeight: 700, minWidth: 20 }}>{si+1}</span>
+            <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
+            <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "8px", borderRadius: 6, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 12, width: 65 }}>
+              <option value="MR">MR</option><option value="LIVE">라이브</option>
+            </select>
+            <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 50, padding: "8px", fontSize: 12, textAlign: "center" }} />
+            <button onClick={() => moveSong(si,-1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▲</button>
+            <button onClick={() => moveSong(si,1)} style={{ padding: "4px 6px", border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, borderRadius: 4, cursor: "pointer" }}>▼</button>
+            <button onClick={() => delSong(si)} style={{ padding: "4px 6px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* 테크라이더 */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 700 }}>🔧 테크라이더</span>
+          <button onClick={addTech} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 6, border: "1px solid #FF9800", background: "transparent", color: "#FF9800", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ 항목 추가</button>
+        </div>
+        {(f.techrider||[]).map((tr, ti) => (
+          <div key={tr.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 4 }}>
+            <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="장비명" style={{ flex: 1, padding: "8px", fontSize: 13 }} />
+            <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 45, padding: "8px", fontSize: 13, textAlign: "center" }} />
+            <span style={{ color: "#556", fontSize: 11 }}>개</span>
+            {tr.item?.includes("앰프") && <Input value={tr.model||""} onChange={e => upTech(ti, "model", e.target.value)} placeholder="모델명" style={{ width: 80, padding: "8px", fontSize: 12 }} />}
+            <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "4px 8px", borderRadius: 4, border: tr.qty > 0 ? "1px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 11, cursor: "pointer" }}>{tr.qty > 0 ? "✓" : "○"}</button>
+            <button onClick={() => delTech(ti)} style={{ padding: "4px 6px", border: "none", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      <button onClick={() => { if (!f.artist) { alert("아티스트명을 입력하세요."); return; } onSave(f); }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>✅ {f.id ? "수정 완료" : "등록"}</button>
+    </div>);
+  };
+
+  return (<div style={{ minHeight: "100vh", background: "#0a0a1a", padding: "20px 16px 80px" }}>
+    <div style={{ maxWidth: 500, margin: "0 auto" }}>
+      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎤 공연관리</h2>
+      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 14px" }}>{perfs.length}개 공연 등록</p>
+
+      {canEdit && !addMode && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <button onClick={() => { setAddMode(true); setEditId(null); setNewPerf({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], techrider: [
+          { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
+          { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
+        ]}); }} style={{ padding: "14px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🎤 수동 등록</button>
+        <button onClick={autoImport} style={{ padding: "14px", borderRadius: 10, border: "1.5px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🔄 프로그램 가져오기</button>
+      </div>}
+
+      {addMode && <PerfForm perf={newPerf} onSave={savePerf} onCancel={() => setAddMode(false)} />}
+
+      {/* 등록된 공연 목록 */}
+      {perfs.sort((a,b) => (a.time||"").localeCompare(b.time||"")).map(pf => {
+        const isEdit = editId === pf.id;
+        const pg = pf.programId ? programs.find(p => p.id === pf.programId) : null;
+        const genreColor = { 보컬: "#E91E63", 밴드: "#F44336", 재즈: "#2196F3", 댄스: "#4CAF50", 마술: "#FF9800", 퍼포먼스: "#9C27B0" };
+
+        if (isEdit) return <PerfForm key={pf.id} perf={pf} onSave={savePerf} onCancel={() => setEditId(null)} />;
+
+        return (<div key={pf.id} onClick={canEdit ? () => setEditId(pf.id) : undefined} style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid #222", marginBottom: 8, cursor: canEdit ? "pointer" : "default" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ padding: "3px 10px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 12, fontWeight: 700 }}>{pf.genre}</span>
+            <span style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
+            {canEdit && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
+            {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "4px 8px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, borderRadius: 6, cursor: "pointer" }}>🗑</button>}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+            {pf.time && <span style={{ color: "#8892b0", fontSize: 13 }}>⏰ {pf.time}~{pf.endTime}</span>}
+            {(pf.location || pg?.location) && <span style={{ color: "#556", fontSize: 13 }}>📍 {pf.location || pg?.location}</span>}
+            {pf.phone && <span style={{ color: "#556", fontSize: 12 }}>📞 {pf.phone}</span>}
+          </div>
+          {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 8, background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.1)" }}>
+            <span style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
+            {(pf.setlist||[]).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 12, marginLeft: 8 }}>{i+1}. {s.name || "?"} ({s.type})</span>)}
+          </div>}
+          {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 4 }}>
+            <span style={{ color: "#FF9800", fontSize: 11 }}>🔧 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span>
+          </div>}
+        </div>);
+      })}
+
+      {perfs.length === 0 && !addMode && <div style={{ textAlign: "center", padding: 40, color: "#556" }}>등록된 공연이 없습니다.<br/>수동 등록 또는 프로그램에서 가져오세요.</div>}
+    </div>
+  </div>);
+}
+
 function CongestionPage({ settings, setSettings, session }) {
   const zones = settings.zones || [];
   const myZone = zones.find(z => z.accountId === session?.id);
@@ -2460,7 +2632,7 @@ function CongestionPage({ settings, setSettings, session }) {
   };
 
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin";
-  const normalOnly = zones.filter(z => z.name && (z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking"));
+  const normalOnly = zones.filter(z => z.name && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking"));
   const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
   const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
@@ -4653,6 +4825,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { k: "parking", icon: "🅿️", label: "주차관리" },
             { k: "shuttle", icon: "🚌", label: "셔틀버스" },
             { k: "program", icon: "🎭", label: "축제 프로그램" },
+              { k: "stage", icon: "🎤", label: "공연관리" },
             { k: "timeline", icon: "📋", label: "상황일지" },
           ]},
           { group: "📡 데이터/연동", items: [
@@ -5012,10 +5185,11 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
   zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "status", "program", "inbox"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
+  stagemgr: { label: "무대관리자", color: "#9C27B0", pages: ["dashboard", "stage", "status", "program", "chat"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
   counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "chat", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
   parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "chat", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
   shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "program"], desc: "셔틀버스 위치 관리" },
@@ -5095,7 +5269,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
     setNewAcc({ id: "", pw: "", name: "", role: "counter" });
   };
 
-  const ROLE_RANK = { sysadmin: 100, admin: 80, manager: 60, zonemgr: 50, counter: 40, parking: 40, shuttle: 40, viewer: 20 };
+  const ROLE_RANK = { sysadmin: 100, admin: 80, manager: 60, zonemgr: 50, stagemgr: 45, counter: 40, parking: 40, shuttle: 40, viewer: 20 };
   const myRank = ROLE_RANK[currentUser.role] || 0;
   const canManage = (acc) => {
     if (acc.id === currentUser.id) return false; // 자기 자신 수정 불가
@@ -5176,6 +5350,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                   { id: "shuttle", icon: "🚌", label: "셔틀" },
                   { id: "chat", icon: "💬", label: "메시지" },
                   { id: "cms", icon: "⚙️", label: "관리" },
+                  { id: "stage", icon: "🎤", label: "공연관리" },
                 ];
                 const rolePg = (ROLES[acc.role] || ROLES.viewer).pages;
                 const enabled = acc.enabledPages || rolePg;
@@ -5620,13 +5795,14 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = 0; const _unused_unread = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","chat","status","program","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "parking", "shuttle", "chat", "status", "program", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","parking","shuttle","chat","status","program","stage","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
     ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
     { id: "status", icon: "🎪", label: "축제관리" },
     { id: "program", icon: "🎭", label: "프로그램" },
+    ft.stage !== false && { id: "stage", icon: "🎤", label: "공연관리" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "chat", icon: "💬", label: "메시지" },
@@ -5676,6 +5852,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       
       {page === "congestion" && <CongestionPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "program" && <ProgramPage settings={settings} setSettings={setSettings} session={session} onManage={() => { setCmsTab("programs"); setPage("cms"); }} />}
+      {page === "stage" && <StageMgmtPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
