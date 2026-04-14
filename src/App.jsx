@@ -2910,11 +2910,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               const filter = d.damName || "";
               const target = filter ? allItems.find(i => (i.damnm || i.damNm || "").includes(filter)) : allItems[0];
               if (target) {
-                const nm = target.damnm || target.damnm || "";
-                setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: parseFloat(target.inflowqy) || 0, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
+                const nm = target.damnm || target.damNm || "";
+                const discharge = parseFloat(target.sflowqy || target.totdcwtrqy || target.outflowqy) || 0;
+                const inflow = parseFloat(target.inflowqy) || 0;
+                setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
                 setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR") } }));
                 const allDams = allItems.map(i => i.damnm || i.damNm).filter(Boolean).join(", ");
-                alert(`✅ ${nm}댐\n📅 ${vdate} ${vtime}시\n\n💧 유입량: ${target.inflowqy || "-"} ㎥/s\n📏 현재수위: ${target.nowlowlevel || "-"} EL.m\n📦 현재저수량: ${target.nowrsvwtqy || "-"} 백만㎥\n📏 전일수위: ${target.lastlowlevel || "-"} EL.m\n📦 전일저수량: ${target.lastrsvwtqy || "-"} 백만㎥\n\n🏗️ 전체 댐 목록:\n${allDams}\n\n대시보드에 반영되었습니다.`);
+                const fields = Object.keys(target).join(", ");
+                alert(`✅ ${nm}댐\n📅 ${vdate} ${vtime}시\n\n🌊 방류량: ${discharge} ㎥/s\n💧 유입량: ${inflow} ㎥/s\n📏 현재수위: ${target.nowlowlevel || "-"} EL.m\n📦 현재저수량: ${target.nowrsvwtqy || "-"} 백만㎥\n📊 저수율: ${target.rsvwtrt || "-"}%\n📏 전일수위: ${target.lastlowlevel || "-"} EL.m\n🌧️ 강우량: ${target.rainqy || "-"} mm\n\n🏗️ 전체 댐:\n${allDams}\n\n📋 응답필드:\n${fields}\n\n대시보드에 방류량 반영됨`);
               } else {
                 const allDams = allItems.map(i => i.damnm || i.damNm).filter(Boolean).join(", ");
                 alert(`❌ "${filter}" 댐을 찾을 수 없습니다.\n\n전체 댐 목록:\n${allDams}\n\n위 이름 중 하나를 입력하세요.`);
@@ -2926,7 +2929,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
         <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
           ℹ️ <strong>API:</strong> 한국수자원공사_다목적댐 운영 정보 (/multipurPoseDamlist)<br />
-          • <strong>수집항목:</strong> 유입량(inflowqy), 수위(nowlowlevel), 저수량(nowrsvwtqy)<br />
+          • <strong>대시보드 표시:</strong> 방류량(sflowqy) ㎥/s<br />
+          • <strong>기타 수집:</strong> 유입량, 수위, 저수량, 저수율, 강우량<br />
           • <strong>인증키:</strong> 공공데이터포털 → 한국수자원공사_다목적댐 운영 정보 활용신청
         </p>
       </Card>
@@ -4518,7 +4522,7 @@ function useDamFetcher(categories, setCategories, settings, setSettings, active,
         const filter = dam.damName || "";
         const target = filter ? allItems.find(i => (i.damnm || i.damNm || "").includes(filter)) : allItems[0];
         if (target) {
-          const discharge = parseFloat(target.inflowqy) || 0;
+          const discharge = parseFloat(target.sflowqy || target.totdcwtrqy || target.outflowqy) || 0;
           setCategories(p => p.map(c => c.id === "dam" ? { ...c, currentValue: discharge, lastUpdated: new Date().toLocaleTimeString("ko-KR"), dataType: "실황" } : c));
           setSettings(prev => ({ ...prev, dam: { ...prev.dam, lastFetch: new Date().toLocaleString("ko-KR"), lastData: target } }));
         }
