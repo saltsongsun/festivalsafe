@@ -1643,6 +1643,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
 
 // ─── Festival Status Page (축제관리) ─────────────────────────────
 function FestivalStatusPage({ settings, setSettings, session }) {
+  const nowFSP = useNow(30000);
   const zones = settings.zones || [];
   const workSites = settings.workSites || [];
   const isAdmin = session?.role === "admin" || session?.role === "manager" || session?.role === "sysadmin" || session?.role === "zonemgr";
@@ -1831,7 +1832,7 @@ function FestivalStatusPage({ settings, setSettings, session }) {
 
         {/* 프로그램 현황 */}
         {(settings.programs || []).length > 0 && (() => {
-          const now3 = new Date();
+          const now3 = nowFSP;
           const nowMin3 = now3.getHours() * 60 + now3.getMinutes();
           const todayStr3 = now3.toISOString().slice(0, 10);
           const fDates = settings.festivalDates || [];
@@ -2050,7 +2051,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
   const [alwaysOpen, setAlwaysOpen] = useState(false);
   const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#2196F3" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#4CAF50" }, S: { label: "부대", color: "#FF9800" } };
 
-  const now = new Date();
+  const now = useNow(30000); // 30초마다 갱신
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const todayStr = now.toISOString().slice(0, 10);
 
