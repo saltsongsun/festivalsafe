@@ -2415,6 +2415,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
   const [dateOpen, setDateOpen] = useState({});
+  const [detailId, setDetailId] = useState(null);
   const [newPerf, setNewPerf] = useState({ artist: "", phone: "", genre: "보컬", programId: "", setlist: [], instruments: [], techrider: [
     { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
     { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
@@ -2652,37 +2653,102 @@ function StageMgmtPage({ settings, setSettings, session }) {
           const dateLabel = dateKey === "미지정" ? "📅 일자 미지정" : (() => { const d = new Date(dateKey); return `📅 ${d.getMonth()+1}/${d.getDate()} (${["일","월","화","수","목","금","토"][d.getDay()]})`; })();
           const isOpen = dateOpen[dateKey] !== false;
 
-          return (<div key={dateKey} style={{ marginBottom: 10, borderRadius: 12, border: "1px solid #222", overflow: "hidden" }}>
-            <div onClick={() => setDateOpen(p => ({ ...p, [dateKey]: !isOpen }))} style={{ padding: "12px 16px", background: "rgba(156,39,176,0.04)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <span style={{ color: "#CE93D8", fontSize: 13 }}>{isOpen ? "▼" : "▶"}</span>
-              <span style={{ color: "#CE93D8", fontSize: 15, fontWeight: 800, flex: 1 }}>{dateLabel}</span>
-              <span style={{ color: "#556", fontSize: 12 }}>{items.length}팀</span>
+          return (<div key={dateKey} style={{ marginBottom: 10, borderRadius: 14, border: "1px solid #222", overflow: "hidden" }}>
+            <div onClick={() => setDateOpen(p => ({ ...p, [dateKey]: !isOpen }))} style={{ padding: "14px 16px", background: "rgba(156,39,176,0.04)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <span style={{ color: "#CE93D8", fontSize: 14 }}>{isOpen ? "▼" : "▶"}</span>
+              <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>{dateLabel}</span>
+              <span style={{ padding: "3px 10px", borderRadius: 10, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 13, fontWeight: 700 }}>{items.length}팀</span>
             </div>
-            {isOpen && <div style={{ padding: "8px 10px" }}>
+            {isOpen && <div style={{ padding: "6px 8px" }}>
               {items.map(pf => {
                 const isEdit = editId === pf.id;
+                const isDetail = detailId === pf.id;
                 const pg = pf.programId ? programs.find(p => p.id === pf.programId) : null;
+                const gc = genreColor[pf.genre] || "#556";
+                const slCount = (pf.setlist||[]).length;
+                const instCount = (pf.instruments||[]).length;
+                const reqCount = (pf.techrider||[]).filter(t=>t.qty>0).length;
+
                 if (isEdit) return <PerfForm key={pf.id} perf={pf} onSave={savePerf} onCancel={() => setEditId(null)} />;
 
-                return (<div key={pf.id} onClick={canEdit ? () => setEditId(pf.id) : undefined} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a2e", marginBottom: 6, cursor: canEdit ? "pointer" : "default" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <span style={{ padding: "3px 8px", borderRadius: 6, background: `${genreColor[pf.genre]||"#556"}15`, color: genreColor[pf.genre]||"#556", fontSize: 12, fontWeight: 700 }}>{pf.genre}</span>
-                    <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
-                    {canEdit && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
-                    {canEdit && <button onClick={e => { e.stopPropagation(); delPerf(pf.id); }} style={{ padding: "6px 10px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, borderRadius: 4, cursor: "pointer" }}>🗑</button>}
+                // 상세 보기
+                if (isDetail) return (<div key={pf.id} style={{ borderRadius: 14, border: `2px solid ${gc}33`, marginBottom: 8, overflow: "hidden" }}>
+                  {/* 헤더 */}
+                  <div style={{ padding: "16px", background: `${gc}08` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <span style={{ padding: "4px 12px", borderRadius: 8, background: `${gc}15`, color: gc, fontSize: 13, fontWeight: 700 }}>{pf.genre}</span>
+                      <span style={{ color: "#ccd6f6", fontSize: 18, fontWeight: 800, flex: 1 }}>{pf.artist}</span>
+                      <button onClick={() => setDetailId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
+                    </div>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", color: "#8892b0", fontSize: 14 }}>
+                      {pf.time && <span>⏰ {pf.time}~{pf.endTime}</span>}
+                      {(pf.location || pg?.location) && <span>📍 {pf.location || pg?.location}</span>}
+                      {pf.phone && <span>📞 {pf.phone}</span>}
+                    </div>
+                    {canEdit && <button onClick={() => { setDetailId(null); setEditId(pf.id); }} style={{ marginTop: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1.5px solid #9C27B0", background: "rgba(156,39,176,0.06)", color: "#CE93D8", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✏️ 수정하기</button>}
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                    {pf.time && <span style={{ color: "#8892b0", fontSize: 13 }}>⏰ {pf.time}~{pf.endTime}</span>}
-                    {(pf.location || pg?.location) && <span style={{ color: "#556", fontSize: 12 }}>📍 {pf.location || pg?.location}</span>}
-                    {pf.phone && <span style={{ color: "#556", fontSize: 12 }}>📞 {pf.phone}</span>}
-                  </div>
-                  {(pf.setlist||[]).length > 0 && <div style={{ marginTop: 4, padding: "8px 10px", borderRadius: 6, background: "rgba(156,39,176,0.04)" }}>
-                    <span style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵 {(pf.setlist||[]).length}곡</span>
-                    {(pf.setlist||[]).slice(0,3).map((s,i) => <span key={i} style={{ color: "#8892b0", fontSize: 12, marginLeft: 6 }}>{i+1}.{s.name||"?"}</span>)}
-                    {(pf.setlist||[]).length > 3 && <span style={{ color: "#556", fontSize: 12 }}> +{(pf.setlist||[]).length-3}</span>}
+
+                  {/* 셋리스트 */}
+                  {slCount > 0 && <div style={{ padding: "14px 16px", borderTop: "1px solid #1a1a2e" }}>
+                    <div style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🎵 셋리스트 ({slCount}곡)</div>
+                    {(pf.setlist||[]).map((s,i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0", borderBottom: i < slCount-1 ? "1px solid #1a1a2e" : "none" }}>
+                        <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 800, minWidth: 24 }}>{i+1}</span>
+                        <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 600, flex: 1 }}>{s.name || "?"}</span>
+                        <span style={{ padding: "3px 8px", borderRadius: 4, background: s.type==="LIVE" ? "rgba(76,175,80,0.1)" : "rgba(33,150,243,0.1)", color: s.type==="LIVE" ? "#4CAF50" : "#2196F3", fontSize: 12, fontWeight: 700 }}>{s.type}</span>
+                        <span style={{ color: "#556", fontSize: 13, fontFamily: "monospace" }}>{s.playtime}</span>
+                      </div>
+                    ))}
                   </div>}
-                  {(pf.instruments||[]).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#2196F3", fontSize: 12 }}>🎸 {(pf.instruments||[]).map(i => `${i.name}${(i.qty||1)>1?"×"+(i.qty||1):""}`).join(", ")}</span></div>}
-                  {(pf.techrider||[]).filter(t=>t.qty>0).length > 0 && <div style={{ marginTop: 2 }}><span style={{ color: "#FF9800", fontSize: 12 }}>📝 {(pf.techrider||[]).filter(t=>t.qty>0).map(t => `${t.item}${t.qty>1?"×"+t.qty:""}`).join(", ")}</span></div>}
+
+                  {/* 사용악기 */}
+                  {instCount > 0 && <div style={{ padding: "14px 16px", borderTop: "1px solid #1a1a2e" }}>
+                    <div style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>🎸 사용악기 ({instCount}개)</div>
+                    {(pf.instruments||[]).map((inst,i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0" }}>
+                        <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{inst.name}</span>
+                        {(inst.qty||1)>1 && <span style={{ color: "#8892b0", fontSize: 13 }}>×{inst.qty}</span>}
+                        <span style={{ padding: "2px 8px", borderRadius: 4, background: inst.ch==="S" ? "rgba(76,175,80,0.1)" : "rgba(33,150,243,0.1)", color: inst.ch==="S" ? "#4CAF50" : "#2196F3", fontSize: 12, fontWeight: 700 }}>{inst.ch==="S"?"스테레오":"모노"}</span>
+                        {inst.memo && <span style={{ color: "#556", fontSize: 12 }}>· {inst.memo}</span>}
+                      </div>
+                    ))}
+                  </div>}
+
+                  {/* 요청사항 */}
+                  {reqCount > 0 && <div style={{ padding: "14px 16px", borderTop: "1px solid #1a1a2e" }}>
+                    <div style={{ color: "#FF9800", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📝 요청사항 ({reqCount}건)</div>
+                    {(pf.techrider||[]).filter(t=>t.qty>0).map((t,i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0" }}>
+                        <span style={{ color: "#4CAF50", fontSize: 13 }}>✓</span>
+                        <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{t.item}</span>
+                        {t.qty>1 && <span style={{ color: "#8892b0", fontSize: 13 }}>×{t.qty}</span>}
+                        {t.memo && <span style={{ color: "#556", fontSize: 12 }}>· {t.memo}</span>}
+                      </div>
+                    ))}
+                  </div>}
+
+                  {slCount === 0 && instCount === 0 && reqCount === 0 && <div style={{ padding: "20px 16px", borderTop: "1px solid #1a1a2e", textAlign: "center", color: "#556", fontSize: 13 }}>테크라이더가 아직 작성되지 않았습니다.</div>}
+                </div>);
+
+                // 컴팩트 카드
+                return (<div key={pf.id} onClick={() => setDetailId(pf.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid #1a1a2e", marginBottom: 5, cursor: "pointer" }}>
+                  <div style={{ width: 4, height: 40, borderRadius: 2, background: gc, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                      <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 800 }}>{pf.artist}</span>
+                      <span style={{ color: gc, fontSize: 12, fontWeight: 600 }}>{pf.genre}</span>
+                    </div>
+                    <div style={{ color: "#556", fontSize: 13 }}>
+                      {pf.time && <span>⏰ {pf.time}~{pf.endTime}</span>}
+                      {(pf.location || pg?.location) && <span style={{ marginLeft: 8 }}>📍 {pf.location || pg?.location}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {slCount > 0 && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵{slCount}</span>}
+                    {instCount > 0 && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>🎸{instCount}</span>}
+                    {reqCount > 0 && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,152,0,0.08)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>📝{reqCount}</span>}
+                  </div>
+                  {canEdit && <span style={{ color: "#333", fontSize: 14 }}>›</span>}
                 </div>);
               })}
             </div>}
