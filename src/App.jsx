@@ -3563,6 +3563,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <span style={{ padding: "3px 10px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 12, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
             <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: 0, flex: 1 }}>{cl.title}</h3>
             <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 15, fontWeight: 800 }}>{done}/{total}</span>
+            <button onClick={() => { if (confirm(`"${cl.title}" 체크리스트를 삭제하시겠습니까?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>🗑</button>
           </div>
           <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", marginBottom: 10 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 2, transition: "width .3s" }} /></div>
           {cl.items.map((item, ii) => {
@@ -3577,6 +3578,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: isOff ? "#445" : item.checked ? "#4CAF50" : "#ccd6f6", fontSize: 14, textDecoration: item.checked ? "line-through" : isOff ? "line-through" : "none" }}>{item.text}</div>
                 {item.checkedBy && <div style={{ color: "#556", fontSize: 11 }}>{item.checkedBy} · {item.checkedAt}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                <button onClick={(e) => { e.stopPropagation(); const newText = prompt("항목 수정:", item.text); if (newText && newText !== item.text) { const cls = [...(settings.checklists||[])]; const its = [...cls[ci].items]; its[ii] = { ...item, text: newText }; cls[ci] = { ...cls[ci], items: its }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "2px 5px", borderRadius: 4, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                <button onClick={(e) => { e.stopPropagation(); if (confirm(`"${item.text}" 삭제?`)) { const cls = [...(settings.checklists||[])]; cls[ci] = { ...cls[ci], items: cls[ci].items.filter((_,j) => j !== ii) }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "2px 5px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 11, cursor: "pointer" }}>🗑</button>
               </div>
             </div>);
           })}
