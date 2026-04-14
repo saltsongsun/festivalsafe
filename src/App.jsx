@@ -1657,6 +1657,8 @@ function FestivalStatusPage({ settings, setSettings, session }) {
   });
   const [pgCatOpen, setPgCatOpen] = useState({ always: false, O: false, P: true, E: false, S: false });
   const [editFspWorker, setEditFspWorker] = useState(null); // { siteId, workerId }
+  const [addWorkerSiteId, setAddWorkerSiteId] = useState(null);
+  const [newWorker, setNewWorker] = useState({ name: "", phone: "", role: "운영" });
   const [zoneOpen, setZoneOpen] = useState(() => {
     const open = {};
     (settings.zones || []).forEach(z => { open[z.id] = z.accountId === session?.id; });
@@ -1772,16 +1774,34 @@ function FestivalStatusPage({ settings, setSettings, session }) {
           {isAdmin && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
         </div>);
       })}
-      {isAdmin && <button onClick={() => {
-        const name = prompt("근무자 이름:");
-        if (!name) return;
-        const phone = prompt("연락처 (선택):") || "";
-        const role = prompt("역할 (관리자/계수/운영/지원/안전관리):") || "운영";
-        const worker = { id: "w_" + Date.now(), name, phone, type: "", role, duty: "" };
-        const ws = JSON.parse(JSON.stringify(settings.workSites || []));
-        const si = ws.findIndex(s => s.id === site.id);
-        if (si >= 0) { ws[si].workers = [...(ws[si].workers || []), worker]; setSettings(prev => ({ ...prev, workSites: ws })); }
-      }} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px dashed rgba(33,150,243,0.3)", background: "transparent", color: "#2196F3", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>+ 근무자 추가</button>}
+      {isAdmin && addWorkerSiteId === site.id && <div style={{ padding: "14px", borderRadius: 12, background: "rgba(76,175,80,0.04)", border: "2px solid rgba(76,175,80,0.2)", marginTop: 4, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 16 }}>👤</span>
+          <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 800, flex: 1 }}>근무자 추가</span>
+          <button onClick={() => setAddWorkerSiteId(null)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>닫기 ✕</button>
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>이름 *</label><Input value={newWorker.name} onChange={e => setNewWorker(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" /></div>
+            <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>연락처</label><Input value={newWorker.phone} onChange={e => setNewWorker(p => ({ ...p, phone: e.target.value }))} placeholder="010-0000-0000" /></div>
+          </div>
+          <div><label style={{ color: "#556", fontSize: 12, display: "block", marginBottom: 4 }}>역할</label>
+            <select value={newWorker.role} onChange={e => setNewWorker(p => ({ ...p, role: e.target.value }))} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+              {["관리자","계수","운영","지원","안전관리","기술"].map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <button onClick={() => {
+            if (!newWorker.name) return;
+            const worker = { id: "w_" + Date.now(), name: newWorker.name, phone: newWorker.phone, type: "", role: newWorker.role, duty: "" };
+            const ws = JSON.parse(JSON.stringify(settings.workSites || []));
+            const si = ws.findIndex(s => s.id === site.id);
+            if (si >= 0) { ws[si].workers = [...(ws[si].workers || []), worker]; setSettings(prev => ({ ...prev, workSites: ws })); }
+            setNewWorker({ name: "", phone: "", role: "운영" });
+            setAddWorkerSiteId(null);
+          }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#4CAF50", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ 등록</button>
+        </div>
+      </div>}
+      {isAdmin && addWorkerSiteId !== site.id && <button onClick={() => { setAddWorkerSiteId(site.id); setNewWorker({ name: "", phone: "", role: "운영" }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed rgba(33,150,243,0.3)", background: "transparent", color: "#2196F3", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>+ 근무자 추가</button>}
     </div>);
   };
 
