@@ -2612,6 +2612,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
   const [apiTestResult, setApiTestResult] = useState({});
   const [kmaTestResult, setKmaTestResult] = useState(null);
   const [newCat, setNewCat] = useState({ name: "", unit: "", source: "manual", icon: "📊", apiInterval: 10, thresholds: { BLUE: [0, 100], YELLOW: [100, 200], ORANGE: [200, 300], RED: [300, Infinity] }, currentValue: 0, actionItems: ["점검"], alertMessages: { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "경보" }, apiConfig: { url: "", method: "GET", headers: "", responsePath: "", enabled: false }, kmaCategory: "", history: [] });
+  const [editPgId, setEditPgId] = useState(null);
 
   useEffect(() => { if (initialTab) setTab(initialTab); if (initialCatId) setFocusCat(initialCatId); }, [initialTab, initialCatId]);
 
@@ -3883,9 +3884,44 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const cat = catMap[pg.category] || { l: pg.category, c: "#556" };
           const dateLabel = pg.date === "always" ? "🔄상시" : pg.date ? new Date(pg.date).getMonth()+1 + "/" + new Date(pg.date).getDate() : "";
           const stLabel = pg.pgStatus === "delayed" ? "⏱지연" : pg.pgStatus === "ended" ? "종료" : "";
+          const isEditing = editPgId === pg.id;
           const upPg = (field, val) => setSettings(prev => ({ ...prev, programs: prev.programs.map(p => p.id === pg.id ? { ...p, [field]: val } : p) }));
+
+          if (isEditing) {
+            return (<div key={pg.id} style={{ padding: "16px", borderRadius: 12, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 18 }}>✏️</span>
+                <h4 style={{ color: "#CE93D8", fontSize: 15, fontWeight: 700, margin: 0, flex: 1 }}>프로그램 수정</h4>
+                <button onClick={() => setEditPgId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div><Label>프로그램명</Label><Input value={pg.title} onChange={e => upPg("title", e.target.value)} /></div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div><Label>구분</Label><select value={pg.category || ""} onChange={e => upPg("category", e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+                    <option value="O">🔷 공식</option><option value="P">🎵 공연</option><option value="E">🎨 체험</option><option value="S">🎪 부대</option>
+                  </select></div>
+                  <div><Label>일자</Label><select value={pg.date || ""} onChange={e => upPg("date", e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14 }}>
+                    {(settings.festivalDates || []).map(d => { const dt = new Date(d); return <option key={d} value={d}>{dt.getMonth()+1}/{dt.getDate()}</option>; })}
+                    <option value="always">🔄 상시</option>
+                  </select></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div><Label>시작시간</Label><Input type="time" value={pg.time || ""} onChange={e => upPg("time", e.target.value)} /></div>
+                  <div><Label>종료시간</Label><Input type="time" value={pg.endTime || ""} onChange={e => upPg("endTime", e.target.value)} /></div>
+                </div>
+                <div><Label>장소</Label><Input value={pg.location || ""} onChange={e => upPg("location", e.target.value)} placeholder="진주성 특설무대" /></div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div><Label>담당자</Label><Input value={pg.manager || ""} onChange={e => upPg("manager", e.target.value)} /></div>
+                  <div><Label>연락처</Label><Input value={pg.managerPhone || ""} onChange={e => upPg("managerPhone", e.target.value)} /></div>
+                </div>
+                <div><Label>프로그램 내용</Label><textarea value={pg.description || ""} onChange={e => upPg("description", e.target.value)} rows={2} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #333", background: "#111", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} /></div>
+                <button onClick={() => setEditPgId(null)} style={{ padding: "12px", borderRadius: 10, border: "none", background: "#9C27B0", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ 수정 완료</button>
+              </div>
+            </div>);
+          }
+
           return (<div key={pg.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid #222", marginBottom: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ minWidth: 50, textAlign: "center" }}>
                 <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>
                 <div style={{ color: "#ccd6f6", fontSize: 13, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
@@ -3896,18 +3932,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <div style={{ color: "#556", fontSize: 12 }}>{pg.location ? "📍"+pg.location : ""} {pg.manager ? "👤"+pg.manager : ""}</div>
               </div>
               {stLabel && <span style={{ color: pg.pgStatus === "delayed" ? "#FF9800" : "#556", fontSize: 12, fontWeight: 700 }}>{stLabel}</span>}
-              <button onClick={() => {
-                const t = prompt("프로그램명:", pg.title); if (t === null) return;
-                const loc = prompt("장소:", pg.location || "");
-                const d = prompt("날짜 (YYYY-MM-DD 또는 always):", pg.date || "");
-                const st = prompt("시작시간 (HH:MM):", pg.time || "");
-                const et = prompt("종료시간 (HH:MM):", pg.endTime || "");
-                const ct = prompt("구분 (O공식/P공연/E체험/S부대):", pg.category || "");
-                const mg = prompt("담당자:", pg.manager || "");
-                const mp = prompt("연락처:", pg.managerPhone || "");
-                const desc = prompt("내용:", pg.description || "");
-                setSettings(prev => ({ ...prev, programs: prev.programs.map(p => p.id === pg.id ? { ...p, title: t || p.title, location: loc ?? p.location, date: d ?? p.date, time: st ?? p.time, endTime: et ?? p.endTime, category: ct || p.category, manager: mg ?? p.manager, managerPhone: mp ?? p.managerPhone, description: desc ?? p.description } : p) }));
-              }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #333", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+              <button onClick={() => setEditPgId(pg.id)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
               <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
             </div>
           </div>);
