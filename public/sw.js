@@ -1,4 +1,4 @@
-const CACHE = 'festival-v2';
+const CACHE_VERSION = 'festival-v' + Date.now();
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -7,20 +7,25 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
-  self.clients.matchAll().then(cls => {
-    cls.forEach(c => c.postMessage({ type: 'SW_UPDATED' }));
-  });
 });
 
 self.addEventListener('fetch', e => {
+  // Always network first for navigation and JS/CSS
+  if (e.request.mode === 'navigate' || e.request.destination === 'script' || e.request.destination === 'style') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Other assets: network first with cache fallback
   e.respondWith(
     fetch(e.request).then(res => {
-      if (res.ok && e.request.method === 'GET') {
+      if (res.ok) {
         const clone = res.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        caches.open(CACHE_VERSION).then(cache => cache.put(e.request, clone));
       }
       return res;
     }).catch(() => caches.match(e.request))
