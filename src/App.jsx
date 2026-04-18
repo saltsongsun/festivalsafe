@@ -5619,7 +5619,6 @@ function AppMain({ onError }) {
   const [session, setSession] = useState(null);
   const [selectedFestival, setSelectedFestival] = useState(null);
   const [page, setPage] = useState("dashboard");
-  const [showMore, setShowMore] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   // PWA 업데이트 감지
@@ -5793,6 +5792,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
 function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout, onBackToFestivalSelect, initialPage, setPage: setPageExt, onForceSync, updateAvailable }) {
   const [page, setPageInternal] = useState(initialPage);
   const setPage = (p) => { setPageInternal(p); setPageExt(p); };
+  const [showMore, setShowMore] = useState(false);
 
   const fid = session.festivalId || "default";
   const [categories, setCategories] = usePersist(`${fid}_cat_v10`, DEFAULT_CATEGORIES);
