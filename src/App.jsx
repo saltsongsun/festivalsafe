@@ -820,9 +820,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:0.9}}`}</style>
 
     {/* CueFlow 스타일 헤더 카드 */}
-    <div style={{ maxWidth: 900, margin: "0 auto 16px", padding: "22px 22px 18px", borderRadius: 20, background: "linear-gradient(135deg, rgba(33,150,243,0.08), rgba(33,150,243,0.02))", border: "1px solid rgba(33,150,243,0.15)" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto 16px", padding: "22px 22px 18px", borderRadius: 20, background: "linear-gradient(135deg, rgba(66,165,245,0.08), rgba(66,165,245,0.02))", border: "1px solid rgba(66,165,245,0.25)", boxShadow: "0 0 0 1px rgba(66,165,245,0.08), 0 4px 32px rgba(66,165,245,0.12), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, rgba(33,150,243,0.18), rgba(33,150,243,0.04))", border: "1px solid rgba(33,150,243,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, rgba(66,165,245,0.22), rgba(66,165,245,0.06))", border: "1px solid rgba(66,165,245,0.3)", boxShadow: "0 0 20px rgba(66,165,245,0.15), inset 0 1px 0 rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 600, letterSpacing: -0.5, margin: 0, lineHeight: 1.2 }}>{settings.festivalName || "축제 안전관리"}</h1>
           {settings.festivalSubtitle && <p style={{ color: "#8892b0", fontSize: 12, margin: "4px 0 0", letterSpacing: 0 }}>{settings.festivalSubtitle}</p>}
@@ -833,8 +833,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
-        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.12)", color: "#66BB6A", fontSize: 11, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
+        <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, boxShadow: `0 0 12px ${olv.color}25`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
+        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.15)", border: "1px solid rgba(76,175,80,0.3)", boxShadow: "0 0 12px rgba(76,175,80,0.25)", color: "#66BB6A", fontSize: 11, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
         {loc.name && <span style={{ color: "#556", fontSize: 11, padding: "5px 4px" }}>📍 {loc.name}</span>}
         {kma.enabled && <span style={{ color: "#66BB6A", fontSize: 11, padding: "5px 4px" }}>🌤️ LIVE</span>}
         <span style={{ flex: 1 }} />
@@ -888,19 +888,19 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         const cumVal = crowdLS.cumulative || 0;
         const gateData = (settings.gates || []).map(g => { const s = (crowdLS.zones || []).find(sz => sz.id === g.id); return { ...g, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
         return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.025)", borderRadius: 16, padding: "20px", border: `1px solid ${li.border}33`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "20px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 24px ${li.color}15, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
             <span style={{ color: "#ccd6f6", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
-            <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}40`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 11, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
             <div>
               <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 44, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5 }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 44, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5, textShadow: `0 0 20px ${li.color}40` }}>{cat.currentValue.toLocaleString()}</span>
                 <span style={{ fontSize: 14, color: "#556", fontWeight: 500 }}>{cat.unit}</span>
               </div>
             </div>
@@ -934,14 +934,14 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, danger: { label: "위험", color: "#EF5350", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
-        return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.025)", border: `1px solid ${cl?.color || "rgba(255,255,255,0.05)"}33` }}>
+        return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${cl?.color || "rgba(255,255,255,0.08)"}55`, boxShadow: cl ? `0 0 0 1px ${cl.color}15, 0 4px 16px ${cl.color}15, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: c?.memo || c?.photos?.length ? 10 : 0 }}>
             <span style={{ fontSize: 16 }}>{cl?.icon || "⚪"}</span>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 600 }}>{z.name}</div>
               {c?.reportedAt && <div style={{ color: "#445", fontSize: 11, marginTop: 1 }}>{c.reportedByName} · {c.reportedAt}</div>}
             </div>
-            <span style={{ padding: "4px 12px", borderRadius: 10, background: cl ? `${cl.color}15` : "rgba(255,255,255,0.04)", color: cl?.color || "#445", fontSize: 12, fontWeight: 700 }}>{cl?.label || "미보고"}</span>
+            <span style={{ padding: "4px 12px", borderRadius: 10, background: cl ? `${cl.color}20` : "rgba(255,255,255,0.04)", border: cl ? `1px solid ${cl.color}40` : "1px solid rgba(255,255,255,0.06)", boxShadow: cl ? `0 0 12px ${cl.color}30` : "none", color: cl?.color || "#6B7280", fontSize: 12, fontWeight: 700 }}>{cl?.label || "미보고"}</span>
           </div>
           {c?.memo && <div style={{ color: "#8892b0", fontSize: 12, lineHeight: 1.5, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6 }}>💬 {c.memo}</div>}
           {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
@@ -963,18 +963,18 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       </div>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
         {categories.filter(c => c.id !== "crowd" && !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
-          <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.025)", borderRadius: 16, padding: "18px", border: `1px solid ${li.border}33`, position: "relative", overflow: "hidden", cursor: "pointer", transition: "all 0.2s" }}>
+          <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "18px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 20px ${li.color}12, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
             {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <span style={{ fontSize: 16 }}>{cat.icon}</span>
               <span style={{ color: "#ccd6f6", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>{cat.name}</span>
-              <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}40`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
+              <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
               <div>
                 <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>실황</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 36, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5 }}>{cat.currentValue.toLocaleString()}</span>
+                  <span style={{ fontSize: 36, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5, textShadow: `0 0 16px ${li.color}35` }}>{cat.currentValue.toLocaleString()}</span>
                   <span style={{ fontSize: 13, color: "#556", fontWeight: 500 }}>{cat.unit}</span>
                 </div>
               </div>
