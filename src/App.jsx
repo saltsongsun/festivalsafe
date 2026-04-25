@@ -2802,14 +2802,17 @@ function StageMgmtPage({ settings, setSettings, session }) {
   </div>);
 }
 
-// ─── 2.0: Heatmap Map Page (히트맵 지도) ─────────────────────────────
+// ─── 2.0: Heatmap Map Page (히트맵 지도 - 폴리곤 영역) ─────────────────────────────
 function HeatmapPage({ settings, setSettings, session }) {
-  const [editMode, setEditMode] = useState(false);
+  const [mode, setMode] = useState("view"); // view | draw | edit
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [drawingZoneId, setDrawingZoneId] = useState("");
+  const [selectedAreaId, setSelectedAreaId] = useState(null);
   const mapRef = useRef(null);
   const fileRef = useRef(null);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
   const zones = settings.zones || [];
-  const mapZones = settings.mapZones || [];
+  const mapAreas = settings.mapAreas || []; // [{id, zoneId, points: [{x,y}]}]
   const congestion = settings.zoneCongestion || [];
 
   const handleUpload = (e) => {
@@ -2819,26 +2822,43 @@ function HeatmapPage({ settings, setSettings, session }) {
     reader.readAsDataURL(file);
   };
 
-  const handleMapClick = (e) => {
-    if (!editMode || !mapRef.current) return;
+  const getMapPos = (e) => {
+    if (!mapRef.current) return null;
     const rect = mapRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    // 미배치 구역 첫번째 자동 배치
-    const placed = mapZones.map(mz => mz.zoneId);
-    const next = zones.find(z => !placed.includes(z.id));
-    if (next) {
-      setSettings({ ...settings, mapZones: [...mapZones, { id: "mz_"+Date.now(), zoneId: next.id, x, y }] });
-    } else {
-      alert("배치할 구역이 없습니다. 모든 구역이 이미 배치되었습니다.");
+    return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+  };
+
+  const handleMapClick = (e) => {
+    if (mode !== "draw") return;
+    if (!drawingZoneId) { alert("먼저 위에서 구역을 선택하세요."); return; }
+    const pos = getMapPos(e); if (!pos) return;
+    setDrawingPoints([...drawingPoints, pos]);
+  };
+
+  const finishDrawing = () => {
+    if (drawingPoints.length < 3) { alert("최소 3개 점이 필요합니다."); return; }
+    const newArea = { id: "ma_" + Date.now(), zoneId: drawingZoneId, points: drawingPoints };
+    setSettings({ ...settings, mapAreas: [...mapAreas, newArea] });
+    setDrawingPoints([]); setDrawingZoneId(""); setMode("view");
+    alert("✅ 영역이 저장되었습니다.");
+  };
+
+  const cancelDrawing = () => {
+    setDrawingPoints([]); setDrawingZoneId(""); setMode("view");
+  };
+
+  const undoLastPoint = () => {
+    setDrawingPoints(drawingPoints.slice(0, -1));
+  };
+
+  const removeArea = (id) => {
+    if (confirm("이 영역을 삭제하시겠습니까?")) {
+      setSettings({ ...settings, mapAreas: mapAreas.filter(a => a.id !== id) });
+      setSelectedAreaId(null);
     }
   };
-
-  const moveZone = (mzId, dx, dy) => {
-    setSettings({ ...settings, mapZones: mapZones.map(mz => mz.id === mzId ? { ...mz, x: Math.max(0, Math.min(100, mz.x+dx)), y: Math.max(0, Math.min(100, mz.y+dy)) } : mz) });
-  };
-
-  const removeZone = (mzId) => setSettings({ ...settings, mapZones: mapZones.filter(mz => mz.id !== mzId) });
 
   const getCongestionLevel = (zoneId) => {
     const c = congestion.find(cc => cc.zoneId === zoneId);
@@ -2846,14 +2866,30 @@ function HeatmapPage({ settings, setSettings, session }) {
   };
   const CL = { smooth: "#66BB6A", crowded: "#FFA726", danger: "#EF5350" };
 
+  // 영역의 중심 좌표 계산
+  const getAreaCenter = (points) => {
+    if (!points?.length) return { x: 50, y: 50 };
+    const cx = points.reduce((s,p) => s+p.x, 0) / points.length;
+    const cy = points.reduce((s,p) => s+p.y, 0) / points.length;
+    return { x: cx, y: cy };
+  };
+
+  // 폴리곤 SVG path
+  const pointsToPath = (pts) => pts.map(p => `${p.x},${p.y}`).join(" ");
+
+  // 미배치 구역
+  const placedZoneIds = mapAreas.map(a => a.zoneId);
+  const unplacedZones = zones.filter(z => !placedZoneIds.includes(z.id));
+
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
+    <style>{`@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor) drop-shadow(0 0 32px currentColor)}}`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
       <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, textAlign: "center", margin: "0 0 14px" }}>🗺️ 히트맵 지도</h2>
 
       {!settings.mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
         <h3 style={{ color: "#E2E8F0", fontSize: 16, margin: "0 0 8px" }}>축제장 도면 업로드</h3>
-        <p style={{ color: "#94A3B8", fontSize: 13, marginBottom: 16 }}>축제장 평면도 이미지를 업로드하면 구역을 배치할 수 있습니다.</p>
+        <p style={{ color: "#94A3B8", fontSize: 13, marginBottom: 16 }}>도면을 올리면 구역 영역을 그릴 수 있습니다.</p>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: "none" }} />
         <button onClick={() => fileRef.current?.click()} style={{ padding: "12px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📤 도면 업로드</button>
       </Card>}
@@ -2863,12 +2899,39 @@ function HeatmapPage({ settings, setSettings, session }) {
       </Card>}
 
       {settings.mapImage && <>
-        {/* 컨트롤 */}
+        {/* 컨트롤 - 모드 전환 */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {canEdit && <button onClick={() => setEditMode(!editMode)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: editMode ? "2px solid #FFA726" : "1px solid rgba(255,255,255,0.1)", background: editMode ? "rgba(255,152,0,0.1)" : "rgba(255,255,255,0.03)", color: editMode ? "#FFA726" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{editMode ? "✏️ 편집중 (지도 클릭→배치)" : "✏️ 구역 편집"}</button>}
+          <button onClick={() => setMode("view")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "view" ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: mode === "view" ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: mode === "view" ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>👁️ 보기</button>
+          {canEdit && <button onClick={() => setMode("draw")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "draw" ? "1.5px solid #FFA726" : "1px solid rgba(255,255,255,0.1)", background: mode === "draw" ? "rgba(255,152,0,0.1)" : "rgba(255,255,255,0.03)", color: mode === "draw" ? "#FFA726" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✏️ 영역 그리기</button>}
+          {canEdit && <button onClick={() => setMode("edit")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "edit" ? "1.5px solid #EF5350" : "1px solid rgba(255,255,255,0.1)", background: mode === "edit" ? "rgba(244,67,54,0.1)" : "rgba(255,255,255,0.03)", color: mode === "edit" ? "#EF5350" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>}
           {canEdit && <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: "none" }} />}
-          {canEdit && <button onClick={() => fileRef.current?.click()} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>🔄 도면 변경</button>}
+          {canEdit && <button onClick={() => fileRef.current?.click()} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>🔄</button>}
         </div>
+
+        {/* 그리기 모드 - 구역 선택 */}
+        {mode === "draw" && <div style={{ padding: "12px", borderRadius: 12, background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.25)", marginBottom: 12 }}>
+          <div style={{ color: "#FFA726", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>✏️ 영역 그리기 모드</div>
+          {!drawingZoneId ? <div>
+            <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 8 }}>1️⃣ 그릴 구역을 선택하세요:</div>
+            {unplacedZones.length === 0 ? <div style={{ color: "#94A3B8", fontSize: 12 }}>⚠️ 모든 구역이 이미 배치되었습니다. 추가 구역은 ⚙️관리 → 구역설정에서 등록하세요.</div> :
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{unplacedZones.map(z => (
+                <button key={z.id} onClick={() => setDrawingZoneId(z.id)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.05)", color: "#FFA726", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {z.name}</button>
+              ))}</div>}
+          </div> : <div>
+            <div style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🎯 그리는 중: <span style={{ color: "#FFA726" }}>{zones.find(z => z.id === drawingZoneId)?.name}</span></div>
+            <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 8 }}>2️⃣ 지도를 클릭해서 점을 찍으세요. 최소 3개 점이 필요합니다.</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <span style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12, fontWeight: 700 }}>📍 점 {drawingPoints.length}개</span>
+              <button onClick={undoLastPoint} disabled={drawingPoints.length === 0} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: drawingPoints.length === 0 ? "#475569" : "#94A3B8", fontSize: 12, cursor: drawingPoints.length === 0 ? "not-allowed" : "pointer" }}>↶ 되돌리기</button>
+              <button onClick={finishDrawing} disabled={drawingPoints.length < 3} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: drawingPoints.length < 3 ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #66BB6A, #43A047)", color: drawingPoints.length < 3 ? "#475569" : "#fff", fontSize: 12, fontWeight: 700, cursor: drawingPoints.length < 3 ? "not-allowed" : "pointer" }}>✅ 저장</button>
+              <button onClick={cancelDrawing} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(244,67,54,0.2)", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕ 취소</button>
+            </div>
+          </div>}
+        </div>}
+
+        {mode === "edit" && <div style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(244,67,54,0.06)", border: "1px solid rgba(244,67,54,0.2)", marginBottom: 12 }}>
+          <div style={{ color: "#EF5350", fontSize: 12, fontWeight: 700 }}>🗑 삭제 모드 - 지도에서 영역을 클릭하면 삭제됩니다</div>
+        </div>}
 
         {/* 범례 */}
         <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 12, padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -2878,46 +2941,66 @@ function HeatmapPage({ settings, setSettings, session }) {
         </div>
 
         {/* 지도 */}
-        <div ref={mapRef} onClick={handleMapClick} style={{ position: "relative", width: "100%", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", cursor: editMode ? "crosshair" : "default", background: "#000" }}>
-          <img src={settings.mapImage} alt="map" style={{ width: "100%", display: "block", opacity: 0.85 }} />
-          {/* 히트맵 레이어 - 구역별 원형 */}
-          {mapZones.map(mz => {
-            const zone = zones.find(z => z.id === mz.zoneId);
+        <div ref={mapRef} onClick={handleMapClick} style={{ position: "relative", width: "100%", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", cursor: mode === "draw" && drawingZoneId ? "crosshair" : "default", background: "#000" }}>
+          <img src={settings.mapImage} alt="map" style={{ width: "100%", display: "block", opacity: 0.7, pointerEvents: "none" }} draggable={false} />
+
+          {/* SVG 오버레이 - 폴리곤 영역 */}
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            {/* 저장된 영역 */}
+            {mapAreas.map(area => {
+              const zone = zones.find(z => z.id === area.zoneId);
+              if (!zone) return null;
+              const lv = getCongestionLevel(area.zoneId);
+              const color = CL[lv];
+              const isSelected = selectedAreaId === area.id;
+              return (<g key={area.id} style={{ pointerEvents: mode === "edit" ? "auto" : "none", cursor: mode === "edit" ? "pointer" : "default" }} onClick={(e) => { e.stopPropagation(); if (mode === "edit") removeArea(area.id); else setSelectedAreaId(area.id === selectedAreaId ? null : area.id); }}>
+                {/* 글로우 효과 (블러된 폴리곤) */}
+                <polygon points={pointsToPath(area.points)} fill={color} fillOpacity="0.15" stroke={color} strokeWidth="0.6" strokeOpacity="0.4" style={{ filter: `drop-shadow(0 0 4px ${color})`, animation: lv !== "smooth" ? "glow-pulse 2s infinite" : "none", color }} />
+                {/* 본 영역 */}
+                <polygon points={pointsToPath(area.points)} fill={color} fillOpacity="0.25" stroke={color} strokeWidth="0.4" strokeOpacity="0.9" />
+              </g>);
+            })}
+
+            {/* 그리는 중 폴리곤 */}
+            {mode === "draw" && drawingPoints.length > 0 && <>
+              {drawingPoints.length >= 3 && <polygon points={pointsToPath(drawingPoints)} fill="#FFA726" fillOpacity="0.2" stroke="#FFA726" strokeWidth="0.4" strokeDasharray="1,1" />}
+              {drawingPoints.length >= 2 && <polyline points={pointsToPath(drawingPoints)} fill="none" stroke="#FFA726" strokeWidth="0.4" strokeDasharray="0.8,0.5" />}
+            </>}
+          </svg>
+
+          {/* 영역 라벨 (HTML) */}
+          {mapAreas.map(area => {
+            const zone = zones.find(z => z.id === area.zoneId);
             if (!zone) return null;
-            const lv = getCongestionLevel(mz.zoneId);
+            const lv = getCongestionLevel(area.zoneId);
             const color = CL[lv];
-            return (<div key={mz.id} style={{ position: "absolute", left: `${mz.x}%`, top: `${mz.y}%`, transform: "translate(-50%, -50%)", pointerEvents: editMode ? "auto" : "none" }}>
-              {/* 히트맵 글로우 */}
-              <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 80, height: 80, borderRadius: "50%", background: `radial-gradient(circle, ${color}66, ${color}00)`, filter: "blur(8px)", animation: lv !== "smooth" ? "pulse 2s infinite" : "none" }} />
-              {/* 마커 */}
-              <div onClick={(e) => { if (editMode) { e.stopPropagation(); if (confirm(`${zone.name} 마커를 삭제할까요?`)) removeZone(mz.id); } }} style={{ position: "relative", padding: "6px 12px", borderRadius: 16, background: `${color}EE`, border: "2px solid #fff", color: "#fff", fontSize: 13, fontWeight: 700, boxShadow: `0 0 16px ${color}99`, whiteSpace: "nowrap", cursor: editMode ? "pointer" : "default" }}>
-                <span style={{ marginRight: 4 }}>📍</span>{zone.name}
-                {editMode && <span style={{ marginLeft: 6, color: "#fff", fontSize: 11 }}>✕</span>}
-              </div>
+            const center = getAreaCenter(area.points);
+            return (<div key={area.id} style={{ position: "absolute", left: `${center.x}%`, top: `${center.y}%`, transform: "translate(-50%, -50%)", pointerEvents: "none" }}>
+              <div style={{ padding: "4px 10px", borderRadius: 6, background: `${color}DD`, border: "1.5px solid #fff", color: "#fff", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", boxShadow: `0 0 12px ${color}99` }}>{zone.name}</div>
             </div>);
           })}
-          {editMode && mapZones.length === 0 && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <div style={{ padding: "12px 20px", borderRadius: 12, background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 14, fontWeight: 700 }}>👆 지도를 클릭하여 구역을 배치하세요</div>
+
+          {/* 그리는 중 점 */}
+          {mode === "draw" && drawingPoints.map((p, i) => (
+            <div key={i} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, width: 12, height: 12, borderRadius: 6, background: "#FFA726", border: "2px solid #fff", transform: "translate(-50%, -50%)", boxShadow: "0 0 12px rgba(255,167,38,0.8)", pointerEvents: "none" }} />
+          ))}
+
+          {mode === "draw" && drawingZoneId && drawingPoints.length === 0 && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <div style={{ padding: "12px 20px", borderRadius: 12, background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 14, fontWeight: 700 }}>👆 지도를 클릭하여 영역을 그리세요</div>
           </div>}
         </div>
 
-        {/* 미배치 구역 목록 */}
-        {editMode && (() => {
-          const placed = mapZones.map(mz => mz.zoneId);
-          const unplaced = zones.filter(z => !placed.includes(z.id));
-          if (unplaced.length === 0) return null;
-          return <div style={{ marginTop: 12, padding: "12px", borderRadius: 10, background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.2)" }}>
-            <div style={{ color: "#FFA726", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>📌 미배치 구역 ({unplaced.length})</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{unplaced.map(z => <span key={z.id} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "#94A3B8", fontSize: 12 }}>{z.name}</span>)}</div>
-            <div style={{ color: "#94A3B8", fontSize: 11, marginTop: 6 }}>지도를 클릭하면 다음 구역이 배치됩니다.</div>
-          </div>;
-        })()}
+        {/* 미배치 구역 안내 */}
+        {mode === "view" && unplacedZones.length > 0 && <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(255,152,0,0.05)", border: "1px solid rgba(255,152,0,0.15)" }}>
+          <div style={{ color: "#FFA726", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📌 영역 미설정 구역 ({unplacedZones.length})</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{unplacedZones.map(z => <span key={z.id} style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "#94A3B8", fontSize: 11 }}>{z.name}</span>)}</div>
+        </div>}
 
         {/* 통계 */}
         <Card style={{ marginTop: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center" }}>
             {["smooth", "crowded", "danger"].map(lv => {
-              const count = mapZones.filter(mz => getCongestionLevel(mz.zoneId) === lv).length;
+              const count = mapAreas.filter(a => getCongestionLevel(a.zoneId) === lv).length;
               const labels = { smooth: "원활", crowded: "혼잡", danger: "위험" };
               return <div key={lv}>
                 <div style={{ color: CL[lv], fontSize: 28, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{count}</div>
@@ -3045,22 +3128,47 @@ function AssetsPage({ settings, setSettings, session }) {
   const [filter, setFilter] = useState("all");
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
-  const [newAsset, setNewAsset] = useState({ name: "", category: cats[0], total: 1, qty: 1, location: "", status: "available" });
+  const [unitsModalId, setUnitsModalId] = useState(null);
+  const [newAsset, setNewAsset] = useState({ name: "", category: cats[0], total: 1, qty: 1, location: "", status: "available", trackUnits: false, units: [] });
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
-  const sites = (settings.sites || []).filter(s => s.name);
+
+  // 모든 근무자 목록 (할당용)
+  const allWorkers = (settings.sites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name })));
 
   const filtered = filter === "all" ? assets : assets.filter(a => a.category === filter);
   const STATUS = { available: { label: "사용가능", color: "#66BB6A", icon: "✅" }, inuse: { label: "사용중", color: "#42A5F5", icon: "🔄" }, broken: { label: "고장", color: "#EF5350", icon: "❌" }, lost: { label: "분실", color: "#FFA726", icon: "❓" } };
+  const UNIT_STATUS = { available: { label: "보관중", color: "#66BB6A", icon: "✅" }, assigned: { label: "할당됨", color: "#42A5F5", icon: "👤" }, broken: { label: "고장", color: "#EF5350", icon: "❌" }, lost: { label: "분실", color: "#FFA726", icon: "❓" } };
+
+  // 개별 단위 자동 생성/동기화
+  const syncUnits = (a) => {
+    if (!a.trackUnits) return a.units || [];
+    const existing = a.units || [];
+    const total = a.total || 1;
+    if (existing.length >= total) return existing.slice(0, total);
+    const newUnits = [...existing];
+    for (let i = existing.length; i < total; i++) {
+      newUnits.push({ id: "u_"+Date.now()+"_"+i, number: String(i+1).padStart(2, "0"), status: "available", assignedTo: null, assignedToName: null, history: [{ ts: Date.now(), action: "등록", by: session?.name || "?" }] });
+    }
+    return newUnits;
+  };
 
   const saveAsset = (a) => {
     const id = a.id || "as_"+Date.now();
+    let finalAsset = { ...a, id };
+    if (a.trackUnits) {
+      finalAsset.units = syncUnits(finalAsset);
+      // qty 자동 계산: available 상태 단위 수
+      finalAsset.qty = finalAsset.units.filter(u => u.status === "available").length;
+    }
     const exists = assets.find(x => x.id === id);
-    const updated = exists ? assets.map(x => x.id === id ? { ...a, id } : x) : [...assets, { ...a, id, history: a.history || [{ ts: Date.now(), action: "등록", by: session?.name || "?" }] }];
+    const updated = exists ? assets.map(x => x.id === id ? finalAsset : x) : [...assets, { ...finalAsset, history: finalAsset.history || [{ ts: Date.now(), action: "등록", by: session?.name || "?" }] }];
     setSettings(prev => ({ ...prev, assets: updated }));
     setEditId(null); setAddMode(false);
-    setNewAsset({ name: "", category: cats[0], total: 1, qty: 1, location: "", status: "available" });
+    setNewAsset({ name: "", category: cats[0], total: 1, qty: 1, location: "", status: "available", trackUnits: false, units: [] });
   };
+
   const delAsset = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(prev => ({ ...prev, assets: assets.filter(a => a.id !== id) })); };
+
   const checkOut = (id, to) => {
     const a = assets.find(x => x.id === id); if (!a) return;
     const upd = { ...a, qty: Math.max(0, a.qty - 1), assignedTo: to, status: a.qty <= 1 ? "inuse" : a.status, history: [...(a.history||[]), { ts: Date.now(), action: `대여 (${to})`, by: session?.name || "?" }] };
@@ -3072,8 +3180,19 @@ function AssetsPage({ settings, setSettings, session }) {
     setSettings(prev => ({ ...prev, assets: assets.map(x => x.id === id ? upd : x) }));
   };
 
+  // 단위(개별 무전기 등) 액션
+  const updateUnit = (assetId, unitId, changes, actionLabel) => {
+    const a = assets.find(x => x.id === assetId); if (!a) return;
+    const newUnits = (a.units || []).map(u => u.id === unitId ? { ...u, ...changes, history: [...(u.history||[]), { ts: Date.now(), action: actionLabel, by: session?.name || "?" }] } : u);
+    const newQty = newUnits.filter(u => u.status === "available").length;
+    setSettings(prev => ({ ...prev, assets: assets.map(x => x.id === assetId ? { ...x, units: newUnits, qty: newQty } : x) }));
+  };
+
   // 통계
-  const stats = { total: assets.reduce((s,a)=>s+(a.total||0),0), available: assets.reduce((s,a)=>s+(a.qty||0),0), broken: assets.filter(a=>a.status==="broken").length, lost: assets.filter(a=>a.status==="lost").length };
+  const stats = { total: assets.reduce((s,a)=>s+(a.total||0),0), available: assets.reduce((s,a)=>s+(a.qty||0),0), broken: assets.reduce((s,a)=>s+(a.units||[]).filter(u=>u.status==="broken").length,0) || assets.filter(a=>a.status==="broken").length, lost: assets.reduce((s,a)=>s+(a.units||[]).filter(u=>u.status==="lost").length,0) || assets.filter(a=>a.status==="lost").length };
+
+  // 단위 관리 모달
+  const unitsAsset = unitsModalId ? assets.find(a => a.id === unitsModalId) : null;
 
   const Form = ({ asset, onSave, onCancel }) => {
     const [f, setF] = useState({ ...asset });
@@ -3088,13 +3207,25 @@ function AssetsPage({ settings, setSettings, session }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div><Label>총 수량</Label><Input type="number" value={f.total} onChange={e => upF("total", parseInt(e.target.value)||1)} /></div>
-          <div><Label>현재 가용</Label><Input type="number" value={f.qty} onChange={e => upF("qty", parseInt(e.target.value)||0)} /></div>
+          <div><Label>현재 가용</Label><Input type="number" value={f.qty} onChange={e => upF("qty", parseInt(e.target.value)||0)} disabled={f.trackUnits} style={f.trackUnits ? { opacity: 0.5 } : {}} /></div>
         </div>
-        <div><Label>상태</Label>
+
+        {/* 개별 추적 토글 */}
+        <div onClick={() => upF("trackUnits", !f.trackUnits)} style={{ padding: "12px 14px", borderRadius: 10, background: f.trackUnits ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${f.trackUnits ? "rgba(76,175,80,0.25)" : "rgba(255,255,255,0.08)"}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 36, height: 20, borderRadius: 10, background: f.trackUnits ? "#66BB6A" : "#333", position: "relative", flexShrink: 0 }}>
+            <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: f.trackUnits ? 18 : 2, transition: "all .2s" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700 }}>🔢 개별 번호 추적 {f.trackUnits ? "ON" : "OFF"}</div>
+            <div style={{ color: "#94A3B8", fontSize: 11 }}>무전기처럼 1번/2번/3번 개별 할당이 필요한 경우 켜세요</div>
+          </div>
+        </div>
+
+        {!f.trackUnits && <div><Label>상태</Label>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{Object.entries(STATUS).map(([k, v]) => (
             <button key={k} onClick={() => upF("status", k)} style={{ padding: "8px 14px", borderRadius: 8, border: f.status === k ? `1.5px solid ${v.color}` : "1px solid rgba(255,255,255,0.1)", background: f.status === k ? `${v.color}20` : "rgba(255,255,255,0.02)", color: f.status === k ? v.color : "#94A3B8", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{v.icon} {v.label}</button>
           ))}</div>
-        </div>
+        </div>}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         <button onClick={() => { if (!f.name) { alert("품명을 입력하세요."); return; } onSave(f); }} style={{ flex: 1, padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 저장</button>
@@ -3132,8 +3263,43 @@ function AssetsPage({ settings, setSettings, session }) {
       {filtered.length === 0 && !addMode && <Card style={{ textAlign: "center", padding: 30 }}><p style={{ color: "#94A3B8", fontSize: 13 }}>등록된 장비가 없습니다.</p></Card>}
       {filtered.map(a => {
         if (editId === a.id) return <Form key={a.id} asset={a} onSave={saveAsset} onCancel={() => setEditId(null)} />;
+        const tracked = a.trackUnits && a.units?.length > 0;
         const st = STATUS[a.status] || STATUS.available;
-        const lowStock = a.qty === 0;
+        const lowStock = (a.qty || 0) === 0;
+
+        // 개별 추적 카드
+        if (tracked) {
+          const counts = { available: a.units.filter(u=>u.status==="available").length, assigned: a.units.filter(u=>u.status==="assigned").length, broken: a.units.filter(u=>u.status==="broken").length, lost: a.units.filter(u=>u.status==="lost").length };
+          return (<Card key={a.id} style={{ border: "1px solid rgba(33,150,243,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(33,150,243,0.15)", border: "1px solid rgba(33,150,243,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📻</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 11, fontWeight: 600 }}>{a.category}</span>
+                  <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>{a.name}</span>
+                  <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>🔢 개별</span>
+                </div>
+                {a.location && <div style={{ color: "#94A3B8", fontSize: 12 }}>📍 {a.location}</div>}
+              </div>
+            </div>
+            {/* 4가지 상태 카운트 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 10 }}>
+              {Object.entries(UNIT_STATUS).map(([k, v]) => (
+                <div key={k} style={{ padding: "6px 4px", borderRadius: 8, background: counts[k] > 0 ? `${v.color}10` : "rgba(255,255,255,0.02)", border: `1px solid ${counts[k] > 0 ? `${v.color}30` : "rgba(255,255,255,0.04)"}`, textAlign: "center" }}>
+                  <div style={{ color: v.color, fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{counts[k]}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 10 }}>{v.icon} {v.label}</div>
+                </div>
+              ))}
+            </div>
+            {canEdit && <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setUnitsModalId(a.id)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📋 개별 관리 ({a.units.length}대)</button>
+              <button onClick={() => setEditId(a.id)} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>✏️</button>
+              <button onClick={() => delAsset(a.id)} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(244,67,54,0.2)", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            </div>}
+          </Card>);
+        }
+
+        // 일반 자산 카드
         return (<Card key={a.id} style={{ border: lowStock ? "1px solid rgba(244,67,54,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 44, height: 44, borderRadius: 10, background: `${st.color}15`, border: `1px solid ${st.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{st.icon}</div>
@@ -3161,6 +3327,44 @@ function AssetsPage({ settings, setSettings, session }) {
         </Card>);
       })}
     </div>
+
+    {/* 개별 단위 관리 모달 */}
+    {unitsAsset && <div onClick={() => setUnitsModalId(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, maxHeight: "85vh", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: "20px 20px 0 0", padding: "16px 16px 20px", overflow: "auto", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <h3 style={{ color: "#E2E8F0", fontSize: 17, fontWeight: 700, margin: 0 }}>📋 {unitsAsset.name} - 개별 관리</h3>
+          <button onClick={() => setUnitsModalId(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
+          {(unitsAsset.units || []).map(u => {
+            const us = UNIT_STATUS[u.status] || UNIT_STATUS.available;
+            return (<div key={u.id} style={{ padding: "12px", borderRadius: 12, background: `${us.color}08`, border: `1.5px solid ${us.color}40`, position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ color: us.color, fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: -0.5 }}>#{u.number}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 6, background: `${us.color}15`, color: us.color, fontSize: 10, fontWeight: 700 }}>{us.icon} {us.label}</span>
+              </div>
+              {u.assignedToName && <div style={{ marginBottom: 8, padding: "6px 8px", borderRadius: 6, background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.2)" }}>
+                <div style={{ color: "#42A5F5", fontSize: 12, fontWeight: 700 }}>👤 {u.assignedToName}</div>
+              </div>}
+              {/* 액션 */}
+              {u.status === "available" && <select value="" onChange={e => { if (e.target.value) {
+                const w = allWorkers.find(ww => ww.id === e.target.value);
+                if (w) updateUnit(unitsAsset.id, u.id, { status: "assigned", assignedTo: w.id, assignedToName: w.name }, `${w.name}에게 할당`);
+              } }} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, cursor: "pointer" }}>
+                <option value="">👤 근무자 할당...</option>
+                {allWorkers.map(w => <option key={w.id} value={w.id}>{w.name} ({w.siteName})</option>)}
+              </select>}
+              {u.status === "assigned" && <button onClick={() => updateUnit(unitsAsset.id, u.id, { status: "available", assignedTo: null, assignedToName: null }, "반납")} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid rgba(76,175,80,0.3)", background: "rgba(76,175,80,0.05)", color: "#66BB6A", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📥 반납</button>}
+              <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                <button onClick={() => updateUnit(unitsAsset.id, u.id, { status: u.status === "broken" ? "available" : "broken" }, u.status === "broken" ? "수리완료" : "고장 신고")} style={{ flex: 1, padding: "5px", borderRadius: 5, border: "1px solid rgba(244,67,54,0.2)", background: u.status === "broken" ? "rgba(244,67,54,0.15)" : "transparent", color: "#EF5350", fontSize: 11, cursor: "pointer" }}>❌ {u.status === "broken" ? "수리" : "고장"}</button>
+                <button onClick={() => updateUnit(unitsAsset.id, u.id, { status: u.status === "lost" ? "available" : "lost" }, u.status === "lost" ? "회수" : "분실 신고")} style={{ flex: 1, padding: "5px", borderRadius: 5, border: "1px solid rgba(255,152,0,0.2)", background: u.status === "lost" ? "rgba(255,152,0,0.15)" : "transparent", color: "#FFA726", fontSize: 11, cursor: "pointer" }}>❓ {u.status === "lost" ? "회수" : "분실"}</button>
+              </div>
+            </div>);
+          })}
+        </div>
+      </div>
+    </div>}
   </div>);
 }
 
