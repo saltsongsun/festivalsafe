@@ -825,7 +825,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 150, height: 150, borderRadius: "50%", background: "radial-gradient(circle, rgba(171,71,188,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, position: "relative" }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(66,165,245,0.22), rgba(66,165,245,0.06))", border: "1px solid rgba(66,165,245,0.3)", boxShadow: "0 0 20px rgba(66,165,245,0.15), inset 0 1px 0 rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(66,165,245,0.22), rgba(66,165,245,0.06))", border: "1px solid rgba(66,165,245,0.3)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ color: "#fff", fontSize: 18, fontWeight: 700, letterSpacing: -0.5, margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{settings.festivalName || "축제 안전관리"}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
@@ -835,8 +835,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)", position: "relative" }}>
-        <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, boxShadow: `0 0 12px ${olv.color}25`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
-        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.15)", border: "1px solid rgba(76,175,80,0.3)", boxShadow: "0 0 12px rgba(76,175,80,0.25)", color: "#66BB6A", fontSize: 12, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
+        <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
+        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.15)", border: "1px solid rgba(76,175,80,0.3)", color: "#66BB6A", fontSize: 12, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
         {loc.name && <span style={{ color: "#94A3B8", fontSize: 12, padding: "5px 4px" }}>📍 {loc.name}</span>}
         {kma.enabled && <span style={{ color: "#66BB6A", fontSize: 12, padding: "5px 4px" }}>🌤️ LIVE</span>}
         <span style={{ flex: 1 }} />
@@ -899,14 +899,14 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, position: "relative" }}>
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
             <span style={{ color: "#E2E8F0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
-            <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12, position: "relative" }}>
             <div>
               <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4, fontWeight: 500 }}>실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 32, fontWeight: 700, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1, textShadow: `0 0 16px ${li.color}40` }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 32, fontWeight: 700, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1,  }}>{cat.currentValue.toLocaleString()}</span>
                 <span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}>{cat.unit}</span>
               </div>
             </div>
@@ -940,14 +940,14 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, danger: { label: "위험", color: "#EF5350", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
-        return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.06)", border: `1px solid ${cl?.color || "rgba(255,255,255,0.08)"}55`, boxShadow: cl ? `0 0 0 1px ${cl.color}15, 0 4px 16px ${cl.color}15, inset 0 1px 0 rgba(255,255,255,0.04)` : "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+        return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.06)", border: `1px solid ${cl?.color || "rgba(255,255,255,0.08)"}55`, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: c?.memo || c?.photos?.length ? 10 : 0 }}>
             <span style={{ fontSize: 16 }}>{cl?.icon || "⚪"}</span>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 600 }}>{z.name}</div>
               {c?.reportedAt && <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 1 }}>{c.reportedByName} · {c.reportedAt}</div>}
             </div>
-            <span style={{ padding: "4px 12px", borderRadius: 10, background: cl ? `${cl.color}20` : "rgba(255,255,255,0.04)", border: cl ? `1px solid ${cl.color}40` : "1px solid rgba(255,255,255,0.06)", boxShadow: cl ? `0 0 12px ${cl.color}30` : "none", color: cl?.color || "#6B7280", fontSize: 12, fontWeight: 700 }}>{cl?.label || "미보고"}</span>
+            <span style={{ padding: "4px 12px", borderRadius: 10, background: cl ? `${cl.color}20` : "rgba(255,255,255,0.04)", border: cl ? `1px solid ${cl.color}40` : "1px solid rgba(255,255,255,0.06)", color: cl?.color || "#6B7280", fontSize: 12, fontWeight: 700 }}>{cl?.label || "미보고"}</span>
           </div>
           {c?.memo && <div style={{ color: "#8892b0", fontSize: 12, lineHeight: 1.5, padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6 }}>💬 {c.memo}</div>}
           {c?.photos?.length > 0 && <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
@@ -976,13 +976,13 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, position: "relative" }}>
               <span style={{ fontSize: 16 }}>{cat.icon}</span>
               <span style={{ color: "#E2E8F0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>{cat.name}</span>
-              <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
+              <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
               <div>
                 <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 6, fontWeight: 500 }}>실황</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 36, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5, textShadow: `0 0 16px ${li.color}35` }}>{cat.currentValue.toLocaleString()}</span>
+                  <span style={{ fontSize: 36, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5,  }}>{cat.currentValue.toLocaleString()}</span>
                   <span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}>{cat.unit}</span>
                 </div>
               </div>
@@ -3456,7 +3456,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {tab === "monitor" && <div>{categories.map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id} style={{ border: `1px solid ${li.border}`, cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}10, 0 4px 20px ${li.color}15` }} onClick={() => { setTab(cat.kmaCategory ? "kma" : "apiconfig"); setFocusCat(cat.id); }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
         <div><span style={{ fontSize: 18, marginRight: 6 }}>{cat.icon}</span><span style={{ color: "#E2E8F0", fontWeight: 700, fontSize: 14 }}>{cat.name}</span></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 22, fontVariantNumeric: "tabular-nums", textShadow: `0 0 12px ${li.color}40` }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.label}</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 22, fontVariantNumeric: "tabular-nums", textShadow: `0 0 12px ${li.color}40` }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.label}</span></div>
       </div>
       <div style={{ marginTop: 4, color: "#94A3B8", fontSize: 14 }}>{cat.kmaCategory ? `🌤️기상청 ${cat.kmaCategory}` : cat.apiConfig?.enabled ? "🔌커스텀API" : "✏️수동"} | 클릭하여 설정 ›</div>
       <HistoryChart cat={cat} />
