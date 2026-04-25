@@ -2539,73 +2539,93 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
       {/* 셋리스트 탭 */}
       {editTab === "setlist" && <div>
-        <button onClick={addSong} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(156,39,176,0.3)", background: "transparent", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 곡 추가</button>
         {(f.setlist||[]).map((song, si) => (
-          <div key={song.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 6 }}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-              <span style={{ color: "#E1BEE7", fontSize: 15, fontWeight: 800, minWidth: 24 }}>{si+1}</span>
-              <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1 }} />
-              <button onClick={() => moveSong(si,-1)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▲</button>
-              <button onClick={() => moveSong(si,1)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▼</button>
-              <button onClick={() => delSong(si)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>
+          <div key={song.id} style={{ position: "relative", padding: "12px", borderRadius: 12, background: "linear-gradient(135deg, rgba(156,39,176,0.06), rgba(156,39,176,0.01))", border: "1px solid rgba(156,39,176,0.2)", marginBottom: 8 }}>
+            <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 2 }}>
+              <button onClick={() => moveSong(si,-1)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 11, cursor: "pointer" }}>▲</button>
+              <button onClick={() => moveSong(si,1)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 11, cursor: "pointer" }}>▼</button>
+              <button onClick={() => delSong(si)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
             </div>
-            <div style={{ display: "flex", gap: 6, paddingLeft: 24 }}>
-              <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13, width: 80 }}>
-                <option value="MR">MR</option><option value="LIVE">라이브</option>
-              </select>
-              <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 60, textAlign: "center" }} />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, paddingRight: 90 }}>
+              <span style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, rgba(156,39,176,0.3), rgba(156,39,176,0.1))", color: "#E1BEE7", fontSize: 14, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{si+1}</span>
+              <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1, fontWeight: 600 }} />
+            </div>
+            <div style={{ display: "flex", gap: 6, paddingLeft: 36 }}>
+              <button onClick={() => upSong(si, "type", song.type === "MR" ? "LIVE" : "MR")} style={{ padding: "8px 14px", borderRadius: 8, border: "1.5px solid " + (song.type === "LIVE" ? "#66BB6A" : "#42A5F5"), background: song.type === "LIVE" ? "rgba(76,175,80,0.1)" : "rgba(33,150,243,0.08)", color: song.type === "LIVE" ? "#66BB6A" : "#42A5F5", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{song.type === "LIVE" ? "🎤 라이브" : "🎵 MR"}</button>
+              <Input value={song.playtime} onChange={e => upSong(si, "playtime", e.target.value)} placeholder="3:30" style={{ width: 70, textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 600 }} />
               <Input value={song.memo||""} onChange={e => upSong(si, "memo", e.target.value)} placeholder="메모" style={{ flex: 1 }} />
             </div>
           </div>
         ))}
-        {(f.setlist||[]).length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>아직 곡이 없습니다</div>}
+        <button onClick={addSong} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1.5px dashed rgba(156,39,176,0.3)", background: "rgba(156,39,176,0.04)", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>+</span>
+          <span>곡 추가</span>
+        </button>
+        {(f.setlist||[]).length === 0 && <div style={{ textAlign: "center", padding: "20px 0", color: "#94A3B8", fontSize: 13, marginTop: 10 }}>아직 곡이 없습니다</div>}
       </div>}
 
       {/* 사용악기 탭 */}
       {editTab === "inst" && <div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+        {/* 프리셋 칩 */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {INST_PRESETS.filter(p => !(f.instruments||[]).find(i => i.name === p)).map(preset => (
-            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.2)", background: "rgba(33,150,243,0.04)", color: "#42A5F5", fontSize: 13, cursor: "pointer" }}>+ {preset}</button>
+            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "7px 12px", borderRadius: 16, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ {preset}</button>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {/* 직접 입력 */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
           <Input value={instCustom} onChange={e => setInstCustom(e.target.value)} placeholder="직접 입력 (예: 첼로)" />
-          <button onClick={() => { if (instCustom) { addInst(instCustom); setInstCustom(""); } }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>추가</button>
+          <button onClick={() => { if (instCustom) { addInst(instCustom); setInstCustom(""); } }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>추가</button>
         </div>
-        {(f.instruments||[]).map((inst, ii) => (
-          <div key={inst.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(33,150,243,0.03)", border: "1px solid rgba(33,150,243,0.1)", marginBottom: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 800 }}>{ii+1}</span>
-              <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700, flex: 1 }}>{inst.name}</span>
-              <button onClick={() => moveInst(ii,-1)} style={{ padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▲</button>
-              <button onClick={() => moveInst(ii,1)} style={{ padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▼</button>
-              <button onClick={() => delInst(ii)} style={{ padding: "6px 8px", border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>🗑</button>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button onClick={() => upInst(ii, "qty", Math.max(0,(inst.qty||1)-1))} style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>-</button>
-                <span style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 800, minWidth: 22, textAlign: "center" }}>{inst.qty||1}</span>
-                <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>+</button>
+        {/* 타일 그리드 */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          {(f.instruments||[]).map((inst, ii) => (
+            <div key={inst.id} style={{ position: "relative", padding: "12px", borderRadius: 12, background: "linear-gradient(135deg, rgba(33,150,243,0.08), rgba(33,150,243,0.02))", border: "1px solid rgba(33,150,243,0.2)" }}>
+              <div style={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 2 }}>
+                <button onClick={() => moveInst(ii,-1)} style={{ width: 22, height: 22, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 10, cursor: "pointer" }}>▲</button>
+                <button onClick={() => moveInst(ii,1)} style={{ width: 22, height: 22, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 10, cursor: "pointer" }}>▼</button>
+                <button onClick={() => delInst(ii)} style={{ width: 22, height: 22, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 11, cursor: "pointer" }}>✕</button>
               </div>
-              <button onClick={() => upInst(ii, "ch", inst.ch==="S"?"M":"S")} style={{ padding: "6px 12px", borderRadius: 6, border: "1.5px solid "+(inst.ch==="S"?"#66BB6A":"#42A5F5"), background: "transparent", color: inst.ch==="S"?"#66BB6A":"#42A5F5", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S 스테레오":"M 모노"}</button>
-              <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모" style={{ flex: 1, minWidth: 80 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, paddingRight: 70 }}>
+                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(33,150,243,0.2)", color: "#42A5F5", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{ii+1}</span>
+                <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inst.name}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
+                <button onClick={() => upInst(ii, "qty", Math.max(0,(inst.qty||1)-1))} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>−</button>
+                <span style={{ color: "#42A5F5", fontSize: 16, fontWeight: 800, flex: 1, textAlign: "center" }}>{inst.qty||1}</span>
+                <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>+</button>
+                <button onClick={() => upInst(ii, "ch", inst.ch==="S"?"M":"S")} style={{ padding: "5px 10px", borderRadius: 6, border: "1.5px solid "+(inst.ch==="S"?"#66BB6A":"#42A5F5"), background: inst.ch==="S"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.08)", color: inst.ch==="S"?"#66BB6A":"#42A5F5", fontSize: 12, fontWeight: 700, cursor: "pointer", marginLeft: 4 }}>{inst.ch==="S"?"S":"M"}</button>
+              </div>
+              <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모" style={{ padding: "6px 8px", fontSize: 12 }} />
             </div>
-          </div>
-        ))}
-        {(f.instruments||[]).length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#94A3B8" }}>위 프리셋을 터치하여 악기를 추가하세요</div>}
+          ))}
+          {(f.instruments||[]).length === 0 && <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 30, color: "#94A3B8" }}>위 프리셋을 터치하여 악기를 추가하세요</div>}
+        </div>
       </div>}
 
       {/* 요청사항 탭 */}
       {editTab === "req" && <div>
-        <button onClick={addTech} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(255,152,0,0.3)", background: "transparent", color: "#FFA726", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 요청항목 추가</button>
-        {(f.techrider||[]).map((tr, ti) => (
-          <div key={tr.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "10px 12px", borderRadius: 10, background: tr.qty > 0 ? "rgba(76,175,80,0.03)" : "rgba(255,255,255,0.02)", border: tr.qty > 0 ? "1px solid rgba(76,175,80,0.15)" : "1px solid #222", marginBottom: 5 }}>
-            <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "6px 10px", borderRadius: 6, border: tr.qty > 0 ? "2px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#66BB6A" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>{tr.qty > 0 ? "✓" : "○"}</button>
-            <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ flex: 1 }} />
-            <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 45, textAlign: "center" }} />
-            <button onClick={() => delTech(ti)} style={{ padding: "6px 8px", border: "none", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>
-          </div>
-        ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 10 }}>
+          {(f.techrider||[]).map((tr, ti) => {
+            const isOn = tr.qty > 0;
+            return (<div key={tr.id} style={{ position: "relative", padding: "12px", borderRadius: 12, background: isOn ? "linear-gradient(135deg, rgba(76,175,80,0.12), rgba(76,175,80,0.03))" : "rgba(255,255,255,0.03)", border: isOn ? "1.5px solid rgba(76,175,80,0.4)" : "1px solid rgba(255,255,255,0.06)", transition: "all 0.2s" }}>
+              <button onClick={() => delTech(ti)} style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: 6, border: "none", background: "rgba(0,0,0,0.3)", color: "#94A3B8", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              <div onClick={() => upTech(ti, "qty", isOn ? 0 : 1)} style={{ cursor: "pointer", marginBottom: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: isOn ? "linear-gradient(135deg, #66BB6A, #43A047)" : "rgba(255,255,255,0.04)", border: isOn ? "none" : "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: isOn ? "#fff" : "#475569", fontWeight: 700, marginBottom: 6 }}>{isOn ? "✓" : "○"}</div>
+              </div>
+              <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ padding: "8px", fontSize: 13, marginBottom: 6, fontWeight: 600 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button onClick={() => upTech(ti, "qty", Math.max(0, tr.qty - 1))} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>−</button>
+                <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ flex: 1, padding: "6px", fontSize: 14, textAlign: "center", fontWeight: 700, color: isOn ? "#66BB6A" : "#94A3B8" }} />
+                <button onClick={() => upTech(ti, "qty", tr.qty + 1)} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>+</button>
+              </div>
+            </div>);
+          })}
+          <button onClick={addTech} style={{ padding: "12px", borderRadius: 12, border: "1.5px dashed rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.04)", color: "#FFA726", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 100 }}>
+            <span style={{ fontSize: 24 }}>+</span>
+            <span>항목 추가</span>
+          </button>
+        </div>
       </div>}
 
       {/* 하단 액션 */}
