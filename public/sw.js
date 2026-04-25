@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'festival-v' + Date.now();
+const CACHE_VERSION = 'safeflow-v' + Date.now();
 
 self.addEventListener('install', e => {
   self.skipWaiting();
