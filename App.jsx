@@ -607,7 +607,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 42, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{selected.currentValue.toLocaleString()}<span style={{ fontSize: 16, color: "#8892b0", marginLeft: 4 }}>{selected.unit}</span></div>
+              <div style={{ fontSize: 42, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{selected.currentValue.toLocaleString()}<span style={{ fontSize: 16, color: "#8892b0", marginLeft: 4 }}>{selected.unit}</span></div>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4, alignItems: "center" }}>
                 <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</span>
                 {selected.actionStatus && <span style={{ padding: "6px 12px", borderRadius: 20, background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", border: `1px solid ${selected.actionStatus === "handling" ? "rgba(255,152,0,0.3)" : "rgba(76,175,80,0.3)"}`, color: selected.actionStatus === "handling" ? "#FF9800" : "#4CAF50", fontSize: 13, fontWeight: 700 }}>{selected.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>}
@@ -628,11 +628,11 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                 <div style={{ textAlign: "center", padding: 14, borderRadius: 12, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.15)" }}>
                   <div style={{ color: "#8892b0", fontSize: 13 }}>🏃 현재 체류</div>
-                  <div style={{ color: "#4CAF50", fontSize: 28, fontWeight: 900, fontFamily: "monospace" }}>{selected.currentValue.toLocaleString()}</div>
+                  <div style={{ color: "#4CAF50", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{selected.currentValue.toLocaleString()}</div>
                 </div>
                 <div style={{ textAlign: "center", padding: 14, borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)" }}>
                   <div style={{ color: "#8892b0", fontSize: 13 }}>📊 누적 방문</div>
-                  <div style={{ color: "#2196F3", fontSize: 28, fontWeight: 900, fontFamily: "monospace" }}>{cumVal.toLocaleString()}</div>
+                  <div style={{ color: "#2196F3", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
                 </div>
               </div>
 
@@ -705,9 +705,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <div key={z.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
                       <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{z.name}</span>
                       <div style={{ textAlign: "right" }}>
-                        <span style={{ color: "#4CAF50", fontSize: 16, fontWeight: 800, fontFamily: "monospace" }}>{(z.count || 0).toLocaleString()}</span>
+                        <span style={{ color: "#4CAF50", fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{(z.count || 0).toLocaleString()}</span>
                         <span style={{ color: "#445", fontSize: 14, margin: "0 4px" }}>/</span>
-                        <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>{(z.cumulative || 0).toLocaleString()}</span>
+                        <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{(z.cumulative || 0).toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
@@ -758,7 +758,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginBottom: 16 }}>
             {Object.entries(LEVELS).map(([lk, lvi]) => (<div key={lk} style={{ padding: "8px 10px", borderRadius: 8, background: lk === lv ? lvi.bg : "rgba(255,255,255,0.02)", border: `1px solid ${lk === lv ? lvi.border : "#1a1a2e"}`, textAlign: "center" }}>
               <div style={{ color: lvi.color, fontSize: 14, fontWeight: 700 }}>{lvi.label}</div>
-              <div style={{ color: lk === lv ? "#fff" : "#556", fontSize: 13, fontFamily: "monospace", marginTop: 2 }}>{selected.thresholds[lk]?.[0]}~{selected.thresholds[lk]?.[1] === Infinity ? "∞" : selected.thresholds[lk]?.[1]}</div>
+              <div style={{ color: lk === lv ? "#fff" : "#556", fontSize: 13, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>{selected.thresholds[lk]?.[0]}~{selected.thresholds[lk]?.[1] === Infinity ? "∞" : selected.thresholds[lk]?.[1]}</div>
             </div>))}
           </div>
 
@@ -820,34 +820,33 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:0.9}}`}</style>
 
     {/* CueFlow 스타일 헤더 카드 */}
-    <div style={{ maxWidth: 900, margin: "0 auto 14px", padding: "20px 20px 16px", borderRadius: 20, background: "linear-gradient(135deg, rgba(33,150,243,0.08), rgba(33,150,243,0.02))", border: "1px solid rgba(33,150,243,0.15)", boxShadow: "0 4px 24px rgba(0,0,0,0.2)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, rgba(33,150,243,0.2), rgba(33,150,243,0.05))", border: "1px solid rgba(33,150,243,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, flexShrink: 0 }}>{settings.logoEmoji}</div>
+    <div style={{ maxWidth: 900, margin: "0 auto 16px", padding: "22px 22px 18px", borderRadius: 20, background: "linear-gradient(135deg, rgba(33,150,243,0.08), rgba(33,150,243,0.02))", border: "1px solid rgba(33,150,243,0.15)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, rgba(33,150,243,0.18), rgba(33,150,243,0.04))", border: "1px solid rgba(33,150,243,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 300, letterSpacing: -0.5, margin: 0, lineHeight: 1.2 }}>{settings.festivalName || "축제 안전관리"}</h1>
-          {settings.festivalSubtitle && <p style={{ color: "#8892b0", fontSize: 12, margin: "4px 0 0" }}>{settings.festivalSubtitle}</p>}
+          <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 600, letterSpacing: -0.5, margin: 0, lineHeight: 1.2 }}>{settings.festivalName || "축제 안전관리"}</h1>
+          {settings.festivalSubtitle && <p style={{ color: "#8892b0", fontSize: 12, margin: "4px 0 0", letterSpacing: 0 }}>{settings.festivalSubtitle}</p>}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ color: "#ccd6f6", fontSize: 20, fontWeight: 700, fontFamily: "'SF Mono', Menlo, monospace", lineHeight: 1 }}>{fmtTime(now)}</div>
-          <div style={{ color: "#556", fontSize: 11, marginTop: 4 }}>{fmtDate(now)}</div>
+          <div style={{ color: "#ccd6f6", fontSize: 22, fontWeight: 600, fontFeatureSettings: "'tnum'", fontVariantNumeric: "tabular-nums", lineHeight: 1, letterSpacing: -0.5 }}>{fmtTime(now)}</div>
+          <div style={{ color: "#556", fontSize: 11, marginTop: 6 }}>{fmtDate(now)}</div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-        {/* 종합 상태 뱃지 */}
-        <span style={{ padding: "5px 12px", borderRadius: 12, background: olv.bg, border: `1px solid ${olv.border}`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
-        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 12, background: "rgba(76,175,80,0.12)", color: "#4CAF50", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>● 24H</span>}
-        {loc.name && <span style={{ color: "#556", fontSize: 11, padding: "5px 0" }}>📍 {loc.name}</span>}
-        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 11, padding: "5px 0" }}>🌤️ LIVE</span>}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
+        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.12)", color: "#4CAF50", fontSize: 11, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
+        {loc.name && <span style={{ color: "#556", fontSize: 11, padding: "5px 4px" }}>📍 {loc.name}</span>}
+        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 11, padding: "5px 4px" }}>🌤️ LIVE</span>}
         <span style={{ flex: 1 }} />
-        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "5px 12px", borderRadius: 10, border: "1px solid rgba(33,150,243,0.2)", background: "transparent", color: "#2196F3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-          <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none" }}>🔄</span> {spinning ? "..." : "최신화"}
+        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.04)", color: "#2196F3", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none", marginRight: 4 }}>🔄</span>{spinning ? "..." : "최신화"}
         </button>
         {updateAvailable && <button onClick={() => {
           const overlay = document.createElement("div");
           overlay.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999"><div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#ccd6f6;margin-top:16px;font-size:16px;font-weight:700">업데이트 적용 중...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
           document.body.appendChild(overlay);
           setTimeout(() => { if (window.applySwUpdate) window.applySwUpdate(); else window.location.reload(); }, 500);
-        }} style={{ padding: "5px 12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 12, fontWeight: 700, cursor: "pointer", animation: "pulse 2s infinite" }}>📲 업데이트</button>}
+        }} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 12, fontWeight: 700, cursor: "pointer", animation: "pulse 2s infinite" }}>📲 업데이트</button>}
       </div>
     </div>
 
@@ -891,24 +890,24 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         return (
         <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.025)", borderRadius: 16, padding: "20px", border: `1px solid ${li.border}33`, position: "relative", overflow: "hidden", cursor: "pointer" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 18 }}>{cat.icon}</span>
-            <span style={{ color: "#8892b0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
-            <span style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 10, background: li.bg, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
-            {cat.actionStatus && <span style={{ padding: "3px 8px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 11, fontWeight: 700 }}>🔧 조치중</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+            <span style={{ color: "#ccd6f6", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
+            <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}40`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 11, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
             <div>
-              <div style={{ color: "#556", fontSize: 11, marginBottom: 4, letterSpacing: 0.3 }}>실황 체류</div>
+              <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 48, fontWeight: 200, color: li.color, fontFamily: "'SF Mono', Menlo, monospace", lineHeight: 1, letterSpacing: -1 }}>{cat.currentValue.toLocaleString()}</span>
-                <span style={{ fontSize: 16, color: "#556" }}>{cat.unit}</span>
+                <span style={{ fontSize: 44, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5 }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 14, color: "#556", fontWeight: 500 }}>{cat.unit}</span>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ color: "#556", fontSize: 11, marginBottom: 4, letterSpacing: 0.3 }}>누적 방문</div>
+              <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>누적 방문</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, justifyContent: "flex-end" }}>
-                <span style={{ fontSize: 26, fontWeight: 300, fontFamily: "'SF Mono', Menlo, monospace", color: "#8892b0", lineHeight: 1 }}>{cumVal.toLocaleString()}</span>
+                <span style={{ fontSize: 26, fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", color: "#8892b0", lineHeight: 1, letterSpacing: -0.5 }}>{cumVal.toLocaleString()}</span>
                 <span style={{ fontSize: 12, color: "#445" }}>명</span>
               </div>
             </div>
@@ -917,16 +916,16 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           {gateData.filter(g => g.name).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8 }}>
             {gateData.filter(g => g.name).map(g => (
               <div key={g.id} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                <div style={{ color: "#556", fontSize: 11, marginBottom: 3 }}>🚪 {g.name}</div>
+                <div style={{ color: "#556", fontSize: 11, marginBottom: 4, fontWeight: 500 }}>🚪 {g.name}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ color: "#4CAF50", fontSize: 20, fontWeight: 300, fontFamily: "'SF Mono', Menlo, monospace" }}>{g.count}</span>
+                  <span style={{ color: "#4CAF50", fontSize: 18, fontWeight: 600, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>{g.count}</span>
                   <span style={{ color: "#445", fontSize: 11 }}>체류</span>
-                  <span style={{ color: "#445", fontSize: 11, marginLeft: "auto" }}>누적 {g.cumulative}</span>
+                  <span style={{ color: "#445", fontSize: 11, marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>누적 {g.cumulative}</span>
                 </div>
               </div>
             ))}
           </div>}
-          {cat.lastUpdated && <div style={{ color: "#445", fontSize: 11, marginTop: 10 }}>업데이트 {cat.lastUpdated}</div>}
+          {cat.lastUpdated && <div style={{ color: "#445", fontSize: 11, marginTop: 12 }}>업데이트 {cat.lastUpdated}</div>}
         </div>); })}
     </div>
     {/* 구역별 혼잡도 */}
@@ -966,32 +965,32 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         {categories.filter(c => c.id !== "crowd" && !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
           <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.025)", borderRadius: 16, padding: "18px", border: `1px solid ${li.border}33`, position: "relative", overflow: "hidden", cursor: "pointer", transition: "all 0.2s" }}>
             {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <span style={{ fontSize: 18 }}>{cat.icon}</span>
-              <span style={{ color: "#8892b0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>{cat.name}</span>
-              <span style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 10, background: li.bg, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{ fontSize: 16 }}>{cat.icon}</span>
+              <span style={{ color: "#ccd6f6", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>{cat.name}</span>
+              <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}40`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
               <div>
-                <div style={{ color: "#556", fontSize: 11, marginBottom: 4, letterSpacing: 0.3 }}>실황</div>
+                <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>실황</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 38, fontWeight: 200, color: li.color, fontFamily: "'SF Mono', Menlo, monospace", lineHeight: 1, letterSpacing: -1 }}>{cat.currentValue.toLocaleString()}</span>
-                  <span style={{ fontSize: 14, color: "#556" }}>{cat.unit}</span>
+                  <span style={{ fontSize: 36, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5 }}>{cat.currentValue.toLocaleString()}</span>
+                  <span style={{ fontSize: 13, color: "#556", fontWeight: 500 }}>{cat.unit}</span>
                 </div>
               </div>
               {nextFc && <div style={{ textAlign: "right" }}>
-                <div style={{ color: "#556", fontSize: 11, marginBottom: 4, letterSpacing: 0.3 }}>예보</div>
-                <div style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>
+                <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>예보</div>
+                <div style={{ display: "inline-flex", alignItems: "baseline", gap: 3 }}>
                   <span style={{ fontSize: 14, color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
-                  <span style={{ fontSize: 22, fontWeight: 300, fontFamily: "'SF Mono', Menlo, monospace", color: "#8892b0", lineHeight: 1 }}>{nextFc.value}</span>
+                  <span style={{ fontSize: 20, fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", color: "#8892b0", lineHeight: 1, letterSpacing: -0.5 }}>{nextFc.value}</span>
                 </div>
-                <div style={{ fontSize: 10, color: "#445", marginTop: 2 }}>{nextFc.time}</div>
+                <div style={{ fontSize: 10, color: "#445", marginTop: 4 }}>{nextFc.time}</div>
               </div>}
             </div>
-            {cat.lastUpdated && <div style={{ color: "#445", fontSize: 11, marginTop: 4 }}>업데이트 {cat.lastUpdated}</div>}
-            {fc.length > 1 && <div style={{ marginTop: 12, display: "flex", gap: 3, height: 20, alignItems: "flex-end" }}>
-              {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=3+((f.value-mn)/rng)*17; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.2+(i===0?0.6:0.1*i) }} />; })}
+            {fc.length > 1 && <div style={{ display: "flex", gap: 3, height: 16, alignItems: "flex-end", marginBottom: 8 }}>
+              {fc.slice(0, 6).map((f, i) => { const vals = fc.slice(0,6).map(x=>x.value); const mn=Math.min(...vals); const mx=Math.max(...vals); const rng=mx-mn||1; const h=3+((f.value-mn)/rng)*13; return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex:1, height:h, borderRadius:2, background:li.color, opacity:0.15+(i===0?0.5:0.08*(6-i)) }} />; })}
             </div>}
+            {cat.lastUpdated && <div style={{ color: "#445", fontSize: 11 }}>업데이트 {cat.lastUpdated}</div>}
           </div>); })}
       </div>
     </>}
@@ -1008,9 +1007,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                 {tl && <span style={{ color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 13, fontWeight: 700 }}>{tl}</span>}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 32, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{cat.currentValue.toLocaleString()}</span>
                 <span style={{ fontSize: 16, color: "#8892b0" }}>{cat.unit}</span>
-                {nextFc && <span style={{ fontSize: 18, fontFamily: "monospace", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
+                {nextFc && <span style={{ fontSize: 18, fontVariantNumeric: "tabular-nums", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
               </div>
             </div>
             <span style={{ padding: "6px 12px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.label}</span>
@@ -1033,7 +1032,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <span style={{ padding: "6px 12px", borderRadius: 8, background: `${color}15`, color, fontSize: 13, fontWeight: 700 }}>{label}</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
-              <span style={{ color, fontSize: 28, fontWeight: 900, fontFamily: "monospace" }}>{lot.current||0}</span>
+              <span style={{ color, fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{lot.current||0}</span>
               <span style={{ color: "#556", fontSize: 16 }}>/ {lot.capacity}</span>
               <span style={{ color: "#556", fontSize: 14, marginLeft: "auto" }}>{pct}%</span>
             </div>
@@ -1064,7 +1063,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
               <span style={{ fontSize: 16 }}>👥</span>
-              <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontFamily: "monospace" }}>{pax}</span>
+              <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{pax}</span>
               <span style={{ color: "#556", fontSize: 14 }}>/ {cap}명</span>
               <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", marginLeft: 8 }}>
                 <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#F44336" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
@@ -1322,7 +1321,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
   const Stat = ({ label, value, color }) => (
     <div style={{ textAlign: "center" }}>
       <div style={{ color: "#556", fontSize: 14 }}>{label}</div>
-      <div style={{ color: color || "#ccd6f6", fontSize: 28, fontWeight: 900, fontFamily: "monospace", lineHeight: 1.2 }}>{(value || 0).toLocaleString()}</div>
+      <div style={{ color: color || "#ccd6f6", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.2 }}>{(value || 0).toLocaleString()}</div>
     </div>
   );
 
@@ -1344,13 +1343,13 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       <div style={{ display: "flex", justifyContent: "center", gap: 30, marginBottom: 8 }}>
         <div>
           <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>🏃 체류 인원</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{curTotal.toLocaleString()}</div>
+          <div style={{ fontSize: 40, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{curTotal.toLocaleString()}</div>
           <div style={{ color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</div>
         </div>
         <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
         <div>
           <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: "#2196F3", fontFamily: "monospace" }}>{cumTotal.toLocaleString()}</div>
+          <div style={{ fontSize: 40, fontWeight: 900, color: "#2196F3", fontVariantNumeric: "tabular-nums" }}>{cumTotal.toLocaleString()}</div>
           <div style={{ color: "#556", fontSize: 14 }}>총 방문객</div>
         </div>
       </div>
@@ -1398,9 +1397,9 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
         {zoneData.filter(z => z.name).map(z => (
           <div key={z.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: selZone === z.id ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, border: selZone === z.id ? "1px solid rgba(76,175,80,0.2)" : "1px solid transparent" }}>
             <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{z.name}</span>
-            <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontFamily: "monospace", minWidth: 50, textAlign: "right" }}>{(z.count || 0).toLocaleString()}</span>
+            <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.count || 0).toLocaleString()}</span>
             <span style={{ color: "#445", fontSize: 14, margin: "0 2px" }}>/</span>
-            <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 700, fontFamily: "monospace", minWidth: 50, textAlign: "right" }}>{(z.cumulative || 0).toLocaleString()}</span>
+            <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.cumulative || 0).toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -1481,7 +1480,7 @@ function ParkingPage({ settings, setSettings, session }) {
           {/* 현황 */}
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <div style={{ color: "#8892b0", fontSize: 14, marginBottom: 4 }}>현재 주차</div>
-            <div style={{ fontSize: 44, fontWeight: 900, color: li.color, fontFamily: "monospace" }}>{(lot.current || 0).toLocaleString()}</div>
+            <div style={{ fontSize: 44, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{(lot.current || 0).toLocaleString()}</div>
             <div style={{ color: "#8892b0", fontSize: 13 }}>/ {lot.capacity.toLocaleString()}대</div>
             <div style={{ marginTop: 8, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: li.color, borderRadius: 4, transition: "width .5s" }} />
@@ -1570,7 +1569,7 @@ function ShuttlePage({ settings, setSettings, session }) {
           <div style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: isFull ? "rgba(244,67,54,0.08)" : "rgba(76,175,80,0.05)", border: `1.5px solid ${isFull ? "rgba(244,67,54,0.2)" : "rgba(76,175,80,0.12)"}` }}>
             <div style={{ textAlign: "center", marginBottom: 10 }}>
               <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>탑승인원</div>
-              <div style={{ fontSize: 42, fontWeight: 900, color: paxColor, fontFamily: "monospace" }}>{pax}</div>
+              <div style={{ fontSize: 42, fontWeight: 900, color: paxColor, fontVariantNumeric: "tabular-nums" }}>{pax}</div>
               <div style={{ color: "#8892b0", fontSize: 13 }}>/ {cap}명</div>
               {isFull && <div style={{ marginTop: 6, padding: "6px 20px", borderRadius: 20, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 14, fontWeight: 800, display: "inline-block", animation: "blink 1.5s infinite" }}>🚫 만차</div>}
             </div>
@@ -1865,7 +1864,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         ].map(c => (
           <div key={c.label} style={{ padding: "10px 6px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${c.color}33`, textAlign: "center" }}>
             <div style={{ fontSize: 14 }}>{c.icon}</div>
-            <div style={{ color: c.color, fontSize: 22, fontWeight: 900, fontFamily: "monospace" }}>{c.value}</div>
+            <div style={{ color: c.color, fontSize: 22, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
             <div style={{ color: "#556", fontSize: 12 }}>{c.label}</div>
           </div>
         ))}
@@ -2053,7 +2052,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                   return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.3 : 1, filter: isPast3 ? "grayscale(0.8)" : "none" }}>
                     {isNow3 && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
                     {isPast3 && <span style={{ padding: "2px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
-                    <span style={{ color: "#8892b0", fontSize: 12, fontFamily: "monospace", minWidth: 45 }}>{p.time}</span>
+                    <span style={{ color: "#8892b0", fontSize: 12, fontVariantNumeric: "tabular-nums", minWidth: 45 }}>{p.time}</span>
                     <span style={{ color: isPast3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
                     {p.location && <span style={{ color: "#445", fontSize: 12 }}>📍{p.location}</span>}
                   </div>);
@@ -2272,7 +2271,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
       <div style={{ display: "flex", alignItems: "center", gap: compact ? 8 : 12 }}>
         <div style={{ textAlign: "center", minWidth: compact ? 44 : 54, flexShrink: 0 }}>
           {dateLabel && <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>}
-          <div style={{ color: isPast ? "#555" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, fontFamily: "monospace" }}>{pg.time || "--"}</div>
+          <div style={{ color: isPast ? "#555" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{pg.time || "--"}</div>
           <div style={{ color: "#556", fontSize: 12 }}>~{pg.endTime}</div>
         </div>
         <div style={{ width: 3, minHeight: compact ? 30 : 40, background: isPast ? "#333" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
@@ -2664,7 +2663,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
             {s.memo && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>{s.memo}</div>}
           </div>
           <span style={{ padding: "3px 10px", borderRadius: 6, background: s.type==="LIVE"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.1)", color: s.type==="LIVE"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700 }}>{s.type}</span>
-          <span style={{ color: "#556", fontSize: 13, fontFamily: "monospace" }}>{s.playtime}</span>
+          <span style={{ color: "#556", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.playtime}</span>
         </div>)}
       </div>}
 
@@ -3440,7 +3439,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {tab === "monitor" && <div>{categories.map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id} style={{ border: `1px solid ${li.border}`, cursor: "pointer" }} onClick={() => { setTab(cat.kmaCategory ? "kma" : "apiconfig"); setFocusCat(cat.id); }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
         <div><span style={{ fontSize: 18, marginRight: 6 }}>{cat.icon}</span><span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{cat.name}</span></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 800, fontSize: 22, fontFamily: "monospace" }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 8px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.label}</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 800, fontSize: 22, fontVariantNumeric: "tabular-nums" }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 8px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.label}</span></div>
       </div>
       <div style={{ marginTop: 4, color: "#445", fontSize: 14 }}>{cat.kmaCategory ? `🌤️기상청 ${cat.kmaCategory}` : cat.apiConfig?.enabled ? "🔌커스텀API" : "✏️수동"} | 클릭하여 설정 ›</div>
       <HistoryChart cat={cat} />
@@ -3452,7 +3451,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 4px" }}>🌤️ 기상청 초단기실황조회 API</h3>
         <p style={{ color: "#556", fontSize: 13, margin: "0 0 16px" }}>공공데이터포털 VilageFcstInfoService_2.0 / getUltraSrtNcst</p>
         <div style={{ display: "grid", gap: 12 }}>
-          <div><Label>공공데이터포털 인증키 (ServiceKey)</Label><Input value={kma.serviceKey || ""} onChange={e => setSettings({ ...settings, kma: { ...kma, serviceKey: e.target.value } })} placeholder="인증키를 입력하세요 (Decoding 키)" style={{ fontFamily: "monospace", fontSize: 14 }} /></div>
+          <div><Label>공공데이터포털 인증키 (ServiceKey)</Label><Input value={kma.serviceKey || ""} onChange={e => setSettings({ ...settings, kma: { ...kma, serviceKey: e.target.value } })} placeholder="인증키를 입력하세요 (Decoding 키)" style={{ fontVariantNumeric: "tabular-nums", fontSize: 14 }} /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div><Label>수집 간격 (분)</Label><Input type="number" value={kma.interval || 10} onChange={e => setSettings({ ...settings, kma: { ...kma, interval: parseInt(e.target.value) || 10 } })} /></div>
             <div><Label>데이터 형식</Label><Input value="JSON" disabled style={{ color: "#556" }} /></div>
@@ -3496,12 +3495,12 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <span style={{ color: kmaTestResult.ok ? "#4CAF50" : "#F44336", fontSize: 14, fontWeight: 700 }}>{kmaTestResult.ok ? "✅ 성공" : "❌ 실패"}</span>
           {kmaTestResult.simulated && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", border: "1px solid rgba(255,152,0,0.3)", color: "#FF9800", fontSize: 14, fontWeight: 700 }}>시뮬레이션</span>}
         </div>
-        <pre style={{ color: "#aaa", fontSize: 13, margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace" }}>{kmaTestResult.msg}</pre>
+        <pre style={{ color: "#aaa", fontSize: 13, margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontVariantNumeric: "tabular-nums" }}>{kmaTestResult.msg}</pre>
         {kmaTestResult.items && <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
           <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 6px", fontWeight: 700 }}>수신 데이터:</p>
           {kmaTestResult.items.map((item, i) => (<div key={i} style={{ display: "flex", gap: 10, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
             <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 700, minWidth: 40 }}>{item.category}</span>
-            <span style={{ color: "#ccd6f6", fontSize: 14, fontFamily: "monospace" }}>{item.obsrValue}</span>
+            <span style={{ color: "#ccd6f6", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{item.obsrValue}</span>
             <span style={{ color: "#556", fontSize: 13 }}>{KMA_CODES[item.category]?.name || ""} ({KMA_CODES[item.category]?.unit || ""})</span>
           </div>))}
         </div>}
@@ -3708,7 +3707,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#F44336", fontSize: 15, margin: "0 0 4px" }}>🔴 안전관리책임자</h3>
         <p style={{ color: "#556", fontSize: 14, margin: "0 0 10px" }}>경계/경보 알림 + 조치중/조치완료 SMS 수신</p>
-        {(settings.smsManagers || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(244,67,54,0.05)", borderRadius: 6, border: "1px solid rgba(244,67,54,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontFamily: "monospace" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsManagers: settings.smsManagers.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
+        {(settings.smsManagers || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(244,67,54,0.05)", borderRadius: 6, border: "1px solid rgba(244,67,54,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsManagers: settings.smsManagers.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}><Input placeholder="이름" value={nc.name} onChange={e => setNc({ ...nc, name: e.target.value })} style={{ width: 80 }} /><Input placeholder="01012345678" value={nc.phone} onChange={e => setNc({ ...nc, phone: e.target.value })} style={{ flex: 1 }} /><button onClick={() => { if (nc.name && nc.phone) { setSettings({ ...settings, smsManagers: [...(settings.smsManagers || []), { name: nc.name, phone: nc.phone }] }); setNc({ name: "", phone: "" }); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontWeight: 700, cursor: "pointer" }}>추가</button></div>
       </Card>
 
@@ -3716,7 +3715,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#FF9800", fontSize: 15, margin: "0 0 4px" }}>🟠 안전요원</h3>
         <p style={{ color: "#556", fontSize: 14, margin: "0 0 10px" }}>경계/경보 알림 + 조치중/조치완료 SMS 수신</p>
-        {(settings.smsStaff || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(255,152,0,0.05)", borderRadius: 6, border: "1px solid rgba(255,152,0,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontFamily: "monospace" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsStaff: settings.smsStaff.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
+        {(settings.smsStaff || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(255,152,0,0.05)", borderRadius: 6, border: "1px solid rgba(255,152,0,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsStaff: settings.smsStaff.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}><Input placeholder="이름" value={nc.name} onChange={e => setNc({ ...nc, name: e.target.value })} style={{ width: 80 }} /><Input placeholder="01012345678" value={nc.phone} onChange={e => setNc({ ...nc, phone: e.target.value })} style={{ flex: 1 }} /><button onClick={() => { if (nc.name && nc.phone) { setSettings({ ...settings, smsStaff: [...(settings.smsStaff || []), { name: nc.name, phone: nc.phone }] }); setNc({ name: "", phone: "" }); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #FF9800, #F57C00)", color: "#fff", boxShadow: "0 4px 12px rgba(255,152,0,0.3)", fontWeight: 700, cursor: "pointer" }}>추가</button></div>
       </Card>
 
@@ -4122,7 +4121,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div key={w.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr 80px 1fr 1fr", gap: 6, padding: "6px 10px", borderRadius: 6, background: "rgba(255,255,255,0.02)" }}>
               <span style={{ color: w.role === "manager" ? "#F44336" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "책임자" : "요원"}</span>
               <span style={{ color: "#ccd6f6", fontSize: 13 }}>{w.name}</span>
-              <span style={{ color: "#8892b0", fontSize: 14, fontFamily: "monospace" }}>{w.phone}</span>
+              <span style={{ color: "#8892b0", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{w.phone}</span>
               <span style={{ color: "#8892b0", fontSize: 14 }}>{w.position || "-"}</span>
               <span style={{ color: "#8892b0", fontSize: 14 }}>{w.duty || "-"}</span>
             </div>
@@ -4165,7 +4164,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: pct >= 90 ? "#F44336" : pct >= 70 ? "#FF9800" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
             </div>
-            <span style={{ color: "#8892b0", fontSize: 13, fontFamily: "monospace", minWidth: 60, textAlign: "right" }}>{lot.current || 0}/{lot.capacity}</span>
+            <span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>{lot.current || 0}/{lot.capacity}</span>
             <span style={{ color: remain <= 0 ? "#F44336" : "#4CAF50", fontSize: 14, fontWeight: 700, minWidth: 45 }}>{remain <= 0 ? "만차" : `잔여${remain}`}</span>
           </div>;
         })}
@@ -4252,11 +4251,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div style={{ textAlign: "center", padding: 16, borderRadius: 12, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.15)" }}>
                 <div style={{ color: "#8892b0", fontSize: 13 }}>🏃 체류 인원</div>
-                <div style={{ color: "#4CAF50", fontSize: 32, fontWeight: 900, fontFamily: "monospace" }}>{curVal.toLocaleString()}</div>
+                <div style={{ color: "#4CAF50", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{curVal.toLocaleString()}</div>
               </div>
               <div style={{ textAlign: "center", padding: 16, borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)" }}>
                 <div style={{ color: "#8892b0", fontSize: 13 }}>📊 누적 방문</div>
-                <div style={{ color: "#2196F3", fontSize: 32, fontWeight: 900, fontFamily: "monospace" }}>{cumVal.toLocaleString()}</div>
+                <div style={{ color: "#2196F3", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
               </div>
             </div>
 
@@ -4286,8 +4285,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 {zoneData.filter(z => z.name).map(z => (
                   <div key={z.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
                     <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{z.name}</span>
-                    <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontFamily: "monospace", minWidth: 60, textAlign: "right" }}>체류 {(z.count || 0).toLocaleString()}</span>
-                    <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontFamily: "monospace", minWidth: 70, textAlign: "right", marginLeft: 8 }}>누적 {(z.cumulative || 0).toLocaleString()}</span>
+                    <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>체류 {(z.count || 0).toLocaleString()}</span>
+                    <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 70, textAlign: "right", marginLeft: 8 }}>누적 {(z.cumulative || 0).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -4699,7 +4698,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ minWidth: 50, textAlign: "center" }}>
                 <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>
-                <div style={{ color: "#ccd6f6", fontSize: 13, fontFamily: "monospace" }}>{pg.time || "--:--"}</div>
+                <div style={{ color: "#ccd6f6", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{pg.time || "--:--"}</div>
               </div>
               <span style={{ padding: "3px 8px", borderRadius: 6, background: `${cat.c}15`, color: cat.c, fontSize: 12, fontWeight: 700 }}>{cat.l}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -6019,15 +6018,15 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
     {/* Bottom nav */}
     {/* 더보기 메뉴 오버레이 */}
-    {showMore && <div onClick={() => setShowMore(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: "rgba(0,0,0,0.6)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#111118", borderRadius: "20px 20px 0 0", padding: "20px 16px 30px" }}>
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: "#333", margin: "0 auto 16px" }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+    {showMore && <div onClick={() => setShowMore(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: 0, right: 0, bottom: 64, background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderTop: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px 20px 0 0", padding: "12px 16px 16px", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {navs.map(n => (
-            <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "16px 4px", borderRadius: 14, border: page === n.id ? "2px solid #2196F3" : "1px solid #222", background: page === n.id ? "rgba(33,150,243,0.08)" : "rgba(255,255,255,0.02)", color: page === n.id ? "#2196F3" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, position: "relative" }}>
-              <span style={{ fontSize: 24 }}>{n.icon}</span>
-              <span style={{ fontSize: 13, fontWeight: page === n.id ? 700 : 400 }}>{n.label}</span>
-              {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 8, right: 12, width: 8, height: 8, borderRadius: 4, background: "#2196F3" }} />}
+            <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "12px 4px", borderRadius: 12, border: page === n.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: page === n.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: page === n.id ? "#2196F3" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative", transition: "all 0.2s" }}>
+              <span style={{ fontSize: 22, lineHeight: 1 }}>{n.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: page === n.id ? 700 : 500 }}>{n.label}</span>
+              {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: 8, width: 7, height: 7, borderRadius: 4, background: "#2196F3", boxShadow: "0 0 8px rgba(33,150,243,0.6)" }} />}
             </button>
           ))}
         </div>
