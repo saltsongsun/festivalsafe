@@ -6018,17 +6018,24 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
     {/* Bottom nav */}
     {/* 더보기 메뉴 오버레이 */}
-    {showMore && <div onClick={() => setShowMore(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderTop: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px 20px 0 0", padding: "16px 16px 24px", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 16px" }} />
-        <div style={{ maxWidth: 480, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-          {navs.map(n => (
-            <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "14px 4px", borderRadius: 14, border: page === n.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: page === n.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: page === n.id ? "#2196F3" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, position: "relative", transition: "all 0.2s" }}>
-              <span style={{ fontSize: 22 }}>{n.icon}</span>
-              <span style={{ fontSize: 12, fontWeight: page === n.id ? 700 : 500 }}>{n.label}</span>
-              {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 8, right: 10, width: 7, height: 7, borderRadius: 4, background: "#2196F3", boxShadow: "0 0 8px rgba(33,150,243,0.6)" }} />}
-            </button>
-          ))}
+    {showMore && <div onClick={() => setShowMore(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: 0, right: 0, bottom: 64, background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderTop: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px 20px 0 0", padding: "12px 16px 16px", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+          {(() => {
+            const MAX = 5;
+            const pinned = navs.slice(0, MAX - 1).map(n => n.id);
+            const isInPinned = pinned.includes(page);
+            const visibleIds = isInPinned ? pinned : [...pinned.slice(0, MAX - 2), page];
+            return navs.filter(n => !visibleIds.includes(n.id)).map(n => (
+              <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "12px 4px", borderRadius: 12, border: page === n.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: page === n.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: page === n.id ? "#2196F3" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative", transition: "all 0.2s" }}>
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{n.icon}</span>
+                <span style={{ fontSize: 12, fontWeight: page === n.id ? 700 : 500 }}>{n.label}</span>
+                {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: 8, width: 7, height: 7, borderRadius: 4, background: "#2196F3", boxShadow: "0 0 8px rgba(33,150,243,0.6)" }} />}
+                {n.id === "inbox" && unreadCount > 0 && <span style={{ position: "absolute", top: 4, right: 6, padding: "1px 5px", borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", fontSize: 10, fontWeight: 700 }}>{unreadCount > 9 ? "9+" : unreadCount}</span>}
+              </button>
+            ));
+          })()}
         </div>
       </div>
     </div>}
