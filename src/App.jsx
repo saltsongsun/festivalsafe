@@ -15,10 +15,10 @@ try {
 
 // ─── Constants ───────────────────────────────────────────────────
 const LEVELS = {
-  BLUE: { label: "정상", color: "#2196F3", bg: "rgba(33,150,243,0.12)", border: "rgba(33,150,243,0.3)", icon: "✅" },
-  YELLOW: { label: "주의", color: "#FFC107", bg: "rgba(255,193,7,0.12)", border: "rgba(255,193,7,0.3)", icon: "⚡" },
-  ORANGE: { label: "경계", color: "#FF9800", bg: "rgba(255,152,0,0.15)", border: "rgba(255,152,0,0.4)", icon: "⚠️" },
-  RED: { label: "경보", color: "#F44336", bg: "rgba(244,67,54,0.15)", border: "rgba(244,67,54,0.4)", icon: "🚨" },
+  BLUE: { label: "정상", color: "#42A5F5", bg: "rgba(66,165,245,0.18)", border: "rgba(66,165,245,0.45)", icon: "✅" },
+  YELLOW: { label: "주의", color: "#FFD54F", bg: "rgba(255,213,79,0.18)", border: "rgba(255,213,79,0.45)", icon: "⚡" },
+  ORANGE: { label: "경계", color: "#FFB74D", bg: "rgba(255,183,77,0.2)", border: "rgba(255,183,77,0.5)", icon: "⚠️" },
+  RED: { label: "경보", color: "#FF5252", bg: "rgba(255,82,82,0.2)", border: "rgba(255,82,82,0.5)", icon: "🚨" },
 };
 const LV_ORDER = ["BLUE", "YELLOW", "ORANGE", "RED"];
 
@@ -424,7 +424,7 @@ async function sendSolapi(s, text, contacts) {
 const Card = ({ children, style, onClick }) => <div onClick={onClick} style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))", borderRadius: 16, padding: 20, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.2)", backdropFilter: "blur(10px)", ...style }}>{children}</div>;
 const Label = ({ children }) => <label style={{ color: "#8892b0", fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6, letterSpacing: 0.2 }}>{children}</label>;
 const Input = ({ style, ...p }) => <input {...p} style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, boxSizing: "border-box", transition: "all 0.2s", ...style }} />;
-const Toggle = ({ on, onToggle, labelOn, labelOff }) => (<div style={{ display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 56, height: 30, borderRadius: 15, background: on ? "#4CAF50" : "#333", cursor: "pointer", position: "relative", transition: "all .3s" }} onClick={onToggle}><div style={{ width: 24, height: 24, borderRadius: 12, background: "#fff", position: "absolute", top: 3, left: on ? 29 : 3, transition: "all .3s", boxShadow: "0 2px 4px rgba(0,0,0,.3)" }} /></div><span style={{ color: on ? "#4CAF50" : "#666", fontWeight: 700, fontSize: 14 }}>{on ? labelOn : labelOff}</span></div>);
+const Toggle = ({ on, onToggle, labelOn, labelOff }) => (<div style={{ display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 56, height: 30, borderRadius: 15, background: on ? "#66BB6A" : "#333", cursor: "pointer", position: "relative", transition: "all .3s" }} onClick={onToggle}><div style={{ width: 24, height: 24, borderRadius: 12, background: "#fff", position: "absolute", top: 3, left: on ? 29 : 3, transition: "all .3s", boxShadow: "0 2px 4px rgba(0,0,0,.3)" }} /></div><span style={{ color: on ? "#66BB6A" : "#666", fontWeight: 700, fontSize: 14 }}>{on ? labelOn : labelOff}</span></div>);
 
 function AlertToast({ alert, onClose }) {
   if (!alert) return null; const lv = LEVELS[alert.level];
@@ -449,8 +449,8 @@ function HistoryChart({ cat }) {
       <YAxis domain={[Math.floor(yMin), Math.ceil(yMax)]} tick={{ fill: "#445", fontSize: 13 }} width={45} />
       <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, cat.name]} />
       {thr.YELLOW?.[0] > 0 && <ReferenceLine y={thr.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" strokeWidth={1} />}
-      {thr.ORANGE?.[0] > 0 && <ReferenceLine y={thr.ORANGE[0]} stroke="#FF9800" strokeDasharray="4 4" strokeWidth={1} />}
-      {thr.RED?.[0] > 0 && thr.RED[0] !== Infinity && <ReferenceLine y={thr.RED[0]} stroke="#F44336" strokeDasharray="4 4" strokeWidth={1} />}
+      {thr.ORANGE?.[0] > 0 && <ReferenceLine y={thr.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" strokeWidth={1} />}
+      {thr.RED?.[0] > 0 && thr.RED[0] !== Infinity && <ReferenceLine y={thr.RED[0]} stroke="#EF5350" strokeDasharray="4 4" strokeWidth={1} />}
       <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} dot={{ fill: color, r: 2.5 }} activeDot={{ r: 5 }} />
     </LineChart></ResponsiveContainer></div>);
 }
@@ -489,8 +489,8 @@ function DashboardOrgChart({ settings, show, onToggle }) {
     if (!isOrg) {
       return (<div key={node.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, marginBottom: 4 }}>
         <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
-        {node.position && <span style={{ color: "#4CAF50", fontSize: 12 }}>{node.position}</span>}
-        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
+        {node.position && <span style={{ color: "#66BB6A", fontSize: 12 }}>{node.position}</span>}
+        {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#66BB6A", fontSize: 13, fontWeight: 700, textDecoration: "none", marginLeft: "auto" }}>📞</a>}
       </div>);
     }
 
@@ -498,8 +498,8 @@ function DashboardOrgChart({ settings, show, onToggle }) {
       <div style={{ borderRadius: 10, border: "1px solid rgba(33,150,243,0.15)", overflow: "hidden" }}>
         <div style={{ padding: "8px 12px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 14 }}>🏢</span>
-          <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 800, flex: 1 }}>{node.name}</span>
-          {node.position && <span style={{ color: "#2196F3", fontSize: 12 }}>{node.position}</span>}
+          <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 800, flex: 1 }}>{node.name}</span>
+          {node.position && <span style={{ color: "#42A5F5", fontSize: 12 }}>{node.position}</span>}
           <span style={{ color: "#556", fontSize: 12 }}>{childPersons.length}명</span>
         </div>
         {childPersons.length > 0 && <div style={{ padding: "4px 10px 6px" }}>
@@ -530,9 +530,9 @@ function DashboardOrgChart({ settings, show, onToggle }) {
             const parentOrg = orgData.find(o => o.id === n.parentId && o.type === "org");
             return (<div key={n.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", borderRadius: 8, gap: 10, background: "rgba(255,255,255,0.02)", flexWrap: "wrap" }}>
               <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, minWidth: 50 }}>{n.name}</span>
-              {n.position && <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 600, minWidth: 50 }}>{n.position}</span>}
+              {n.position && <span style={{ color: "#66BB6A", fontSize: 14, fontWeight: 600, minWidth: 50 }}>{n.position}</span>}
               {parentOrg && <span style={{ color: "#556", fontSize: 14, flex: 1 }}>🏢 {parentOrg.name}</span>}
-              <a href={`tel:${n.phone.replace(/-/g, "")}`} style={{ padding: "8px 16px", borderRadius: 20, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", color: "#4CAF50", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>📞 {n.phone}</a>
+              <a href={`tel:${n.phone.replace(/-/g, "")}`} style={{ padding: "8px 16px", borderRadius: 20, background: "rgba(76,175,80,0.12)", border: "1px solid rgba(76,175,80,0.25)", color: "#66BB6A", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>📞 {n.phone}</a>
             </div>);
           })}
         </div>
@@ -610,7 +610,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <div style={{ fontSize: 42, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{selected.currentValue.toLocaleString()}<span style={{ fontSize: 16, color: "#8892b0", marginLeft: 4 }}>{selected.unit}</span></div>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 4, alignItems: "center" }}>
                 <span style={{ padding: "4px 12px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</span>
-                {selected.actionStatus && <span style={{ padding: "6px 12px", borderRadius: 20, background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", border: `1px solid ${selected.actionStatus === "handling" ? "rgba(255,152,0,0.3)" : "rgba(76,175,80,0.3)"}`, color: selected.actionStatus === "handling" ? "#FF9800" : "#4CAF50", fontSize: 13, fontWeight: 700 }}>{selected.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>}
+                {selected.actionStatus && <span style={{ padding: "6px 12px", borderRadius: 20, background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(76,175,80,0.15)", border: `1px solid ${selected.actionStatus === "handling" ? "rgba(255,152,0,0.3)" : "rgba(76,175,80,0.3)"}`, color: selected.actionStatus === "handling" ? "#FFA726" : "#66BB6A", fontSize: 13, fontWeight: 700 }}>{selected.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>}
               </div>
             </div>
           </div>
@@ -628,11 +628,11 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                 <div style={{ textAlign: "center", padding: 14, borderRadius: 12, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.15)" }}>
                   <div style={{ color: "#8892b0", fontSize: 13 }}>🏃 현재 체류</div>
-                  <div style={{ color: "#4CAF50", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{selected.currentValue.toLocaleString()}</div>
+                  <div style={{ color: "#66BB6A", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{selected.currentValue.toLocaleString()}</div>
                 </div>
                 <div style={{ textAlign: "center", padding: 14, borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)" }}>
                   <div style={{ color: "#8892b0", fontSize: 13 }}>📊 누적 방문</div>
-                  <div style={{ color: "#2196F3", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
+                  <div style={{ color: "#42A5F5", fontSize: 28, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
                 </div>
               </div>
 
@@ -646,8 +646,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <YAxis tick={{ fill: "#556", fontSize: 14 }} width={50} />
                     <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()}명`, "체류"]} />
                     {!selected.isTempDual && selected.thresholds.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" label={{ value: "주의", fill: "#FFC107", fontSize: 14 }} />}
-                    {!selected.isTempDual && selected.thresholds.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FF9800" strokeDasharray="4 4" label={{ value: "경계", fill: "#FF9800", fontSize: 14 }} />}
-                    <Line type="monotone" dataKey="value" stroke="#4CAF50" strokeWidth={3} dot={{ fill: "#4CAF50", r: 3 }} />
+                    {!selected.isTempDual && selected.thresholds.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" label={{ value: "경계", fill: "#FFA726", fontSize: 14 }} />}
+                    <Line type="monotone" dataKey="value" stroke="#66BB6A" strokeWidth={3} dot={{ fill: "#66BB6A", r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>}
@@ -661,8 +661,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 14 }} interval="preserveStartEnd" />
                     <YAxis tick={{ fill: "#556", fontSize: 14 }} width={50} />
                     <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} />
-                    <Line type="monotone" dataKey="체류" stroke="#4CAF50" strokeWidth={2} dot={false} name="🏃 체류" />
-                    <Line type="monotone" dataKey="누적" stroke="#2196F3" strokeWidth={2} dot={false} name="📊 누적" />
+                    <Line type="monotone" dataKey="체류" stroke="#66BB6A" strokeWidth={2} dot={false} name="🏃 체류" />
+                    <Line type="monotone" dataKey="누적" stroke="#42A5F5" strokeWidth={2} dot={false} name="📊 누적" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>}
@@ -682,16 +682,16 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <XAxis dataKey="date" tick={{ fill: "#556", fontSize: 13 }} />
                     <YAxis tick={{ fill: "#556", fontSize: 14 }} width={50} />
                     <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} />
-                    <Line type="monotone" dataKey="누적방문" stroke="#2196F3" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="최대체류" stroke="#FF9800" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="누적방문" stroke="#42A5F5" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="최대체류" stroke="#FFA726" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>}
                 <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
                   {(settings.dailyRecords || []).map((r, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", padding: "6px 12px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6 }}>
                       <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{r.date}</span>
-                      <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, marginRight: 12 }}>누적 {(r.cumulative || 0).toLocaleString()}</span>
-                      <span style={{ color: "#FF9800", fontSize: 13 }}>최대 {(r.peakCurrent || 0).toLocaleString()}</span>
+                      <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 700, marginRight: 12 }}>누적 {(r.cumulative || 0).toLocaleString()}</span>
+                      <span style={{ color: "#FFA726", fontSize: 13 }}>최대 {(r.peakCurrent || 0).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -705,9 +705,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                     <div key={z.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
                       <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1 }}>{z.name}</span>
                       <div style={{ textAlign: "right" }}>
-                        <span style={{ color: "#4CAF50", fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{(z.count || 0).toLocaleString()}</span>
+                        <span style={{ color: "#66BB6A", fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{(z.count || 0).toLocaleString()}</span>
                         <span style={{ color: "#445", fontSize: 14, margin: "0 4px" }}>/</span>
-                        <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{(z.cumulative || 0).toLocaleString()}</span>
+                        <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{(z.cumulative || 0).toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
@@ -727,7 +727,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "실황"]} />
                   {!selected.isTempDual && selected.thresholds.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" label={{ value: "주의", fill: "#FFC107", fontSize: 14 }} />}
-                  {!selected.isTempDual && selected.thresholds.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FF9800" strokeDasharray="4 4" label={{ value: "경계", fill: "#FF9800", fontSize: 14 }} />}
+                  {!selected.isTempDual && selected.thresholds.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" label={{ value: "경계", fill: "#FFA726", fontSize: 14 }} />}
                   <Line type="monotone" dataKey="value" stroke={li.color} strokeWidth={3} dot={{ fill: li.color, r: 3 }} activeDot={{ r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -736,7 +736,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
           {/* 초단기 예보 그래프 */}
           {(selected.forecast || []).length > 0 && <div style={{ marginBottom: 16 }}>
-            <h3 style={{ color: "#FF9800", fontSize: 13, marginBottom: 8 }}>📋 초단기 예보 (향후 6시간)</h3>
+            <h3 style={{ color: "#FFA726", fontSize: 13, marginBottom: 8 }}>📋 초단기 예보 (향후 6시간)</h3>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
                 <LineChart data={selected.forecast} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
@@ -744,13 +744,13 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 13 }} />
                   <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "예보"]} />
-                  <Line type="monotone" dataKey="value" stroke="#FF9800" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#FF9800", r: 3 }} />
+                  <Line type="monotone" dataKey="value" stroke="#FFA726" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#FFA726", r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: li.color }} /><span style={{ color: "#556", fontSize: 14 }}>실황</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#FF9800", borderTop: "2px dashed #FF9800" }} /><span style={{ color: "#556", fontSize: 14 }}>예보</span></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#FFA726", borderTop: "2px dashed #FF9800" }} /><span style={{ color: "#556", fontSize: 14 }}>예보</span></div>
             </div>
           </div>}
 
@@ -767,18 +767,18 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <button onClick={() => onAction?.(selected.id, "handling")} style={{
               flex: 1, padding: "12px", borderRadius: 10, border: selected.actionStatus === "handling" ? "2px solid #FF9800" : "1px solid #444",
               background: selected.actionStatus === "handling" ? "rgba(255,152,0,0.15)" : "rgba(255,255,255,0.03)",
-              color: selected.actionStatus === "handling" ? "#FF9800" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer"
+              color: selected.actionStatus === "handling" ? "#FFA726" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer"
             }}>🔧 조치중</button>
             <button onClick={() => onAction?.(selected.id, "resolved")} style={{
               flex: 1, padding: "12px", borderRadius: 10, border: selected.actionStatus === "resolved" ? "2px solid #4CAF50" : "1px solid #444",
               background: selected.actionStatus === "resolved" ? "rgba(76,175,80,0.15)" : "rgba(255,255,255,0.03)",
-              color: selected.actionStatus === "resolved" ? "#4CAF50" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer"
+              color: selected.actionStatus === "resolved" ? "#66BB6A" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer"
             }}>✅ 조치완료</button>
           </div>}
 
           {/* 조치사항 작성 */}
           {isWarning && <div style={{ padding: 14, borderRadius: 10, background: "rgba(255,152,0,0.05)", border: "1px solid rgba(255,152,0,0.15)", marginBottom: 12 }}>
-            <h4 style={{ color: "#FF9800", fontSize: 13, margin: "0 0 10px", fontWeight: 700 }}>📝 조치사항 작성</h4>
+            <h4 style={{ color: "#FFA726", fontSize: 13, margin: "0 0 10px", fontWeight: 700 }}>📝 조치사항 작성</h4>
             <textarea id={`action-text-${selected.id}`} placeholder="조치 내용을 입력하세요..." defaultValue={selected.actionReport?.content || ""} style={{ width: "100%", minHeight: 70, padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} />
             <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
               <Label style={{ margin: 0, flex: "0 0 auto" }}>담당자</Label>
@@ -796,7 +796,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             {selected.actionReport?.content && <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>최근 조치 기록:</div>
               <div style={{ color: "#ccd6f6", fontSize: 14, whiteSpace: "pre-wrap" }}>{selected.actionReport.content}</div>
-              {selected.actionReport.assigneeName && <div style={{ color: "#FF9800", fontSize: 13, marginTop: 4 }}>👤 담당: {selected.actionReport.assigneeName}</div>}
+              {selected.actionReport.assigneeName && <div style={{ color: "#FFA726", fontSize: 13, marginTop: 4 }}>👤 담당: {selected.actionReport.assigneeName}</div>}
               {selected.actionReport.createdAt && <div style={{ color: "#445", fontSize: 14, marginTop: 2 }}>🕐 {selected.actionReport.createdAt}</div>}
             </div>}
           </div>}
@@ -809,7 +809,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
 
           {/* CMS 설정 이동 */}
           <button onClick={() => onCardClick(selected.id)} style={{ marginTop: 14, width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#556", fontSize: 14, cursor: "pointer" }}>⚙️ CMS 설정으로 이동</button>
-          <button onClick={() => setSelectedId(null)} style={{ marginTop: 8, width: "100%", padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>← 전체 현황으로 돌아가기</button>
+          <button onClick={() => setSelectedId(null)} style={{ marginTop: 8, width: "100%", padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>← 전체 현황으로 돌아가기</button>
         </div>
       </div>
     </div>);
@@ -834,11 +834,11 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
-        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.12)", color: "#4CAF50", fontSize: 11, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
+        {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.12)", color: "#66BB6A", fontSize: 11, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
         {loc.name && <span style={{ color: "#556", fontSize: 11, padding: "5px 4px" }}>📍 {loc.name}</span>}
-        {kma.enabled && <span style={{ color: "#4CAF50", fontSize: 11, padding: "5px 4px" }}>🌤️ LIVE</span>}
+        {kma.enabled && <span style={{ color: "#66BB6A", fontSize: 11, padding: "5px 4px" }}>🌤️ LIVE</span>}
         <span style={{ flex: 1 }} />
-        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.04)", color: "#2196F3", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={handleRefresh} disabled={spinning} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.04)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none", marginRight: 4 }}>🔄</span>{spinning ? "..." : "최신화"}
         </button>
         {updateAvailable && <button onClick={() => {
@@ -853,7 +853,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     {/* 긴급상황 배너 */}
     {settings.emergencyLevel > 0 && <div style={{ maxWidth: 900, margin: "0 auto 10px", padding: "14px 18px", borderRadius: 14, background: settings.emergencyLevel >= 3 ? "linear-gradient(135deg, rgba(244,67,54,0.2), rgba(244,67,54,0.05))" : "linear-gradient(135deg, rgba(255,152,0,0.15), rgba(255,152,0,0.03))", border: `2px solid ${settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.5)" : "rgba(255,152,0,0.4)"}`, textAlign: "center", animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none", boxShadow: settings.emergencyLevel >= 3 ? "0 4px 20px rgba(244,67,54,0.2)" : "none" }}>
       <span style={{ fontSize: 22 }}>🚨</span>
-      <span style={{ color: settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800", fontWeight: 800, fontSize: 18, marginLeft: 8, letterSpacing: -0.3 }}>{["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</span>
+      <span style={{ color: settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726", fontWeight: 800, fontSize: 18, marginLeft: 8, letterSpacing: -0.3 }}>{["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</span>
       {settings.emergencyMessage && <div style={{ color: "#ccd6f6", fontSize: 13, marginTop: 6 }}>{settings.emergencyMessage}</div>}
     </div>}
 
@@ -871,7 +871,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     {/* 조치중 */}
     {(() => { const handling = categories.filter(c => c.actionStatus === "handling"); return handling.length > 0 ? (
       <div style={{ maxWidth: 1100, margin: "0 auto 6px", padding: "8px 12px", borderRadius: 10, background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.2)" }}>
-        <span style={{ color: "#FF9800", fontWeight: 700, fontSize: 13 }}>🔧 조치중 {handling.length}건</span>
+        <span style={{ color: "#FFA726", fontWeight: 700, fontSize: 13 }}>🔧 조치중 {handling.length}건</span>
         {handling.map(cat => <span key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ marginLeft: 8, color: "#ccd6f6", fontSize: 12, cursor: "pointer" }}>{cat.icon}{cat.name}</span>)}
       </div>
     ) : null; })()}
@@ -894,7 +894,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
             <span style={{ color: "#ccd6f6", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
             <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}40`, color: li.color, fontSize: 11, fontWeight: 700 }}>{li.icon} {li.label}</span>
-            {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 11, fontWeight: 700 }}>🔧 조치중</span>}
+            {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 11, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
             <div>
@@ -918,7 +918,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               <div key={g.id} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
                 <div style={{ color: "#556", fontSize: 11, marginBottom: 4, fontWeight: 500 }}>🚪 {g.name}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ color: "#4CAF50", fontSize: 18, fontWeight: 600, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>{g.count}</span>
+                  <span style={{ color: "#66BB6A", fontSize: 18, fontWeight: 600, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>{g.count}</span>
                   <span style={{ color: "#445", fontSize: 11 }}>체류</span>
                   <span style={{ color: "#445", fontSize: 11, marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>누적 {g.cumulative}</span>
                 </div>
@@ -932,7 +932,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
       {(settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).map(z => {
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
-        const CL = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, danger: { label: "위험", color: "#F44336", icon: "🔴" } };
+        const CL = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, danger: { label: "위험", color: "#EF5350", icon: "🔴" } };
         const cl = c ? CL[c.level] : null;
         return (<div key={z.id} style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,0.025)", border: `1px solid ${cl?.color || "rgba(255,255,255,0.05)"}33` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: c?.memo || c?.photos?.length ? 10 : 0 }}>
@@ -981,7 +981,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
               {nextFc && <div style={{ textAlign: "right" }}>
                 <div style={{ color: "#445", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>예보</div>
                 <div style={{ display: "inline-flex", alignItems: "baseline", gap: 3 }}>
-                  <span style={{ fontSize: 14, color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+                  <span style={{ fontSize: 14, color: nextFc.value > cat.currentValue ? "#EF5350" : nextFc.value < cat.currentValue ? "#42A5F5" : "#556" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
                   <span style={{ fontSize: 20, fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", color: "#8892b0", lineHeight: 1, letterSpacing: -0.5 }}>{nextFc.value}</span>
                 </div>
                 <div style={{ fontSize: 10, color: "#445", marginTop: 4 }}>{nextFc.time}</div>
@@ -1004,12 +1004,12 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 17 }}>{cat.name}</span>
-                {tl && <span style={{ color: tl.includes("저온") ? "#2196F3" : "#F44336", fontSize: 13, fontWeight: 700 }}>{tl}</span>}
+                {tl && <span style={{ color: tl.includes("저온") ? "#42A5F5" : "#EF5350", fontSize: 13, fontWeight: 700 }}>{tl}</span>}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
                 <span style={{ fontSize: 32, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{cat.currentValue.toLocaleString()}</span>
                 <span style={{ fontSize: 16, color: "#8892b0" }}>{cat.unit}</span>
-                {nextFc && <span style={{ fontSize: 18, fontVariantNumeric: "tabular-nums", color: nextFc.value > cat.currentValue ? "#F44336" : nextFc.value < cat.currentValue ? "#2196F3" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
+                {nextFc && <span style={{ fontSize: 18, fontVariantNumeric: "tabular-nums", color: nextFc.value > cat.currentValue ? "#EF5350" : nextFc.value < cat.currentValue ? "#42A5F5" : "#556", marginLeft: 6 }}>{nextFc.value > cat.currentValue ? "↑" : "↓"} {nextFc.value}</span>}
               </div>
             </div>
             <span style={{ padding: "6px 12px", borderRadius: 10, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 15, fontWeight: 700 }}>{li.label}</span>
@@ -1023,7 +1023,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
         {(settings.parkingLots || []).map(lot => {
           const pct = lot.capacity > 0 ? Math.round((lot.current||0)/lot.capacity*100) : 0;
-          const color = pct>=100?"#F44336":pct>=90?"#FF9800":pct>=70?"#FFC107":"#4CAF50";
+          const color = pct>=100?"#EF5350":pct>=90?"#FFA726":pct>=70?"#FFC107":"#66BB6A";
           const label = pct>=100?"만차":pct>=90?"혼잡":pct>=70?"보통":"여유";
           return (<div key={lot.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${color}33` }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
@@ -1055,18 +1055,18 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           const pct = Math.round(pax/cap*100);
           const stops = (settings.shuttleStops || []).sort((a,b) => (a.order||0)-(b.order||0));
           const curIdx = stops.findIndex(s => s.id === bus.currentStopId);
-          return (<div key={bus.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${isRun ? "#4CAF50" : "#FF9800"}33` }}>
+          return (<div key={bus.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: "16px", border: `1.5px solid ${isRun ? "#66BB6A" : "#FFA726"}33` }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 20, marginRight: 8 }}>🚌</span>
               <span style={{ color: "#ccd6f6", fontWeight: 800, fontSize: 16, flex: 1 }}>{bus.name}</span>
-              <span style={{ padding: "6px 12px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#4CAF50" : "#FF9800", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
+              <span style={{ padding: "6px 12px", borderRadius: 8, background: isRun ? "rgba(76,175,80,0.12)" : "rgba(255,152,0,0.12)", color: isRun ? "#66BB6A" : "#FFA726", fontSize: 13, fontWeight: 700 }}>{isRun ? "● 운행중" : "○ 대기"}</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
               <span style={{ fontSize: 16 }}>👥</span>
-              <span style={{ color: pax>=cap ? "#F44336" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{pax}</span>
+              <span style={{ color: pax>=cap ? "#EF5350" : "#ccd6f6", fontSize: 24, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{pax}</span>
               <span style={{ color: "#556", fontSize: 14 }}>/ {cap}명</span>
               <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", marginLeft: 8 }}>
-                <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#F44336" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
+                <div style={{ height: "100%", width: `${Math.min(pct,100)}%`, background: pax>=cap ? "#EF5350" : "#66BB6A", borderRadius: 3, transition: "width .5s" }} />
               </div>
             </div>
             {/* 정류장 노선도 */}
@@ -1103,7 +1103,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <div style={{ maxWidth: 1100, margin: "20px auto 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <h3 style={{ color: "#8892b0", fontSize: 13, fontWeight: 700, margin: 0 }}>🔔 최근 알림</h3>
-          <button onClick={() => onDeleteAlert?.("all")} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>
+          <button onClick={() => onDeleteAlert?.("all")} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>
         </div>
         {alerts.slice(0, 5).map((a, i) => { const ali = LEVELS[a.level]; return (
           <div key={i} style={{ background: ali.bg, borderRadius: 8, padding: "10px 14px", border: `1px solid ${ali.border}`, marginBottom: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1131,15 +1131,15 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           {/* 헤더 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
             <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "6px 10px", background: "rgba(255,152,0,0.1)", borderRadius: "8px 0 0 0", border: "1px solid rgba(255,152,0,0.15)" }}>
-              <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700 }}>항목</span>
-              <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700 }}>지시사항</span>
-              <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700, textAlign: "right" }}>지시일자</span>
+              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>항목</span>
+              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>지시사항</span>
+              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700, textAlign: "right" }}>지시일자</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#556", fontSize: 14 }}>→</div>
             <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "6px 10px", background: "rgba(76,175,80,0.1)", borderRadius: "0 8px 0 0", border: "1px solid rgba(76,175,80,0.15)" }}>
-              <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>항목</span>
-              <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>조치사항</span>
-              <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700, textAlign: "right" }}>완료일자</span>
+              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>항목</span>
+              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>조치사항</span>
+              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, textAlign: "right" }}>완료일자</span>
             </div>
           </div>
 
@@ -1151,9 +1151,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                 <span style={{ color: "#ddd", fontSize: 14 }}>{cat.actionReport?.content || "지시 대기"}</span>
                 <span style={{ color: "#888", fontSize: 13, textAlign: "right" }}>{cat.handlingStartedAt || "-"}</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#FF9800", fontSize: 14 }}>🔧</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#FFA726", fontSize: 14 }}>🔧</div>
               <div style={{ display: "flex", alignItems: "center", padding: "8px 10px", background: "rgba(255,152,0,0.03)", border: "1px solid rgba(255,152,0,0.08)", borderRadius: "0 4px 4px 0" }}>
-                <span style={{ color: "#FF9800", fontSize: 13, fontStyle: "italic" }}>조치 진행중...</span>
+                <span style={{ color: "#FFA726", fontSize: 13, fontStyle: "italic" }}>조치 진행중...</span>
               </div>
             </div>
           ))}
@@ -1166,9 +1166,9 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                 <span style={{ color: "#888", fontSize: 14 }}>{r.instruction || "-"}</span>
                 <span style={{ color: "#556", fontSize: 13, textAlign: "right" }}>{r.instructedAt || "-"}</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#4CAF50", fontSize: 14 }}>✅</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#66BB6A", fontSize: 14 }}>✅</div>
               <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(76,175,80,0.03)", border: "1px solid rgba(76,175,80,0.08)", borderRadius: "0 4px 4px 0" }}>
-                <span style={{ color: "#4CAF50", fontSize: 13 }}>{r.icon}{r.name}</span>
+                <span style={{ color: "#66BB6A", fontSize: 13 }}>{r.icon}{r.name}</span>
                 <span style={{ color: "#aaa", fontSize: 14 }}>{r.resolution || "완료"}</span>
                 <span style={{ color: "#556", fontSize: 13, textAlign: "right" }}>{r.resolvedAt}</span>
               </div>
@@ -1331,10 +1331,10 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
 
     {showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === myGate.id); return z ? (
       <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, padding: 16, borderRadius: 16, background: "rgba(76,175,80,0.06)", border: "1.5px solid rgba(76,175,80,0.2)", textAlign: "center" }}>
-        <div style={{ color: "#4CAF50", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 내 출입구: {z.name}</div>
+        <div style={{ color: "#66BB6A", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 내 출입구: {z.name}</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 30 }}>
-          <Stat label="체류" value={z.count || 0} color="#4CAF50" />
-          <Stat label="누적" value={z.cumulative || 0} color="#2196F3" />
+          <Stat label="체류" value={z.count || 0} color="#66BB6A" />
+          <Stat label="누적" value={z.cumulative || 0} color="#42A5F5" />
         </div>
       </div>
     ) : null; })()}
@@ -1349,7 +1349,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
         <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
         <div>
           <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: "#2196F3", fontVariantNumeric: "tabular-nums" }}>{cumTotal.toLocaleString()}</div>
+          <div style={{ fontSize: 40, fontWeight: 900, color: "#42A5F5", fontVariantNumeric: "tabular-nums" }}>{cumTotal.toLocaleString()}</div>
           <div style={{ color: "#556", fontSize: 14 }}>총 방문객</div>
         </div>
       </div>
@@ -1358,32 +1358,32 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
 
     {hasGates && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#2196F3" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>전체</button>
+        <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#42A5F5" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>전체</button>
         {zoneData.filter(z => z.name).map(z => (
-          <button key={z.id} onClick={() => setSelZone(z.id)} style={{ padding: "8px 14px", borderRadius: 8, border: selZone === z.id ? "1.5px solid #4CAF50" : "1px solid #333", background: selZone === z.id ? "rgba(76,175,80,0.15)" : "transparent", color: selZone === z.id ? "#4CAF50" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          <button key={z.id} onClick={() => setSelZone(z.id)} style={{ padding: "8px 14px", borderRadius: 8, border: selZone === z.id ? "1.5px solid #4CAF50" : "1px solid #333", background: selZone === z.id ? "rgba(76,175,80,0.15)" : "transparent", color: selZone === z.id ? "#66BB6A" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             {z.name} ({z.count || 0})
           </button>
         ))}
       </div>
       {selZone && !showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === selZone); return z ? (
         <div style={{ textAlign: "center", marginTop: 8, padding: 10, background: "rgba(76,175,80,0.06)", borderRadius: 8, border: "1px solid rgba(76,175,80,0.15)" }}>
-          <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>📍 {z.name}</span>
+          <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>📍 {z.name}</span>
           <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 6 }}>
-            <Stat label="체류" value={z.count || 0} color="#4CAF50" />
-            <Stat label="누적" value={z.cumulative || 0} color="#2196F3" />
+            <Stat label="체류" value={z.count || 0} color="#66BB6A" />
+            <Stat label="누적" value={z.cumulative || 0} color="#42A5F5" />
           </div>
         </div>
       ) : null; })()}
     </div>}
 
     <div style={{ width: "100%", maxWidth: 400 }}>
-      <div style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>▲ 입장 (체류 + 누적 증가)</div>
+      <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>▲ 입장 (체류 + 누적 증가)</div>
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        {[1, 5, 10, 50].map(n => <button key={n} onClick={() => adjustTotal(n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>+{n}</button>)}
+        {[1, 5, 10, 50].map(n => <button key={n} onClick={() => adjustTotal(n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>+{n}</button>)}
       </div>
-      <div style={{ color: "#F44336", fontSize: 13, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>▼ 퇴장 (체류만 감소, 누적 유지)</div>
+      <div style={{ color: "#EF5350", fontSize: 13, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>▼ 퇴장 (체류만 감소, 누적 유지)</div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        {[1, 5, 10, 50].map(n => <button key={n} onClick={() => adjustTotal(-n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
+        {[1, 5, 10, 50].map(n => <button key={n} onClick={() => adjustTotal(-n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         <input id="cc" type="number" placeholder="직접 입력" style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 16 }} />
@@ -1397,9 +1397,9 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
         {zoneData.filter(z => z.name).map(z => (
           <div key={z.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: selZone === z.id ? "rgba(76,175,80,0.06)" : "rgba(255,255,255,0.02)", borderRadius: 8, border: selZone === z.id ? "1px solid rgba(76,175,80,0.2)" : "1px solid transparent" }}>
             <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{z.name}</span>
-            <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.count || 0).toLocaleString()}</span>
+            <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.count || 0).toLocaleString()}</span>
             <span style={{ color: "#445", fontSize: 14, margin: "0 2px" }}>/</span>
-            <span style={{ color: "#2196F3", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.cumulative || 0).toLocaleString()}</span>
+            <span style={{ color: "#42A5F5", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 50, textAlign: "right" }}>{(z.cumulative || 0).toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -1411,7 +1411,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
         <button onClick={saveDailyRecord} style={{ padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#4CAF50,#388E3C)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📋 금일 데이터 저장 (일일 마감)</button>
         <button onClick={() => exportExcel("hourly")} style={{ padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>📥 시간별 현황 엑셀</button>
         <button onClick={() => exportExcel("daily")} style={{ padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>📥 일자별 현황 엑셀</button>
-        <button onClick={() => exportExcel("all")} style={{ padding: "10px", borderRadius: 8, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 전체 데이터 엑셀</button>
+        <button onClick={() => exportExcel("all")} style={{ padding: "10px", borderRadius: 8, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 전체 데이터 엑셀</button>
       </div>}
     </div>
 
@@ -1419,10 +1419,10 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       <h3 style={{ color: "#8892b0", fontSize: 13, marginBottom: 8 }}>입력 기록</h3>
       <div style={{ maxHeight: 160, overflow: "auto" }}>
         {log.map((l, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6, color: "#aaa", fontSize: 13 }}>
-          <span style={{ color: l.delta > 0 ? "#4CAF50" : "#F44336", fontWeight: 700 }}>{l.delta > 0 ? "+" : ""}{l.delta}</span>
+          <span style={{ color: l.delta > 0 ? "#66BB6A" : "#EF5350", fontWeight: 700 }}>{l.delta > 0 ? "+" : ""}{l.delta}</span>
           {l.zone && <span style={{ color: "#556" }}>{l.zone}</span>}
           <span>체류 {l.total.toLocaleString()}</span>
-          <span style={{ color: "#2196F3" }}>누적 {(l.cum || 0).toLocaleString()}</span>
+          <span style={{ color: "#42A5F5" }}>누적 {(l.cum || 0).toLocaleString()}</span>
           <span>{l.time}</span>
         </div>)}
       </div>
@@ -1487,7 +1487,7 @@ function ParkingPage({ settings, setSettings, session }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
               <span style={{ color: li.color, fontSize: 14, fontWeight: 700 }}>{pct.toFixed(0)}% 사용</span>
-              <span style={{ color: remain <= 0 ? "#F44336" : "#4CAF50", fontSize: 14, fontWeight: 700 }}>잔여 {remain}대</span>
+              <span style={{ color: remain <= 0 ? "#EF5350" : "#66BB6A", fontSize: 14, fontWeight: 700 }}>잔여 {remain}대</span>
             </div>
           </div>
 
@@ -1500,10 +1500,10 @@ function ParkingPage({ settings, setSettings, session }) {
 
           {/* +/- 버튼 */}
           <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-            {[1, 5, 10].map(n => <button key={n} onClick={() => adjustParking(lot.id, n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>+{n}</button>)}
+            {[1, 5, 10].map(n => <button key={n} onClick={() => adjustParking(lot.id, n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>+{n}</button>)}
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-            {[1, 5, 10].map(n => <button key={n} onClick={() => adjustParking(lot.id, -n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
+            {[1, 5, 10].map(n => <button key={n} onClick={() => adjustParking(lot.id, -n)} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input id={`pk-${lot.id}`} type="number" placeholder="직접 입력" style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }} />
@@ -1544,14 +1544,14 @@ function ShuttlePage({ settings, setSettings, session }) {
     </div>}
 
     {myBuses.map(bus => {
-      const statusColors = { running: "#4CAF50", stopped: "#FF9800", off: "#F44336" };
+      const statusColors = { running: "#66BB6A", stopped: "#FFA726", off: "#EF5350" };
       const statusLabels = { running: "🟢 운행중", stopped: "🟡 대기중", off: "🔴 운행종료" };
       const sc = statusColors[bus.status || "off"];
       const cap = bus.capacity || 45;
       const pax = bus.passengers || 0;
       const isFull = pax >= cap;
       const paxPct = Math.min((pax / cap) * 100, 100);
-      const paxColor = isFull ? "#F44336" : pax >= cap * 0.8 ? "#FF9800" : "#4CAF50";
+      const paxColor = isFull ? "#EF5350" : pax >= cap * 0.8 ? "#FFA726" : "#66BB6A";
       return (
         <div key={bus.id} style={{ maxWidth: 500, margin: "0 auto 20px", background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: `2px solid ${sc}33` }}>
           {/* 버스 정보 */}
@@ -1579,14 +1579,14 @@ function ShuttlePage({ settings, setSettings, session }) {
             </div>
             {/* +/- 버튼 */}
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              {[1, 5, 10].map(n => <button key={n} onClick={() => updateBus(bus.id, { passengers: Math.min(cap, pax + n) })} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 18, fontWeight: 800, cursor: isFull ? "not-allowed" : "pointer", opacity: isFull ? 0.4 : 1 }} disabled={isFull}>+{n}</button>)}
+              {[1, 5, 10].map(n => <button key={n} onClick={() => updateBus(bus.id, { passengers: Math.min(cap, pax + n) })} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #2a4a3a", background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 18, fontWeight: 800, cursor: isFull ? "not-allowed" : "pointer", opacity: isFull ? 0.4 : 1 }} disabled={isFull}>+{n}</button>)}
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              {[1, 5, 10].map(n => <button key={n} onClick={() => updateBus(bus.id, { passengers: Math.max(0, pax - n) })} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
+              {[1, 5, 10].map(n => <button key={n} onClick={() => updateBus(bus.id, { passengers: Math.max(0, pax - n) })} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #4a2a2a", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 18, fontWeight: 800, cursor: "pointer" }}>-{n}</button>)}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => updateBus(bus.id, { passengers: 0 })} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1px solid #555", background: "transparent", color: "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 초기화 (0명)</button>
-              <button onClick={() => updateBus(bus.id, { passengers: cap })} style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${isFull ? "#a33" : "#555"}`, background: isFull ? "rgba(244,67,54,0.1)" : "transparent", color: isFull ? "#F44336" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🚫 만차 ({cap}명)</button>
+              <button onClick={() => updateBus(bus.id, { passengers: cap })} style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${isFull ? "#a33" : "#555"}`, background: isFull ? "rgba(244,67,54,0.1)" : "transparent", color: isFull ? "#EF5350" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🚫 만차 ({cap}명)</button>
             </div>
           </div>
 
@@ -1599,7 +1599,7 @@ function ShuttlePage({ settings, setSettings, session }) {
 
           {/* 운행 상태 버튼 */}
           <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            {[{ s: "running", l: "🟢 운행", c: "#4CAF50" }, { s: "stopped", l: "🟡 대기", c: "#FF9800" }, { s: "off", l: "🔴 종료", c: "#F44336" }].map(st => (
+            {[{ s: "running", l: "🟢 운행", c: "#66BB6A" }, { s: "stopped", l: "🟡 대기", c: "#FFA726" }, { s: "off", l: "🔴 종료", c: "#EF5350" }].map(st => (
               <button key={st.s} onClick={() => updateBus(bus.id, { status: st.s })} style={{ flex: 1, padding: "10px", borderRadius: 10, border: bus.status === st.s ? `2px solid ${st.c}` : "1px solid #333", background: bus.status === st.s ? `${st.c}15` : "transparent", color: bus.status === st.s ? st.c : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{st.l}</button>
             ))}
           </div>
@@ -1640,7 +1640,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
     <img src={photo.data} alt="" style={{ maxWidth: "100%", maxHeight: "75vh", objectFit: "contain", borderRadius: 8 }} onClick={e => e.stopPropagation()} />
     <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
       <span style={{ color: "#8892b0", fontSize: 14 }}>🕐 {photo.time}</span>
-      {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #F44336", background: "rgba(244,67,54,0.15)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 사진 삭제</button>}
+      {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(); }} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #F44336", background: "rgba(244,67,54,0.15)", color: "#EF5350", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 사진 삭제</button>}
       <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #555", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 14, cursor: "pointer" }}>닫기</button>
     </div>
   </div>);
@@ -1671,14 +1671,14 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
   });
   const toggleZone = (zid) => setZoneOpen(p => ({ ...p, [zid]: !p[zid] }));
 
-  const SITE_CONG = { smooth: { label: "여유", color: "#4CAF50", icon: "🟢" }, crowded: { label: "보통", color: "#FF9800", icon: "🟡" }, danger: { label: "밀집", color: "#F44336", icon: "🔴" } };
+  const SITE_CONG = { smooth: { label: "여유", color: "#66BB6A", icon: "🟢" }, crowded: { label: "보통", color: "#FFA726", icon: "🟡" }, danger: { label: "밀집", color: "#EF5350", icon: "🔴" } };
 
-  const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#4CAF50", icon: "🟢" }, break: { label: "휴식", color: "#FF9800", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
-  const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#2196F3", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FF9800", icon: "🚨" }, incident: { label: "사고대처", color: "#F44336", icon: "🆘" } };
-  const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FF9800", icon: "🚗" }, supporting: { label: "현장지원중", color: "#4CAF50", icon: "🚑" } };
-  const STATUS_PERFORMANCE = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, rehearsal: { label: "리허설", color: "#FF9800", icon: "🎤" }, performing: { label: "공연중", color: "#9C27B0", icon: "🎭" }, done: { label: "종료", color: "#556", icon: "⬛" } };
-  const STATUS_PARKING = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, full: { label: "만차", color: "#F44336", icon: "🔴" } };
-  const STATUS_ENTRY = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡" }, dense: { label: "밀집", color: "#F44336", icon: "🔴" } };
+  const STATUS_NORMAL = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, active: { label: "진행", color: "#66BB6A", icon: "🟢" }, break: { label: "휴식", color: "#FFA726", icon: "☕" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const STATUS_SAFETY = { monitoring: { label: "상황관리중", color: "#42A5F5", icon: "🔍" }, fieldSupport: { label: "현장지원", color: "#FFA726", icon: "🚨" }, incident: { label: "사고대처", color: "#EF5350", icon: "🆘" } };
+  const STATUS_SUPPORT = { waiting: { label: "지원대기", color: "#8892b0", icon: "⏳" }, moving: { label: "현장이동중", color: "#FFA726", icon: "🚗" }, supporting: { label: "현장지원중", color: "#66BB6A", icon: "🚑" } };
+  const STATUS_PERFORMANCE = { standby: { label: "대기", color: "#8892b0", icon: "⏳" }, rehearsal: { label: "리허설", color: "#FFA726", icon: "🎤" }, performing: { label: "공연중", color: "#AB47BC", icon: "🎭" }, done: { label: "종료", color: "#556", icon: "⬛" } };
+  const STATUS_PARKING = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, full: { label: "만차", color: "#EF5350", icon: "🔴" } };
+  const STATUS_ENTRY = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, dense: { label: "밀집", color: "#EF5350", icon: "🔴" } };
   const getStatusMap = (zone) => { const t = zone?.zoneType; return t === "safety" ? STATUS_SAFETY : t === "support" ? STATUS_SUPPORT : t === "performance" ? STATUS_PERFORMANCE : t === "parking" ? STATUS_PARKING : t === "entry" ? STATUS_ENTRY : STATUS_NORMAL; };
 
   const setStatus = (siteId, status) => { const site = workSites.find(s => s.id === siteId); setSettings(prev => ({ ...prev, workSites: (prev.workSites || []).map(s => s.id === siteId ? { ...s, status } : s), timeline: [...(prev.timeline || []), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "status", message: `📊 ${site?.name || ""} 상태 → ${status}`, actor: session?.name }] })); };
@@ -1742,11 +1742,11 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         const deleteW = () => { if (!confirm(`${w.name} 삭제?`)) return; const ws = JSON.parse(JSON.stringify(settings.workSites || [])); const si = ws.findIndex(s => s.id === site.id); if (si >= 0) { ws[si].workers = ws[si].workers.filter(ww => ww.id !== w.id); setSettings(prev => ({ ...prev, workSites: ws })); setEditFspWorker(null); } };
 
         if (isEditing && isAdmin) {
-          const WSTAT = { working: { label: "근무중", color: "#4CAF50", icon: "🟢" }, away: { label: "자리비움", color: "#FF9800", icon: "🟡" }, moving: { label: "이동중", color: "#2196F3", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
+          const WSTAT = { working: { label: "근무중", color: "#66BB6A", icon: "🟢" }, away: { label: "자리비움", color: "#FFA726", icon: "🟡" }, moving: { label: "이동중", color: "#42A5F5", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
           return (<div key={w.id} style={{ padding: "14px", borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "2px solid rgba(33,150,243,0.2)", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 18 }}>✏️</span>
-              <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>근무자 수정</span>
+              <span style={{ color: "#42A5F5", fontSize: 15, fontWeight: 800, flex: 1 }}>근무자 수정</span>
               <button onClick={() => setEditFspWorker(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
             </div>
             <div style={{ display: "grid", gap: 10 }}>
@@ -1786,29 +1786,29 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setEditFspWorker(null)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ 수정 완료</button>
-                <button onClick={deleteW} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>
+                <button onClick={deleteW} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>
               </div>
             </div>
           </div>);
         }
 
-        const WSTAT2 = { working: { label: "근무중", color: "#4CAF50", icon: "🟢" }, away: { label: "자리비움", color: "#FF9800", icon: "🟡" }, moving: { label: "이동중", color: "#2196F3", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
+        const WSTAT2 = { working: { label: "근무중", color: "#66BB6A", icon: "🟢" }, away: { label: "자리비움", color: "#FFA726", icon: "🟡" }, moving: { label: "이동중", color: "#42A5F5", icon: "🔵" }, off: { label: "근무종료", color: "#556", icon: "⚫" } };
         const ws2 = WSTAT2[w.wStatus];
         return (<div key={w.id} onClick={isAdmin ? () => setEditFspWorker({ siteId: site.id, workerId: w.id }) : undefined} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, fontSize: 13, cursor: isAdmin ? "pointer" : "default", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", marginBottom: 3, opacity: w.wStatus === "off" ? 0.4 : 1 }}>
           <span style={{ fontSize: 14 }}>{ws2 ? ws2.icon : "👤"}</span>
           <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14, flex: 1 }}>{w.name}</span>
           {ws2 && <span style={{ padding: "3px 8px", borderRadius: 6, background: `${ws2.color}15`, color: ws2.color, fontSize: 12, fontWeight: 700 }}>{ws2.label}</span>}
-          {w.type && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(206,147,216,0.1)", color: "#CE93D8", fontSize: 12, fontWeight: 600 }}>{w.type}</span>}
+          {w.type && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(206,147,216,0.1)", color: "#E1BEE7", fontSize: 12, fontWeight: 600 }}>{w.type}</span>}
           {w.role && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12, fontWeight: 600 }}>{w.role}</span>}
-          {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 12 }}>🔑</span>}
-          {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} style={{ color: "#4CAF50", fontSize: 13, textDecoration: "none" }}>📞</a>}
-          {isAdmin && <span style={{ color: "#2196F3", fontSize: 12 }}>✏️</span>}
+          {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12 }}>🔑</span>}
+          {w.phone && <a href={`tel:${w.phone.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} style={{ color: "#66BB6A", fontSize: 13, textDecoration: "none" }}>📞</a>}
+          {isAdmin && <span style={{ color: "#42A5F5", fontSize: 12 }}>✏️</span>}
         </div>);
       })}
       {isAdmin && addWorkerSiteId === site.id && <div style={{ padding: "14px", borderRadius: 12, background: "rgba(76,175,80,0.04)", border: "2px solid rgba(76,175,80,0.2)", marginTop: 4, marginBottom: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <span style={{ fontSize: 16 }}>👤</span>
-          <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 800, flex: 1 }}>근무자 추가</span>
+          <span style={{ color: "#66BB6A", fontSize: 14, fontWeight: 800, flex: 1 }}>근무자 추가</span>
           <button onClick={() => setAddWorkerSiteId(null)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>닫기 ✕</button>
         </div>
         <div style={{ display: "grid", gap: 8 }}>
@@ -1832,7 +1832,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #4CAF50, #388E3C)", color: "#fff", boxShadow: "0 4px 12px rgba(76,175,80,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>✅ 등록</button>
         </div>
       </div>}
-      {isAdmin && addWorkerSiteId !== site.id && <button onClick={() => { setAddWorkerSiteId(site.id); setNewWorker({ name: "", phone: "", role: "운영" }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed rgba(33,150,243,0.3)", background: "transparent", color: "#2196F3", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>+ 근무자 추가</button>}
+      {isAdmin && addWorkerSiteId !== site.id && <button onClick={() => { setAddWorkerSiteId(site.id); setNewWorker({ name: "", phone: "", role: "운영" }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed rgba(33,150,243,0.3)", background: "transparent", color: "#42A5F5", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>+ 근무자 추가</button>}
     </div>);
   };
 
@@ -1844,11 +1844,11 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
       </div>
 
       {/* 긴급상황 배너 */}
-      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
+      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 22 }}>{["", "🔵", "🟡", "🟠", "🔴"][settings.emergencyLevel]}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: settings.emergencyLevel >= 3 ? "#F44336" : "#FF9800", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
+            <div style={{ color: settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
             {settings.emergencyMessage && <div style={{ color: "#ccd6f6", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
           </div>
           <span style={{ color: "#556", fontSize: 12 }}>{settings.emergencyAt}</span>
@@ -1857,10 +1857,10 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
 
       {/* 종합 현황 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#2196F3", icon: "📍" },
+        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#42A5F5", icon: "📍" },
           { label: "근무지", value: workSites.filter(s=>s.zoneId).length, color: "#009688", icon: "🏠" },
-          { label: "근무자", value: totalWorkers, color: "#4CAF50", icon: "👷" },
-          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#F44336" : "#556", icon: "🔔" }
+          { label: "근무자", value: totalWorkers, color: "#66BB6A", icon: "👷" },
+          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#EF5350" : "#556", icon: "🔔" }
         ].map(c => (
           <div key={c.label} style={{ padding: "10px 6px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${c.color}33`, textAlign: "center" }}>
             <div style={{ fontSize: 14 }}>{c.icon}</div>
@@ -1882,18 +1882,18 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         return (<div style={{ marginBottom: 10 }}>
           {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 4 }}>
             <span style={{ color: "#556", fontSize: 12, lineHeight: "24px" }}>👥인파</span>
-            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#4CAF50" },
-              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FF9800" },
-              { icon: "🔴", label: "위험", count: dangerCount, color: "#F44336" }
+            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#66BB6A" },
+              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FFA726" },
+              { icon: "🔴", label: "위험", count: dangerCount, color: "#EF5350" }
             ].filter(c => c.count > 0).map(c => (
               <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
           {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
             <span style={{ color: "#556", fontSize: 12, lineHeight: "24px" }}>🏠근무지</span>
-            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#4CAF50" },
-              { icon: "🟡", label: "보통", count: sCrowded, color: "#FF9800" },
-              { icon: "🔴", label: "밀집", count: sDanger, color: "#F44336" }
+            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#66BB6A" },
+              { icon: "🟡", label: "보통", count: sCrowded, color: "#FFA726" },
+              { icon: "🔴", label: "밀집", count: sDanger, color: "#EF5350" }
             ].filter(c => c.count > 0).map(c => (
               <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
             ))}
@@ -1903,8 +1903,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
 
       {/* 모드 전환 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
-        <button onClick={() => setMode("festival")} style={{ padding: "12px", borderRadius: 10, border: mode === "festival" ? "2px solid #2196F3" : "1px solid #333", background: mode === "festival" ? "rgba(33,150,243,0.1)" : "transparent", color: mode === "festival" ? "#2196F3" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>🎪 축제관리</button>
-        <button onClick={() => setMode("safety")} style={{ padding: "12px", borderRadius: 10, border: mode === "safety" ? "2px solid #F44336" : "1px solid #333", background: mode === "safety" ? "rgba(244,67,54,0.1)" : "transparent", color: mode === "safety" ? "#F44336" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer", position: "relative" }}>
+        <button onClick={() => setMode("festival")} style={{ padding: "12px", borderRadius: 10, border: mode === "festival" ? "2px solid #2196F3" : "1px solid #333", background: mode === "festival" ? "rgba(33,150,243,0.1)" : "transparent", color: mode === "festival" ? "#42A5F5" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>🎪 축제관리</button>
+        <button onClick={() => setMode("safety")} style={{ padding: "12px", borderRadius: 10, border: mode === "safety" ? "2px solid #F44336" : "1px solid #333", background: mode === "safety" ? "rgba(244,67,54,0.1)" : "transparent", color: mode === "safety" ? "#EF5350" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer", position: "relative" }}>
           🛡️ 안전관리
           {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
         </button>
@@ -1921,9 +1921,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           const siteCongs = sites.filter(s => s.congestion && (s.status === "active" || s.status === "break")).map(s => SITE_CONG[s.congestion]).filter(Boolean);
           return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
             <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <span style={{ color: "#2196F3", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+              <span style={{ color: "#42A5F5", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
               <span style={{ fontSize: 14 }}>📍</span>
-              <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+              <span style={{ color: "#42A5F5", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
               {cg && <span>{CL[cg.level]?.icon}</span>}
               {!open && siteCongs.length > 0 && siteCongs.map((sc, i) => <span key={i} style={{ fontSize: 12 }}>{sc.icon}</span>)}
               <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
@@ -1940,9 +1940,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           const open = zoneOpen[zone.id];
           return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(156,39,176,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
             <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <span style={{ color: "#9C27B0", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+              <span style={{ color: "#AB47BC", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
               <span style={{ fontSize: 14 }}>🎭</span>
-              <span style={{ color: "#9C27B0", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+              <span style={{ color: "#AB47BC", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
               <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
             </div>
             {open && sites.map(site => renderSiteBlock(site, STATUS_PERFORMANCE, zone))}
@@ -1957,7 +1957,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           const todayStr3 = now3.toISOString().slice(0, 10);
           const fDates = settings.festivalDates || [];
           const dayNames = ["일","월","화","수","목","금","토"];
-          const PGCAT = { O: { l: "공식", c: "#2196F3", icon: "🔷" }, P: { l: "공연", c: "#E91E63", icon: "🎵" }, E: { l: "체험", c: "#4CAF50", icon: "🎨" }, S: { l: "부대", c: "#FF9800", icon: "🎪" } };
+          const PGCAT = { O: { l: "공식", c: "#42A5F5", icon: "🔷" }, P: { l: "공연", c: "#E91E63", icon: "🎵" }, E: { l: "체험", c: "#66BB6A", icon: "🎨" }, S: { l: "부대", c: "#FFA726", icon: "🎪" } };
 
           const allPgs = (settings.programs || []);
           const dayPgs = allPgs.filter(p => p.date === pgDateSel || p.date === "always");
@@ -1994,7 +1994,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           }).length;
 
           return (<div style={{ marginTop: 14 }}>
-            <div style={{ color: "#CE93D8", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🎭 프로그램 현황 {isToday3 && currentCount > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>🟢 진행 {currentCount}</span>}</div>
+            <div style={{ color: "#E1BEE7", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🎭 프로그램 현황 {isToday3 && currentCount > 0 && <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>🟢 진행 {currentCount}</span>}</div>
 
             {/* 일자 선택 */}
             <div style={{ display: "flex", gap: 4, marginBottom: 12, overflowX: "auto", paddingBottom: 4 }}>
@@ -2002,7 +2002,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                 const dt = new Date(d);
                 const isToday = d === todayStr3;
                 const active = pgDateSel === d;
-                return (<button key={d} onClick={() => setPgDateSel(d)} style={{ padding: "8px 14px", borderRadius: 20, border: active ? "2px solid #9C27B0" : isToday ? "1.5px solid #4CAF50" : "1px solid #333", background: active ? "rgba(156,39,176,0.15)" : "transparent", color: active ? "#CE93D8" : isToday ? "#4CAF50" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                return (<button key={d} onClick={() => setPgDateSel(d)} style={{ padding: "8px 14px", borderRadius: 20, border: active ? "2px solid #9C27B0" : isToday ? "1.5px solid #4CAF50" : "1px solid #333", background: active ? "rgba(156,39,176,0.15)" : "transparent", color: active ? "#E1BEE7" : isToday ? "#66BB6A" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                   {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
                 </button>);
               })}
@@ -2023,7 +2023,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                 const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
                 const inactive3 = isEnded3 || nowMin3 > eh3*60+em3;
                 return (<div key={p.id} style={{ padding: "8px 14px", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 8, opacity: inactive3 ? 0.3 : 1, filter: inactive3 ? "grayscale(0.8)" : "none" }}>
-                  {isNow3 && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
+                  {isNow3 && <span style={{ color: "#66BB6A", fontSize: 12 }}>🟢</span>}
                   {inactive3 && <span style={{ padding: "2px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
                   <span style={{ color: inactive3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
                   <span style={{ color: "#556", fontSize: 12 }}>{p.time}~{p.endTime}</span>
@@ -2050,7 +2050,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
                   const isNow3 = !isEnded3 && nowMin3 >= sh3*60+sm3 && nowMin3 <= eh3*60+em3;
                   const isPast3 = isEnded3 || nowMin3 > eh3*60+em3;
                   return (<div key={p.id} style={{ padding: "8px 14px", borderTop: `1px solid ${cat.c}11`, display: "flex", alignItems: "center", gap: 8, opacity: isPast3 ? 0.3 : 1, filter: isPast3 ? "grayscale(0.8)" : "none" }}>
-                    {isNow3 && <span style={{ color: "#4CAF50", fontSize: 12 }}>🟢</span>}
+                    {isNow3 && <span style={{ color: "#66BB6A", fontSize: 12 }}>🟢</span>}
                     {isPast3 && <span style={{ padding: "2px 5px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
                     <span style={{ color: "#8892b0", fontSize: 12, fontVariantNumeric: "tabular-nums", minWidth: 45 }}>{p.time}</span>
                     <span style={{ color: isPast3 ? "#445" : "#ccd6f6", fontSize: 13, fontWeight: 700, flex: 1, textDecoration: isEnded3 ? "line-through" : "none" }}>{p.title}</span>
@@ -2069,9 +2069,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
       {mode === "safety" && <>
         {/* 긴급상황 발령 */}
         {isAdmin && <div style={{ padding: "14px", borderRadius: 12, background: "rgba(244,67,54,0.04)", border: "1px solid rgba(244,67,54,0.15)", marginBottom: 14 }}>
-          <div style={{ color: "#F44336", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🚨 긴급상황 발령</div>
+          <div style={{ color: "#EF5350", fontSize: 15, fontWeight: 800, marginBottom: 10 }}>🚨 긴급상황 발령</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 8 }}>
-            {[{ lv: 0, label: "해제", color: "#4CAF50" }, { lv: 1, label: "관심", color: "#2196F3" }, { lv: 2, label: "주의", color: "#FFC107" }, { lv: 3, label: "경계", color: "#FF9800" }, { lv: 4, label: "심각", color: "#F44336" }].map(e => (
+            {[{ lv: 0, label: "해제", color: "#66BB6A" }, { lv: 1, label: "관심", color: "#42A5F5" }, { lv: 2, label: "주의", color: "#FFC107" }, { lv: 3, label: "경계", color: "#FFA726" }, { lv: 4, label: "심각", color: "#EF5350" }].map(e => (
               <button key={e.lv} onClick={() => {
                 setSettings(prev => ({ ...prev, emergencyLevel: e.lv, emergencyAt: e.lv > 0 ? new Date().toLocaleString("ko-KR") : null, timeline: [...(prev.timeline||[]), { id: "tl_"+Date.now(), time: new Date().toLocaleString("ko-KR"), type: "emergency", message: e.lv > 0 ? `🚨 긴급상황 ${e.lv}단계(${e.label}) 발령` : "✅ 긴급상황 해제", actor: session?.name }] }));
               }} style={{ padding: "10px 2px", borderRadius: 8, border: settings.emergencyLevel === e.lv ? `2px solid ${e.color}` : "1px solid #333", background: settings.emergencyLevel === e.lv ? `${e.color}20` : "transparent", color: e.color, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{e.lv === 0 ? "✅" : e.lv+"단계"}<br/>{e.label}</button>
@@ -2083,14 +2083,14 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         {/* 의료 현황 요약 */}
         {(settings.medicalRecords || []).length > 0 && <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,152,0,0.04)", border: "1px solid rgba(255,152,0,0.15)", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span style={{ color: "#FF9800", fontSize: 14, fontWeight: 800 }}>🏥 의료 현황</span>
-            <span style={{ color: "#FF9800", fontSize: 13 }}>치료중 {(settings.medicalRecords||[]).filter(m=>m.status==="treating").length}</span>
-            <span style={{ color: "#2196F3", fontSize: 13 }}>이송 {(settings.medicalRecords||[]).filter(m=>m.status==="transferred").length}</span>
-            <span style={{ color: "#4CAF50", fontSize: 13 }}>귀가 {(settings.medicalRecords||[]).filter(m=>m.status==="discharged").length}</span>
+            <span style={{ color: "#FFA726", fontSize: 14, fontWeight: 800 }}>🏥 의료 현황</span>
+            <span style={{ color: "#FFA726", fontSize: 13 }}>치료중 {(settings.medicalRecords||[]).filter(m=>m.status==="treating").length}</span>
+            <span style={{ color: "#42A5F5", fontSize: 13 }}>이송 {(settings.medicalRecords||[]).filter(m=>m.status==="transferred").length}</span>
+            <span style={{ color: "#66BB6A", fontSize: 13 }}>귀가 {(settings.medicalRecords||[]).filter(m=>m.status==="discharged").length}</span>
           </div>
           {(settings.medicalRecords||[]).filter(m=>m.status==="treating").map((mr,i) => (
             <div key={mr.id} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(255,255,255,0.02)", marginBottom: 3, fontSize: 13, display: "flex", gap: 6 }}>
-              <span style={{ color: "#FF9800", fontWeight: 700 }}>🆘</span>
+              <span style={{ color: "#FFA726", fontWeight: 700 }}>🆘</span>
               <span style={{ color: "#ccd6f6" }}>{mr.patient || "환자"} — {mr.symptoms}</span>
               <span style={{ color: "#556", marginLeft: "auto", fontSize: 12 }}>{mr.location}</span>
             </div>
@@ -2098,9 +2098,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         </div>}
 
         {myRequests.length > 0 && <div style={{ marginBottom: 14 }}>
-          <div style={{ color: "#F44336", fontSize: 15, fontWeight: 800, marginBottom: 8 }}>🔔 수신 요청 ({myRequests.length}건)</div>
+          <div style={{ color: "#EF5350", fontSize: 15, fontWeight: 800, marginBottom: 8 }}>🔔 수신 요청 ({myRequests.length}건)</div>
           {myRequests.map(req => {
-            const rst = req.status === "accepted" ? { label: "접수완료", color: "#2196F3", icon: "✅" } : { label: "접수대기", color: "#FF9800", icon: "⏳" };
+            const rst = req.status === "accepted" ? { label: "접수완료", color: "#42A5F5", icon: "✅" } : { label: "접수대기", color: "#FFA726", icon: "⏳" };
             return (<div key={req.id} style={{ padding: "14px", borderRadius: 12, background: "rgba(244,67,54,0.04)", border: `1.5px solid ${rst.color}44`, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ color: rst.color, fontSize: 14, fontWeight: 700 }}>{rst.icon} {rst.label}</span>
@@ -2127,13 +2127,13 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
             {performanceZones.map(z => <option key={z.id} value={z.id}>🎭 {z.name}</option>)}
           </select>
           <textarea value={reqMsg} onChange={e => setReqMsg(e.target.value)} placeholder="요청 내용" rows={3} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 8 }} />
-          <button onClick={sendRequest} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: reqTarget && reqMsg ? "#F44336" : "#333", color: "#fff", fontSize: 15, fontWeight: 700, cursor: reqTarget && reqMsg ? "pointer" : "default", opacity: reqTarget && reqMsg ? 1 : 0.5 }}>🚨 요청 전송</button>
+          <button onClick={sendRequest} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: reqTarget && reqMsg ? "#EF5350" : "#333", color: "#fff", fontSize: 15, fontWeight: 700, cursor: reqTarget && reqMsg ? "pointer" : "default", opacity: reqTarget && reqMsg ? 1 : 0.5 }}>🚨 요청 전송</button>
         </div>}
 
         {safetyZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(244,67,54,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
           <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(244,67,54,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <span style={{ color: "#F44336", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
-            <span>🛡️</span><span style={{ color: "#F44336", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#EF5350", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🛡️</span><span style={{ color: "#EF5350", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
             <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
           {open && sites.map(site => renderSiteBlock(site, STATUS_SAFETY, zone))}
@@ -2141,8 +2141,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
 
         {supportZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(255,152,0,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
           <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(255,152,0,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <span style={{ color: "#FF9800", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
-            <span>🚑</span><span style={{ color: "#FF9800", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#FFA726", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🚑</span><span style={{ color: "#FFA726", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
             <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
           {open && sites.map(site => renderSiteBlock(site, STATUS_SUPPORT, zone))}
@@ -2171,8 +2171,8 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
         {/* 공연관리 구역 */}
         {performanceZones.map(zone => { const sites = workSites.filter(s => s.zoneId === zone.id); const open = zoneOpen[zone.id]; return (<div key={zone.id} style={{ marginBottom: 8, borderRadius: 12, border: "1px solid rgba(156,39,176,0.2)", overflow: "hidden", background: "rgba(255,255,255,0.03)" }}>
           <div onClick={() => toggleZone(zone.id)} style={{ padding: "12px 14px", background: "rgba(156,39,176,0.06)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <span style={{ color: "#9C27B0", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
-            <span>🎭</span><span style={{ color: "#9C27B0", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
+            <span style={{ color: "#AB47BC", fontSize: 14 }}>{open ? "▼" : "▶"}</span>
+            <span>🎭</span><span style={{ color: "#AB47BC", fontSize: 15, fontWeight: 800, flex: 1 }}>{zone.name}</span>
             <span style={{ color: "#556", fontSize: 12 }}>{sites.length}개 · {sites.reduce((n,s)=>(s.workers||[]).length+n,0)}명</span>
           </div>
           {open && sites.map(site => renderSiteBlock(site, STATUS_PERFORMANCE, zone))}
@@ -2183,7 +2183,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           {(settings.zoneRequests || []).filter(r => r.status === "completed").reverse().slice(0, 10).map(r => {
             const tZone = zones.find(z => z.id === r.targetZoneId);
             return <div key={r.id} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(76,175,80,0.04)", border: "1px solid rgba(76,175,80,0.1)", marginBottom: 4, fontSize: 12 }}>
-              <span style={{ color: "#4CAF50", fontWeight: 700 }}>✅</span> {r.fromZoneName} → {tZone?.name} <span style={{ color: "#556" }}>{r.completedAt}</span>
+              <span style={{ color: "#66BB6A", fontWeight: 700 }}>✅</span> {r.fromZoneName} → {tZone?.name} <span style={{ color: "#556" }}>{r.completedAt}</span>
               <div style={{ color: "#556" }}>{r.message}</div>
             </div>;
           })}
@@ -2207,7 +2207,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
   const [alwaysOpen, setAlwaysOpen] = useState(false);
   const [detailPgId, setDetailPgId] = useState(null);
   const canControl = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
-  const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#2196F3" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#4CAF50" }, S: { label: "부대", color: "#FF9800" } };
+  const CATS = { all: { label: "전체", color: "#8892b0" }, O: { label: "공식", color: "#42A5F5" }, P: { label: "공연", color: "#E91E63" }, E: { label: "체험", color: "#66BB6A" }, S: { label: "부대", color: "#FFA726" } };
 
   const now = useNow(30000); // 30초마다 갱신
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -2234,9 +2234,9 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     if (isDetail) {
       return (<div key={pg.id} style={{ padding: "16px", borderRadius: 14, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-          {isNow && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>● 진행중</span>}
+          {isNow && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>● 진행중</span>}
           {isPast && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 13, fontWeight: 700 }}>종료</span>}
-          {isDelayed && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 13, fontWeight: 700 }}>⏱ 지연</span>}
+          {isDelayed && <span style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 13, fontWeight: 700 }}>⏱ 지연</span>}
           <span style={{ padding: "3px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
           <span style={{ flex: 1 }} />
           <button onClick={(e) => { e.stopPropagation(); setDetailPgId(null); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
@@ -2254,7 +2254,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
           </div>
           <div><label style={{ color: "#556", fontSize: 12 }}>내용</label><textarea value={pg.description || ""} onChange={e => upPg(pg.id, "description", e.target.value)} rows={2} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} /></div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={(e) => { e.stopPropagation(); setPgSt(pg.id, "delayed"); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: isDelayed ? "2px solid #FF9800" : "1px solid #333", background: isDelayed ? "rgba(255,152,0,0.1)" : "transparent", color: "#FF9800", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⏱ 지연</button>
+            <button onClick={(e) => { e.stopPropagation(); setPgSt(pg.id, "delayed"); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: isDelayed ? "2px solid #FF9800" : "1px solid #333", background: isDelayed ? "rgba(255,152,0,0.1)" : "transparent", color: "#FFA726", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⏱ 지연</button>
             <button onClick={(e) => { e.stopPropagation(); setPgSt(pg.id, "ended"); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: isEnded ? "2px solid #556" : "1px solid #333", background: isEnded ? "rgba(85,85,85,0.1)" : "transparent", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{isEnded ? "↩ 종료해제" : "⬛ 종료"}</button>
           </div>
         </div> : <div>
@@ -2271,14 +2271,14 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
       <div style={{ display: "flex", alignItems: "center", gap: compact ? 8 : 12 }}>
         <div style={{ textAlign: "center", minWidth: compact ? 44 : 54, flexShrink: 0 }}>
           {dateLabel && <div style={{ color: "#8892b0", fontSize: 12 }}>{dateLabel}</div>}
-          <div style={{ color: isPast ? "#555" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{pg.time || "--"}</div>
+          <div style={{ color: isPast ? "#555" : isDelayed ? "#FFA726" : isNow ? "#66BB6A" : "#ccd6f6", fontSize: compact ? 14 : 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{pg.time || "--"}</div>
           <div style={{ color: "#556", fontSize: 12 }}>~{pg.endTime}</div>
         </div>
-        <div style={{ width: 3, minHeight: compact ? 30 : 40, background: isPast ? "#333" : isDelayed ? "#FF9800" : isNow ? "#4CAF50" : cat.color, borderRadius: 2, flexShrink: 0 }} />
+        <div style={{ width: 3, minHeight: compact ? 30 : 40, background: isPast ? "#333" : isDelayed ? "#FFA726" : isNow ? "#66BB6A" : cat.color, borderRadius: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, flexWrap: "wrap" }}>
-            {isNow && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
-            {isDelayed && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>⏱ 지연</span>}
+            {isNow && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#66BB6A", fontSize: 12, fontWeight: 700, animation: "blink 2s infinite" }}>● 진행중</span>}
+            {isDelayed && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>⏱ 지연</span>}
             {isPast && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(85,85,85,0.15)", color: "#888", fontSize: 12, fontWeight: 700 }}>종료</span>}
             <span style={{ padding: "3px 8px", borderRadius: 4, background: `${cat.color}15`, color: cat.color, fontSize: 12, fontWeight: 700 }}>{cat.label}</span>
           </div>
@@ -2350,16 +2350,16 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
       <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎭 축제 프로그램</h2>
       <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 10px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
       {["admin","manager","sysadmin"].includes(session?.role) && <div style={{ textAlign: "center", marginBottom: 14 }}>
-        <button onClick={onManage} style={{ padding: "10px 24px", borderRadius: 10, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⚙️ 프로그램 관리</button>
+        <button onClick={onManage} style={{ padding: "10px 24px", borderRadius: 10, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⚙️ 프로그램 관리</button>
       </div>}
 
       {/* 일자 선택 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
-        <button onClick={() => setSelDate("all")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "all" ? "2px solid #9C27B0" : "1px solid #333", background: selDate === "all" ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === "all" ? "#CE93D8" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체</button>
+        <button onClick={() => setSelDate("all")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "all" ? "2px solid #9C27B0" : "1px solid #333", background: selDate === "all" ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === "all" ? "#E1BEE7" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체</button>
         {dates.map((d, i) => {
           const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
           const isToday = d === todayStr;
-          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === d ? "2px solid #9C27B0" : isToday ? "1px solid #4CAF50" : "1px solid #333", background: selDate === d ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === d ? "#CE93D8" : isToday ? "#4CAF50" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === d ? "2px solid #9C27B0" : isToday ? "1px solid #4CAF50" : "1px solid #333", background: selDate === d ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === d ? "#E1BEE7" : isToday ? "#66BB6A" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
             {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
           </button>);
         })}
@@ -2378,7 +2378,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
 
       {/* 진행중 프로그램 */}
       {nowGroup.length > 0 && <div style={{ marginBottom: 14 }}>
-        <div style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 800, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ animation: "blink 2s infinite" }}>●</span> 진행중 {nowGroup.length}개
         </div>
         {nowGroup.map(pg => renderPgCard(pg))}
@@ -2427,7 +2427,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
   const INST_PRESETS = ["어쿠스틱기타(마이킹)","어쿠스틱기타(DI)","일렉기타(앰프)","일렉기타(이펙터)","키보드","드럼","베이스(DI)","베이스(앰프)","MTR"];
   const programs = (settings.programs || []).filter(p => p.category === "P");
   const canEdit = ["admin","manager","sysadmin","stagemgr"].includes(session?.role);
-  const GC = { 보컬: "#E91E63", 밴드: "#F44336", 재즈: "#2196F3", 댄스: "#4CAF50", 마술: "#FF9800", 퍼포먼스: "#9C27B0" };
+  const GC = { 보컬: "#E91E63", 밴드: "#EF5350", 재즈: "#42A5F5", 댄스: "#66BB6A", 마술: "#FFA726", 퍼포먼스: "#AB47BC" };
   const DEFAULT_TR = [
     { id: "tr1", item: "보면대", qty: 1 }, { id: "tr2", item: "의자", qty: 1 }, { id: "tr3", item: "퍼커션테이블", qty: 0 },
     { id: "tr4", item: "3.5mm 연결", qty: 0 }, { id: "tr5", item: "마이크스탠드", qty: 1 }, { id: "tr6", item: "앰프", qty: 0, model: "" }
@@ -2486,12 +2486,12 @@ function StageMgmtPage({ settings, setSettings, session }) {
       {/* 헤더 */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <button onClick={() => setView(f.id ? "detail" : "list")} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>← 뒤로</button>
-        <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>{f.id ? "공연 수정" : "새 공연 등록"}</span>
+        <span style={{ color: "#E1BEE7", fontSize: 16, fontWeight: 800, flex: 1 }}>{f.id ? "공연 수정" : "새 공연 등록"}</span>
       </div>
 
       {/* 내부 탭 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-        {tabs.map(t => <button key={t.id} onClick={() => setEditTab(t.id)} style={{ padding: "10px 14px", borderRadius: 10, border: editTab === t.id ? "2px solid #9C27B0" : "1px solid #222", background: editTab === t.id ? "rgba(156,39,176,0.08)" : "transparent", color: editTab === t.id ? "#CE93D8" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+        {tabs.map(t => <button key={t.id} onClick={() => setEditTab(t.id)} style={{ padding: "10px 14px", borderRadius: 10, border: editTab === t.id ? "2px solid #9C27B0" : "1px solid #222", background: editTab === t.id ? "rgba(156,39,176,0.08)" : "transparent", color: editTab === t.id ? "#E1BEE7" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
           {t.icon} {t.label}{t.count > 0 ? " "+t.count : ""}
         </button>)}
       </div>
@@ -2508,7 +2508,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
               <select value={f.genre} onChange={e => upF("genre", e.target.value)} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }}>
                 {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
-              <button onClick={() => setAddGenre(!addGenre)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#CE93D8", fontSize: 14, cursor: "pointer" }}>+</button>
+              <button onClick={() => setAddGenre(!addGenre)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#E1BEE7", fontSize: 14, cursor: "pointer" }}>+</button>
             </div>
             {addGenre && <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
               <Input value={newGenre} onChange={e => setNewGenre(e.target.value)} placeholder="새 분류명" />
@@ -2529,15 +2529,15 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
       {/* 셋리스트 탭 */}
       {editTab === "setlist" && <div>
-        <button onClick={addSong} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(156,39,176,0.3)", background: "transparent", color: "#CE93D8", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 곡 추가</button>
+        <button onClick={addSong} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(156,39,176,0.3)", background: "transparent", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 곡 추가</button>
         {(f.setlist||[]).map((song, si) => (
           <div key={song.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 6 }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-              <span style={{ color: "#CE93D8", fontSize: 15, fontWeight: 800, minWidth: 24 }}>{si+1}</span>
+              <span style={{ color: "#E1BEE7", fontSize: 15, fontWeight: 800, minWidth: 24 }}>{si+1}</span>
               <Input value={song.name} onChange={e => upSong(si, "name", e.target.value)} placeholder="곡명" style={{ flex: 1 }} />
               <button onClick={() => moveSong(si,-1)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▲</button>
               <button onClick={() => moveSong(si,1)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▼</button>
-              <button onClick={() => delSong(si)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
+              <button onClick={() => delSong(si)} style={{ padding: "6px 10px", border: "none", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>
             </div>
             <div style={{ display: "flex", gap: 6, paddingLeft: 24 }}>
               <select value={song.type} onChange={e => upSong(si, "type", e.target.value)} style={{ padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13, width: 80 }}>
@@ -2555,7 +2555,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
       {editTab === "inst" && <div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
           {INST_PRESETS.filter(p => !(f.instruments||[]).find(i => i.name === p)).map(preset => (
-            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.2)", background: "rgba(33,150,243,0.04)", color: "#2196F3", fontSize: 13, cursor: "pointer" }}>+ {preset}</button>
+            <button key={preset} onClick={() => addInst(preset)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.2)", background: "rgba(33,150,243,0.04)", color: "#42A5F5", fontSize: 13, cursor: "pointer" }}>+ {preset}</button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -2565,11 +2565,11 @@ function StageMgmtPage({ settings, setSettings, session }) {
         {(f.instruments||[]).map((inst, ii) => (
           <div key={inst.id} style={{ padding: "12px", borderRadius: 10, background: "rgba(33,150,243,0.03)", border: "1px solid rgba(33,150,243,0.1)", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 800 }}>{ii+1}</span>
+              <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 800 }}>{ii+1}</span>
               <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700, flex: 1 }}>{inst.name}</span>
               <button onClick={() => moveInst(ii,-1)} style={{ padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▲</button>
               <button onClick={() => moveInst(ii,1)} style={{ padding: "6px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>▼</button>
-              <button onClick={() => delInst(ii)} style={{ padding: "6px 8px", border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>🗑</button>
+              <button onClick={() => delInst(ii)} style={{ padding: "6px 8px", border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, borderRadius: 6, cursor: "pointer" }}>🗑</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -2577,7 +2577,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
                 <span style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 800, minWidth: 22, textAlign: "center" }}>{inst.qty||1}</span>
                 <button onClick={() => upInst(ii, "qty", (inst.qty||1)+1)} style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>+</button>
               </div>
-              <button onClick={() => upInst(ii, "ch", inst.ch==="S"?"M":"S")} style={{ padding: "6px 12px", borderRadius: 6, border: "1.5px solid "+(inst.ch==="S"?"#4CAF50":"#2196F3"), background: "transparent", color: inst.ch==="S"?"#4CAF50":"#2196F3", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S 스테레오":"M 모노"}</button>
+              <button onClick={() => upInst(ii, "ch", inst.ch==="S"?"M":"S")} style={{ padding: "6px 12px", borderRadius: 6, border: "1.5px solid "+(inst.ch==="S"?"#66BB6A":"#42A5F5"), background: "transparent", color: inst.ch==="S"?"#66BB6A":"#42A5F5", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{inst.ch==="S"?"S 스테레오":"M 모노"}</button>
               <Input value={inst.memo||""} onChange={e => upInst(ii, "memo", e.target.value)} placeholder="메모" style={{ flex: 1, minWidth: 80 }} />
             </div>
           </div>
@@ -2587,13 +2587,13 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
       {/* 요청사항 탭 */}
       {editTab === "req" && <div>
-        <button onClick={addTech} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(255,152,0,0.3)", background: "transparent", color: "#FF9800", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 요청항목 추가</button>
+        <button onClick={addTech} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(255,152,0,0.3)", background: "transparent", color: "#FFA726", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>+ 요청항목 추가</button>
         {(f.techrider||[]).map((tr, ti) => (
           <div key={tr.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "10px 12px", borderRadius: 10, background: tr.qty > 0 ? "rgba(76,175,80,0.03)" : "rgba(255,255,255,0.02)", border: tr.qty > 0 ? "1px solid rgba(76,175,80,0.15)" : "1px solid #222", marginBottom: 5 }}>
-            <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "6px 10px", borderRadius: 6, border: tr.qty > 0 ? "2px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#4CAF50" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>{tr.qty > 0 ? "✓" : "○"}</button>
+            <button onClick={() => upTech(ti, "qty", tr.qty > 0 ? 0 : 1)} style={{ padding: "6px 10px", borderRadius: 6, border: tr.qty > 0 ? "2px solid #4CAF50" : "1px solid #333", background: tr.qty > 0 ? "rgba(76,175,80,0.1)" : "transparent", color: tr.qty > 0 ? "#66BB6A" : "#556", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>{tr.qty > 0 ? "✓" : "○"}</button>
             <Input value={tr.item} onChange={e => upTech(ti, "item", e.target.value)} placeholder="항목명" style={{ flex: 1 }} />
             <Input type="number" value={tr.qty} onChange={e => upTech(ti, "qty", parseInt(e.target.value)||0)} style={{ width: 45, textAlign: "center" }} />
-            <button onClick={() => delTech(ti)} style={{ padding: "6px 8px", border: "none", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
+            <button onClick={() => delTech(ti)} style={{ padding: "6px 8px", border: "none", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>
           </div>
         ))}
       </div>}
@@ -2627,8 +2627,8 @@ function StageMgmtPage({ settings, setSettings, session }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <button onClick={() => setView("list")} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 14, cursor: "pointer" }}>← 목록</button>
         <span style={{ flex: 1 }} />
-        {canEdit && <button onClick={() => { setView("edit"); }} style={{ padding: "8px 14px", borderRadius: 8, border: "1.5px solid #9C27B0", background: "transparent", color: "#CE93D8", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✏️ 수정</button>}
-        {canEdit && <button onClick={() => delPerf(pf.id)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>}
+        {canEdit && <button onClick={() => { setView("edit"); }} style={{ padding: "8px 14px", borderRadius: 8, border: "1.5px solid #9C27B0", background: "transparent", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✏️ 수정</button>}
+        {canEdit && <button onClick={() => delPerf(pf.id)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>}
       </div>
 
       {/* 프로필 카드 */}
@@ -2644,25 +2644,25 @@ function StageMgmtPage({ settings, setSettings, session }) {
 
       {/* 상세 탭 */}
       {dtabs.length > 1 && <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-        {dtabs.map(t => <button key={t.id} onClick={() => setDetailTab(t.id)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: detailTab===t.id ? "2px solid #9C27B0" : "1px solid #222", background: detailTab===t.id ? "rgba(156,39,176,0.06)" : "transparent", color: detailTab===t.id ? "#CE93D8" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{t.label}</button>)}
+        {dtabs.map(t => <button key={t.id} onClick={() => setDetailTab(t.id)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: detailTab===t.id ? "2px solid #9C27B0" : "1px solid #222", background: detailTab===t.id ? "rgba(156,39,176,0.06)" : "transparent", color: detailTab===t.id ? "#E1BEE7" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{t.label}</button>)}
       </div>}
 
       {detailTab === "info" && <div style={{ padding: "16px", borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center" }}>
-          <div><div style={{ color: "#CE93D8", fontSize: 24, fontWeight: 800 }}>{sl.length}</div><div style={{ color: "#556", fontSize: 12 }}>셋리스트</div></div>
-          <div><div style={{ color: "#2196F3", fontSize: 24, fontWeight: 800 }}>{ins.length}</div><div style={{ color: "#556", fontSize: 12 }}>악기</div></div>
-          <div><div style={{ color: "#FF9800", fontSize: 24, fontWeight: 800 }}>{tr.length}</div><div style={{ color: "#556", fontSize: 12 }}>요청사항</div></div>
+          <div><div style={{ color: "#E1BEE7", fontSize: 24, fontWeight: 800 }}>{sl.length}</div><div style={{ color: "#556", fontSize: 12 }}>셋리스트</div></div>
+          <div><div style={{ color: "#42A5F5", fontSize: 24, fontWeight: 800 }}>{ins.length}</div><div style={{ color: "#556", fontSize: 12 }}>악기</div></div>
+          <div><div style={{ color: "#FFA726", fontSize: 24, fontWeight: 800 }}>{tr.length}</div><div style={{ color: "#556", fontSize: 12 }}>요청사항</div></div>
         </div>
       </div>}
 
       {detailTab === "setlist" && <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
         {sl.map((s,i) => <div key={i} style={{ padding: "12px 16px", borderBottom: i<sl.length-1?"1px solid #1a1a2e":"none", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, minWidth: 28 }}>{i+1}</span>
+          <span style={{ color: "#E1BEE7", fontSize: 16, fontWeight: 800, minWidth: 28 }}>{i+1}</span>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 600 }}>{s.name||"?"}</div>
             {s.memo && <div style={{ color: "#556", fontSize: 12, marginTop: 2 }}>{s.memo}</div>}
           </div>
-          <span style={{ padding: "3px 10px", borderRadius: 6, background: s.type==="LIVE"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.1)", color: s.type==="LIVE"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700 }}>{s.type}</span>
+          <span style={{ padding: "3px 10px", borderRadius: 6, background: s.type==="LIVE"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.1)", color: s.type==="LIVE"?"#66BB6A":"#42A5F5", fontSize: 12, fontWeight: 700 }}>{s.type}</span>
           <span style={{ color: "#556", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.playtime}</span>
         </div>)}
       </div>}
@@ -2671,14 +2671,14 @@ function StageMgmtPage({ settings, setSettings, session }) {
         {ins.map((inst,i) => <div key={i} style={{ padding: "12px 16px", borderBottom: i<ins.length-1?"1px solid #1a1a2e":"none", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 600, flex: 1 }}>{inst.name}</span>
           {(inst.qty||1)>1 && <span style={{ color: "#8892b0", fontSize: 14, fontWeight: 700 }}>×{inst.qty}</span>}
-          <span style={{ padding: "3px 10px", borderRadius: 6, background: inst.ch==="S"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.1)", color: inst.ch==="S"?"#4CAF50":"#2196F3", fontSize: 12, fontWeight: 700 }}>{inst.ch==="S"?"스테레오":"모노"}</span>
+          <span style={{ padding: "3px 10px", borderRadius: 6, background: inst.ch==="S"?"rgba(76,175,80,0.1)":"rgba(33,150,243,0.1)", color: inst.ch==="S"?"#66BB6A":"#42A5F5", fontSize: 12, fontWeight: 700 }}>{inst.ch==="S"?"스테레오":"모노"}</span>
           {inst.memo && <span style={{ color: "#556", fontSize: 12 }}>· {inst.memo}</span>}
         </div>)}
       </div>}
 
       {detailTab === "req" && <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
         {tr.map((t,i) => <div key={i} style={{ padding: "12px 16px", borderBottom: i<tr.length-1?"1px solid #1a1a2e":"none", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: "#4CAF50", fontSize: 14 }}>✓</span>
+          <span style={{ color: "#66BB6A", fontSize: 14 }}>✓</span>
           <span style={{ color: "#ccd6f6", fontSize: 15, flex: 1 }}>{t.item}</span>
           {t.qty>1 && <span style={{ color: "#8892b0", fontSize: 14 }}>×{t.qty}</span>}
           {t.memo && <span style={{ color: "#556", fontSize: 12 }}>· {t.memo}</span>}
@@ -2710,14 +2710,14 @@ function StageMgmtPage({ settings, setSettings, session }) {
           <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 300, letterSpacing: -0.5, margin: "0 0 6px" }}>공연관리</h2>
           <p style={{ color: "#8892b0", fontSize: 13, margin: 0 }}>아티스트 · 셋리스트 · 테크라이더</p>
           <div style={{ marginTop: 12, display: "inline-flex", gap: 6, padding: "6px 14px", borderRadius: 20, background: "rgba(156,39,176,0.12)", border: "1px solid rgba(156,39,176,0.2)" }}>
-            <span style={{ color: "#CE93D8", fontSize: 14, fontWeight: 700 }}>{perfs.length}</span>
+            <span style={{ color: "#E1BEE7", fontSize: 14, fontWeight: 700 }}>{perfs.length}</span>
             <span style={{ color: "#8892b0", fontSize: 13 }}>개 공연 등록됨</span>
           </div>
         </div>
 
         {canEdit && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
           <button onClick={() => setView("add")} style={{ padding: "16px", borderRadius: 14, border: "none", background: "linear-gradient(135deg, #9C27B0, #7B1FA2)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(156,39,176,0.35)" }}>🎤 수동 등록</button>
-          <button onClick={autoImport} style={{ padding: "16px", borderRadius: 14, border: "1.5px solid rgba(156,39,176,0.3)", background: "rgba(156,39,176,0.05)", color: "#CE93D8", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🔄 가져오기</button>
+          <button onClick={autoImport} style={{ padding: "16px", borderRadius: 14, border: "1.5px solid rgba(156,39,176,0.3)", background: "rgba(156,39,176,0.05)", color: "#E1BEE7", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>🔄 가져오기</button>
         </div>}
 
         {Object.entries(dateGroups).map(([dateKey, items]) => {
@@ -2725,9 +2725,9 @@ function StageMgmtPage({ settings, setSettings, session }) {
           const isOpen = dateOpen[dateKey] !== false;
           return (<div key={dateKey} style={{ marginBottom: 10, borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
             <div onClick={() => setDateOpen(p => ({ ...p, [dateKey]: !isOpen }))} style={{ padding: "14px 16px", background: "rgba(156,39,176,0.04)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <span style={{ color: "#CE93D8", fontSize: 14 }}>{isOpen ? "▼" : "▶"}</span>
-              <span style={{ color: "#CE93D8", fontSize: 16, fontWeight: 800, flex: 1 }}>{dateLabel}</span>
-              <span style={{ padding: "3px 10px", borderRadius: 10, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 13, fontWeight: 700 }}>{items.length}</span>
+              <span style={{ color: "#E1BEE7", fontSize: 14 }}>{isOpen ? "▼" : "▶"}</span>
+              <span style={{ color: "#E1BEE7", fontSize: 16, fontWeight: 800, flex: 1 }}>{dateLabel}</span>
+              <span style={{ padding: "3px 10px", borderRadius: 10, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 13, fontWeight: 700 }}>{items.length}</span>
             </div>
             {isOpen && items.map(pf => {
               const gc = GC[pf.genre] || "#556";
@@ -2746,9 +2746,9 @@ function StageMgmtPage({ settings, setSettings, session }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                  {sl > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, fontWeight: 700 }}>🎵{sl}</span>}
-                  {inst > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>🎸{inst}</span>}
-                  {req > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(255,152,0,0.08)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>📋{req}</span>}
+                  {sl > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(156,39,176,0.08)", color: "#E1BEE7", fontSize: 12, fontWeight: 700 }}>🎵{sl}</span>}
+                  {inst > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 12, fontWeight: 700 }}>🎸{inst}</span>}
+                  {req > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(255,152,0,0.08)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>📋{req}</span>}
                 </div>
                 <span style={{ color: "#333", fontSize: 16 }}>›</span>
               </div>);
@@ -2771,7 +2771,7 @@ function CongestionPage({ settings, setSettings, session }) {
   const [zonePhotos, setZonePhotos] = useState({});
   const [viewPhoto, setViewPhoto] = useState(null);
   const [viewPhotoZone, setViewPhotoZone] = useState(null);
-  const CONG_LEVELS = { smooth: { label: "원활", color: "#4CAF50", icon: "🟢", bg: "rgba(76,175,80,0.1)" }, crowded: { label: "혼잡", color: "#FF9800", icon: "🟡", bg: "rgba(255,152,0,0.1)" }, danger: { label: "위험", color: "#F44336", icon: "🔴", bg: "rgba(244,67,54,0.1)" } };
+  const CONG_LEVELS = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢", bg: "rgba(76,175,80,0.1)" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡", bg: "rgba(255,152,0,0.1)" }, danger: { label: "위험", color: "#EF5350", icon: "🔴", bg: "rgba(244,67,54,0.1)" } };
 
   const handlePhoto = (zoneId, e) => {
     const file = e.target.files?.[0];
@@ -2881,7 +2881,7 @@ function CongestionPage({ settings, setSettings, session }) {
               📷 사진 촬영 / 첨부
               <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhoto(zone.id, e)} style={{ display: "none" }} />
             </label>
-            {curPhotos.length > 0 && <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 700 }}>{curPhotos.length}장</span>}
+            {curPhotos.length > 0 && <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>{curPhotos.length}장</span>}
           </div>
           {curPhotos.length > 0 && <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
             {curPhotos.map((p, i) => <div key={p.id} style={{ position: "relative", flexShrink: 0 }}>
@@ -2892,7 +2892,7 @@ function CongestionPage({ settings, setSettings, session }) {
           <textarea value={curMemo} onChange={e => setMemos(p => ({ ...p, [zone.id]: e.target.value }))} placeholder="현장 상황 메모" rows={2} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 10 }} />
 
           {/* ③ 보고 완료 */}
-          <button onClick={() => submitReport(zone.id)} style={{ width: "100%", padding: "16px", borderRadius: 12, border: "none", background: selected ? (CONG_LEVELS[selected]?.color || "#2196F3") : "#333", color: "#fff", fontSize: 16, fontWeight: 800, cursor: selected ? "pointer" : "default", opacity: selected ? 1 : 0.4 }}>
+          <button onClick={() => submitReport(zone.id)} style={{ width: "100%", padding: "16px", borderRadius: 12, border: "none", background: selected ? (CONG_LEVELS[selected]?.color || "#42A5F5") : "#333", color: "#fff", fontSize: 16, fontWeight: 800, cursor: selected ? "pointer" : "default", opacity: selected ? 1 : 0.4 }}>
             {selected ? `${CONG_LEVELS[selected].icon} ${CONG_LEVELS[selected].label} 보고 완료` : "단계를 먼저 선택하세요"}
           </button>
         </>}
@@ -2913,7 +2913,7 @@ function CongestionPage({ settings, setSettings, session }) {
               {c?.reportedAt && <div style={{ color: "#556", fontSize: 12 }}>{c.reportedByName} · {c.reportedAt}</div>}
             </div>
             <span style={{ color: cl.color, fontSize: 16, fontWeight: 800 }}>{cl.label}</span>
-            {c?.photos?.length > 0 && <span style={{ color: "#2196F3", fontSize: 12 }}>📷{c.photos.length}</span>}
+            {c?.photos?.length > 0 && <span style={{ color: "#42A5F5", fontSize: 12 }}>📷{c.photos.length}</span>}
           </div>);
         })}
       </div>
@@ -3030,7 +3030,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
       <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
         {[{ id: "all", label: "📣 전체" }, { id: "notice", label: "📢 공지" }].map(ch => {
           const unread = getUnread(ch.id);
-          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#2196F3" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
+          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#42A5F5" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {ch.label}
             {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
@@ -3061,14 +3061,14 @@ function ChatPage({ settings, setSettings, accounts, session }) {
         return (<div key={m.id} style={{ display: "flex", justifyContent: isNotice ? "center" : isMine ? "flex-end" : "flex-start", marginBottom: 8 }}>
           {isNotice ? (
             <div style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(156,39,176,0.1)", border: "1px solid rgba(156,39,176,0.15)", maxWidth: "90%" }}>
-              <div style={{ color: "#CE93D8", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📢 공지</div>
+              <div style={{ color: "#E1BEE7", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>📢 공지</div>
               <div style={{ color: "#ccd6f6", fontSize: 14, whiteSpace: "pre-wrap" }}>{m.content}</div>
               <div style={{ color: "#556", fontSize: 12, marginTop: 4 }}>{m.createdBy} · {m.createdAt}</div>
             </div>
           ) : (
             <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMine ? "rgba(33,150,243,0.12)" : "rgba(255,255,255,0.04)", border: isMine ? "1px solid rgba(33,150,243,0.15)" : "1px solid #222" }}>
               {!isMine && <div style={{ color: ROLES[accounts?.find(a => a.id === m.createdById)?.role]?.color || "#8892b0", fontSize: 12, fontWeight: 700, marginBottom: 5 }}>{m.createdBy}</div>}
-              <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{parts.map((p, i) => p.startsWith("@") ? <span key={i} style={{ color: "#2196F3", fontWeight: 700 }}>{p}</span> : p)}</div>
+              <div style={{ color: "#ccd6f6", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{parts.map((p, i) => p.startsWith("@") ? <span key={i} style={{ color: "#42A5F5", fontWeight: 700 }}>{p}</span> : p)}</div>
               <div style={{ color: "#445", fontSize: 12, marginTop: 3, textAlign: isMine ? "right" : "left" }}>{m.createdAt}</div>
             </div>
           )}
@@ -3090,7 +3090,7 @@ function ChatPage({ settings, setSettings, accounts, session }) {
     <div style={{ padding: "10px 16px 80px", background: "#0d1117", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
       <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", gap: 8, alignItems: "flex-end" }}>
         <textarea ref={inputRef} value={msg} onChange={e => handleInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} placeholder={channel === "notice" ? "📢 공지사항..." : "@이름 으로 지정, Enter 전송"} rows={1} style={{ flex: 1, padding: "12px 14px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, resize: "none", boxSizing: "border-box", fontFamily: "inherit", maxHeight: 80 }} />
-        <button onClick={sendMsg} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: msg.trim() ? "#2196F3" : "#333", color: "#fff", fontSize: 18, cursor: msg.trim() ? "pointer" : "default", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>↑</button>
+        <button onClick={sendMsg} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: msg.trim() ? "#42A5F5" : "#333", color: "#fff", fontSize: 18, cursor: msg.trim() ? "pointer" : "default", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>↑</button>
       </div>
     </div>
   </div>);
@@ -3182,14 +3182,14 @@ function OrgChartTab({ settings, setSettings }) {
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 3, cursor: "grab", border: "1px solid transparent" }}>
           <span style={{ fontSize: 12, color: "#556" }}>⠿</span>
           <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{node.name}</span>
-          {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+          {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
           {node.memo && <span style={{ color: "#556", fontSize: 12 }}>{node.memo}</span>}
-          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
+          {node.phone && <a href={`tel:${node.phone.replace(/-/g, "")}`} onClick={(e) => e.stopPropagation()} style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#66BB6A", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>📞</a>}
           <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
             <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, -1); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▲</button>
             <button onClick={(e) => { e.stopPropagation(); moveOrgNode(node.id, 1); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>▼</button>
             <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
-            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
         </div>
       );
@@ -3205,13 +3205,13 @@ function OrgChartTab({ settings, setSettings }) {
           style={{ borderRadius: 12, border: "1px solid rgba(33,150,243,0.2)", overflow: "hidden", cursor: "grab" }}>
           {/* 조직 헤더 */}
           <div style={{ padding: "10px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
-            {children.length > 0 ? <button onClick={() => setCollapsed(p => ({ ...p, [node.id]: !p[node.id] }))} style={{ background: "none", border: "none", color: "#2196F3", fontSize: 14, cursor: "pointer", padding: 0, width: 18 }}>{isCol ? "▶" : "▼"}</button> : <span style={{ width: 18 }} />}
+            {children.length > 0 ? <button onClick={() => setCollapsed(p => ({ ...p, [node.id]: !p[node.id] }))} style={{ background: "none", border: "none", color: "#42A5F5", fontSize: 14, cursor: "pointer", padding: 0, width: 18 }}>{isCol ? "▶" : "▼"}</button> : <span style={{ width: 18 }} />}
             <span style={{ fontSize: 16 }}>🏢</span>
-            <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>{node.name}</span>
-            {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.12)", color: "#2196F3", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
+            <span style={{ color: "#42A5F5", fontSize: 15, fontWeight: 800, flex: 1 }}>{node.name}</span>
+            {node.position && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.12)", color: "#42A5F5", fontSize: 12, fontWeight: 700 }}>{node.position}</span>}
             <span style={{ color: "#556", fontSize: 12 }}>{childPersons.length}명</span>
             <button onClick={(e) => { e.stopPropagation(); startEdit(node); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>✏️</button>
-            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
           {node.memo && <div style={{ padding: "4px 14px 6px", color: "#556", fontSize: 12 }}>{node.memo}</div>}
 
@@ -3234,8 +3234,8 @@ function OrgChartTab({ settings, setSettings }) {
 
       {/* 추가 모드 선택 */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        <button onClick={() => { setAddMode("org"); setEditId(null); setForm({ name: "", position: "", phone: "", memo: "" }); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: addMode === "org" && !editId ? "1.5px solid #2196F3" : "1px solid #333", background: addMode === "org" && !editId ? "rgba(33,150,243,0.1)" : "transparent", color: addMode === "org" && !editId ? "#2196F3" : "#667", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🏢 조직 추가</button>
-        <button onClick={() => { setAddMode("person"); setEditId(null); setForm({ name: "", position: "", phone: "", memo: "" }); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: addMode === "person" && !editId ? "1.5px solid #4CAF50" : "1px solid #333", background: addMode === "person" && !editId ? "rgba(76,175,80,0.1)" : "transparent", color: addMode === "person" && !editId ? "#4CAF50" : "#667", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>👤 인원 추가</button>
+        <button onClick={() => { setAddMode("org"); setEditId(null); setForm({ name: "", position: "", phone: "", memo: "" }); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: addMode === "org" && !editId ? "1.5px solid #2196F3" : "1px solid #333", background: addMode === "org" && !editId ? "rgba(33,150,243,0.1)" : "transparent", color: addMode === "org" && !editId ? "#42A5F5" : "#667", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🏢 조직 추가</button>
+        <button onClick={() => { setAddMode("person"); setEditId(null); setForm({ name: "", position: "", phone: "", memo: "" }); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: addMode === "person" && !editId ? "1.5px solid #4CAF50" : "1px solid #333", background: addMode === "person" && !editId ? "rgba(76,175,80,0.1)" : "transparent", color: addMode === "person" && !editId ? "#66BB6A" : "#667", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>👤 인원 추가</button>
       </div>
 
       {/* 입력 폼 */}
@@ -3277,7 +3277,7 @@ function OrgChartTab({ settings, setSettings }) {
             <button onClick={updateNode} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontWeight: 700, cursor: "pointer" }}>수정 완료</button>
             <button onClick={() => { setEditId(null); setForm({ name: "", position: "", phone: "", memo: "" }); }} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", cursor: "pointer" }}>취소</button>
           </>) : (
-            <button onClick={addNode} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: addMode === "org" ? "#2196F3" : "#4CAF50", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{addMode === "org" ? "🏢 조직 추가" : "👤 인원 추가"}</button>
+            <button onClick={addNode} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: addMode === "org" ? "#42A5F5" : "#66BB6A", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{addMode === "org" ? "🏢 조직 추가" : "👤 인원 추가"}</button>
           )}
         </div>
       </div>
@@ -3297,9 +3297,9 @@ function OrgChartTab({ settings, setSettings }) {
           const parentOrg = org.find(o => o.id === n.parentId && o.type === "org");
           return (<div key={n.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, gap: 10, flexWrap: "wrap" }}>
             <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, minWidth: 60 }}>{n.name}</span>
-            {n.position && <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 600, minWidth: 50 }}>{n.position}</span>}
+            {n.position && <span style={{ color: "#66BB6A", fontSize: 14, fontWeight: 600, minWidth: 50 }}>{n.position}</span>}
             {parentOrg && <span style={{ color: "#556", fontSize: 14, flex: 1 }}>🏢 {parentOrg.name}</span>}
-            <a href={`tel:${n.phone.replace(/-/g, "")}`} style={{ padding: "6px 14px", borderRadius: 20, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#4CAF50", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 {n.phone}</a>
+            <a href={`tel:${n.phone.replace(/-/g, "")}`} style={{ padding: "6px 14px", borderRadius: 20, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.2)", color: "#66BB6A", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 {n.phone}</a>
           </div>);
         })}
       </div>
@@ -3428,7 +3428,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div key={g.label} style={{ marginBottom: 8 }}>
           <div style={{ color: "#556", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>{g.label}</div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {g.tabs.map(t => <button key={t.id} onClick={() => { if ((extraTabs||[]).find(et => et.id === t.id)) { onExtraTab?.(t.id); return; } setTab(t.id); if (t.id !== "apiconfig") setFocusCat(null); }} style={{ padding: "8px 14px", borderRadius: 8, border: tab === t.id ? "1.5px solid #2196F3" : "1px solid #252525", background: tab === t.id ? "rgba(33,150,243,0.15)" : "rgba(255,255,255,0.02)", color: tab === t.id ? "#2196F3" : "#8892b0", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", transition: "all .2s" }}>{t.label}</button>)}
+            {g.tabs.map(t => <button key={t.id} onClick={() => { if ((extraTabs||[]).find(et => et.id === t.id)) { onExtraTab?.(t.id); return; } setTab(t.id); if (t.id !== "apiconfig") setFocusCat(null); }} style={{ padding: "8px 14px", borderRadius: 8, border: tab === t.id ? "1.5px solid #2196F3" : "1px solid #252525", background: tab === t.id ? "rgba(33,150,243,0.15)" : "rgba(255,255,255,0.02)", color: tab === t.id ? "#42A5F5" : "#8892b0", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", transition: "all .2s" }}>{t.label}</button>)}
           </div>
         </div>
       ))}
@@ -3463,7 +3463,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>📍 격자 좌표 (nx, ny)</h3>
         <p style={{ color: "#556", fontSize: 13, margin: "0 0 12px" }}>축제 위치 좌표에서 자동 변환됩니다. 필요시 수동 입력도 가능합니다.</p>
         <div style={{ padding: 12, borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.12)", marginBottom: 12 }}>
-          <p style={{ color: "#8892b0", fontSize: 14, margin: 0 }}>📍 현재 위치: {loc.name} ({loc.lat?.toFixed(4)}, {loc.lon?.toFixed(4)})<br />🔄 자동 변환 격자: <strong style={{ color: "#4CAF50" }}>nx={grid.nx}, ny={grid.ny}</strong></p>
+          <p style={{ color: "#8892b0", fontSize: 14, margin: 0 }}>📍 현재 위치: {loc.name} ({loc.lat?.toFixed(4)}, {loc.lon?.toFixed(4)})<br />🔄 자동 변환 격자: <strong style={{ color: "#66BB6A" }}>nx={grid.nx}, ny={grid.ny}</strong></p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           <div><Label>nx 수동 지정 (비우면 자동)</Label><Input type="number" value={kma.nxOverride || ""} onChange={e => setSettings({ ...settings, kma: { ...kma, nxOverride: e.target.value ? parseInt(e.target.value) : null } })} placeholder={`자동: ${grid.nx}`} /></div>
@@ -3492,14 +3492,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <button onClick={testKmaApi} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#FF9800,#F57C00)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 16, boxShadow: "0 4px 16px rgba(255,152,0,0.3)" }}>🧪 기상청 API 테스트 호출</button>
       {kmaTestResult && <Card style={{ border: `1px solid ${kmaTestResult.ok ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.3)"}`, background: kmaTestResult.ok ? "rgba(76,175,80,0.06)" : "rgba(244,67,54,0.06)" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: kmaTestResult.ok ? "#4CAF50" : "#F44336", fontSize: 14, fontWeight: 700 }}>{kmaTestResult.ok ? "✅ 성공" : "❌ 실패"}</span>
-          {kmaTestResult.simulated && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", border: "1px solid rgba(255,152,0,0.3)", color: "#FF9800", fontSize: 14, fontWeight: 700 }}>시뮬레이션</span>}
+          <span style={{ color: kmaTestResult.ok ? "#66BB6A" : "#EF5350", fontSize: 14, fontWeight: 700 }}>{kmaTestResult.ok ? "✅ 성공" : "❌ 실패"}</span>
+          {kmaTestResult.simulated && <span style={{ padding: "3px 8px", borderRadius: 10, background: "rgba(255,152,0,0.15)", border: "1px solid rgba(255,152,0,0.3)", color: "#FFA726", fontSize: 14, fontWeight: 700 }}>시뮬레이션</span>}
         </div>
         <pre style={{ color: "#aaa", fontSize: 13, margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontVariantNumeric: "tabular-nums" }}>{kmaTestResult.msg}</pre>
         {kmaTestResult.items && <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
           <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 6px", fontWeight: 700 }}>수신 데이터:</p>
           {kmaTestResult.items.map((item, i) => (<div key={i} style={{ display: "flex", gap: 10, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-            <span style={{ color: "#4CAF50", fontSize: 14, fontWeight: 700, minWidth: 40 }}>{item.category}</span>
+            <span style={{ color: "#66BB6A", fontSize: 14, fontWeight: 700, minWidth: 40 }}>{item.category}</span>
             <span style={{ color: "#ccd6f6", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{item.obsrValue}</span>
             <span style={{ color: "#556", fontSize: 13 }}>{KMA_CODES[item.category]?.name || ""} ({KMA_CODES[item.category]?.unit || ""})</span>
           </div>))}
@@ -3524,10 +3524,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Label style={{ minWidth: 60 }}>활성화</Label>
-            <div onClick={() => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, enabled: !(prev.airQuality?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.airQuality?.enabled ? "#4CAF50" : "#333", position: "relative", cursor: "pointer" }}>
+            <div onClick={() => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, enabled: !(prev.airQuality?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.airQuality?.enabled ? "#66BB6A" : "#333", position: "relative", cursor: "pointer" }}>
               <div style={{ width: 20, height: 20, borderRadius: 10, background: "#fff", position: "absolute", top: 2, left: settings.airQuality?.enabled ? 22 : 2, transition: "all .3s" }} />
             </div>
-            <span style={{ color: settings.airQuality?.enabled ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{settings.airQuality?.enabled ? "ON" : "OFF"}</span>
+            <span style={{ color: settings.airQuality?.enabled ? "#66BB6A" : "#EF5350", fontSize: 13, fontWeight: 700 }}>{settings.airQuality?.enabled ? "ON" : "OFF"}</span>
           </div>
           <div><Label>API 인증키 (공공데이터포털)</Label><Input value={settings.airQuality?.serviceKey || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, serviceKey: e.target.value } }))} placeholder="공공데이터포털에서 발급받은 인증키" /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -3537,7 +3537,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div><Label>지역 필터</Label><Input value={settings.airQuality?.stationFilter || ""} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, stationFilter: e.target.value } }))} placeholder="진주, 종로 등" /></div>
           </div>
           <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.airQuality?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, interval: parseInt(e.target.value) || 30 } }))} /></div>
-          {settings.airQuality?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.airQuality.lastFetch}</p>}
+          {settings.airQuality?.lastFetch && <p style={{ color: "#66BB6A", fontSize: 13 }}>✅ 마지막 수신: {settings.airQuality.lastFetch}</p>}
           <button onClick={async () => {
             const aq = settings.airQuality || {};
             const key = aq.serviceKey; const sido = aq.sidoName || "경남"; const filter = aq.stationFilter || "";
@@ -3570,7 +3570,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         </div>
       </Card>
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
-        <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+        <p style={{ color: "#42A5F5", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
           ℹ️ <strong>API:</strong> getCtprvnRltmMesureDnsty (시도별 실시간 측정정보)<br />
           • <strong>시도명:</strong> 경남, 서울, 부산 등 선택<br />
           • <strong>지역 필터:</strong> 측정소명에 포함된 텍스트 (예: 진주, 종로)<br />
@@ -3585,10 +3585,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Label style={{ minWidth: 60 }}>활성화</Label>
-            <div onClick={() => setSettings(prev => ({ ...prev, dam: { ...prev.dam, enabled: !(prev.dam?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.dam?.enabled ? "#4CAF50" : "#333", position: "relative", cursor: "pointer" }}>
+            <div onClick={() => setSettings(prev => ({ ...prev, dam: { ...prev.dam, enabled: !(prev.dam?.enabled) } }))} style={{ width: 44, height: 24, borderRadius: 12, background: settings.dam?.enabled ? "#66BB6A" : "#333", position: "relative", cursor: "pointer" }}>
               <div style={{ width: 20, height: 20, borderRadius: 10, background: "#fff", position: "absolute", top: 2, left: settings.dam?.enabled ? 22 : 2, transition: "all .3s" }} />
             </div>
-            <span style={{ color: settings.dam?.enabled ? "#4CAF50" : "#F44336", fontSize: 13, fontWeight: 700 }}>{settings.dam?.enabled ? "ON" : "OFF"}</span>
+            <span style={{ color: settings.dam?.enabled ? "#66BB6A" : "#EF5350", fontSize: 13, fontWeight: 700 }}>{settings.dam?.enabled ? "ON" : "OFF"}</span>
           </div>
           <div><Label>API 인증키</Label><Input value={settings.dam?.serviceKey || ""} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, serviceKey: e.target.value } }))} placeholder="공공데이터포털 인증키" /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -3597,7 +3597,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             </select></div>
             <div><Label>갱신 주기 (분)</Label><Input type="number" value={settings.dam?.interval || 30} onChange={e => setSettings(prev => ({ ...prev, dam: { ...prev.dam, interval: parseInt(e.target.value) || 30 } }))} /></div>
           </div>
-          {settings.dam?.lastFetch && <p style={{ color: "#4CAF50", fontSize: 13 }}>✅ 마지막 수신: {settings.dam.lastFetch}</p>}
+          {settings.dam?.lastFetch && <p style={{ color: "#66BB6A", fontSize: 13 }}>✅ 마지막 수신: {settings.dam.lastFetch}</p>}
           <button onClick={async () => {
             try {
               const d = settings.dam || {};
@@ -3632,7 +3632,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         </div>
       </Card>
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
-        <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+        <p style={{ color: "#42A5F5", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
           ℹ️ <strong>API:</strong> 한국수자원공사_다목적댐 운영 정보 (/multipurPoseDamlist)<br />
           • <strong>대시보드 표시:</strong> 방류량(sflowqy) ㎥/s<br />
           • <strong>기타 수집:</strong> 유입량, 수위, 저수량, 저수율, 강우량<br />
@@ -3644,13 +3644,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     {/* ── Custom API Config ── */}
     {tab === "apiconfig" && <div>
       <div style={{ padding: 10, borderRadius: 8, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.12)", marginBottom: 14 }}>
-        <p style={{ color: "#8892b0", fontSize: 13, margin: 0 }}>🔌 기상청 외 커스텀 API를 설정합니다. URL에 <code style={{ color: "#4CAF50" }}>{"{lat}"}</code>, <code style={{ color: "#4CAF50" }}>{"{lon}"}</code> 사용 가능.</p>
+        <p style={{ color: "#8892b0", fontSize: 13, margin: 0 }}>🔌 기상청 외 커스텀 API를 설정합니다. URL에 <code style={{ color: "#66BB6A" }}>{"{lat}"}</code>, <code style={{ color: "#66BB6A" }}>{"{lon}"}</code> 사용 가능.</p>
       </div>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 14 }}>
-        {categories.map(cat => <button key={cat.id} onClick={() => setFocusCat(cat.id)} style={{ padding: "6px 12px", borderRadius: 8, border: focusCat === cat.id ? "1px solid #2196F3" : "1px solid #252525", background: focusCat === cat.id ? "rgba(33,150,243,0.15)" : "transparent", color: focusCat === cat.id ? "#2196F3" : "#667", fontSize: 13, cursor: "pointer" }}>{cat.icon}{cat.name}</button>)}
+        {categories.map(cat => <button key={cat.id} onClick={() => setFocusCat(cat.id)} style={{ padding: "6px 12px", borderRadius: 8, border: focusCat === cat.id ? "1px solid #2196F3" : "1px solid #252525", background: focusCat === cat.id ? "rgba(33,150,243,0.15)" : "transparent", color: focusCat === cat.id ? "#42A5F5" : "#667", fontSize: 13, cursor: "pointer" }}>{cat.icon}{cat.name}</button>)}
       </div>
       {catForFocus && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>{catForFocus.icon} {catForFocus.name} 커스텀 API</h3>
-        {catForFocus.kmaCategory && <div style={{ padding: 8, borderRadius: 8, background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.2)", marginBottom: 12 }}><p style={{ color: "#4CAF50", fontSize: 13, margin: 0 }}>🌤️ 이 항목은 기상청 API ({catForFocus.kmaCategory})에 매핑되어 있습니다. 커스텀 API를 활성화하면 기상청 대신 커스텀 API가 사용됩니다.</p></div>}
+        {catForFocus.kmaCategory && <div style={{ padding: 8, borderRadius: 8, background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.2)", marginBottom: 12 }}><p style={{ color: "#66BB6A", fontSize: 13, margin: 0 }}>🌤️ 이 항목은 기상청 API ({catForFocus.kmaCategory})에 매핑되어 있습니다. 커스텀 API를 활성화하면 기상청 대신 커스텀 API가 사용됩니다.</p></div>}
         <div style={{ display: "grid", gap: 10 }}>
           <div><Label>API URL</Label><Input value={catForFocus.apiConfig?.url || ""} onChange={e => upApiCfg(catForFocus.id, "url", e.target.value)} placeholder="https://api.example.com/data?lat={lat}" /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -3661,13 +3661,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div><Label>응답 경로 (JSON Path)</Label><Input value={catForFocus.apiConfig?.responsePath || ""} onChange={e => upApiCfg(catForFocus.id, "responsePath", e.target.value)} placeholder="data.value" /></div>
           <Toggle on={catForFocus.apiConfig?.enabled || false} onToggle={() => upApiCfg(catForFocus.id, "enabled", !catForFocus.apiConfig?.enabled)} labelOn="커스텀 API 활성" labelOff="비활성" />
           <button onClick={() => testCustomApi(catForFocus)} style={{ padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #FF9800, #F57C00)", color: "#fff", boxShadow: "0 4px 12px rgba(255,152,0,0.3)", fontWeight: 700, cursor: "pointer" }}>🧪 테스트</button>
-          {apiTestResult[catForFocus.id] && <div style={{ padding: 10, borderRadius: 8, background: apiTestResult[catForFocus.id].ok ? "rgba(76,175,80,0.08)" : "rgba(244,67,54,0.08)", border: `1px solid ${apiTestResult[catForFocus.id].ok ? "#4CAF5044" : "#F4433644"}` }}><span style={{ color: apiTestResult[catForFocus.id].ok ? "#4CAF50" : "#F44336", fontSize: 14 }}>{apiTestResult[catForFocus.id].ok ? "✅" : "❌"} {apiTestResult[catForFocus.id].msg}</span></div>}
+          {apiTestResult[catForFocus.id] && <div style={{ padding: 10, borderRadius: 8, background: apiTestResult[catForFocus.id].ok ? "rgba(76,175,80,0.08)" : "rgba(244,67,54,0.08)", border: `1px solid ${apiTestResult[catForFocus.id].ok ? "#4CAF5044" : "#F4433644"}` }}><span style={{ color: apiTestResult[catForFocus.id].ok ? "#66BB6A" : "#EF5350", fontSize: 14 }}>{apiTestResult[catForFocus.id].ok ? "✅" : "❌"} {apiTestResult[catForFocus.id].msg}</span></div>}
         </div></Card>}
     </div>}
 
     {/* Operating */}
     {/* Thresholds */}
-    {tab === "thresholds" && <div>{categories.map(cat => (<Card key={cat.id}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><h3 style={{ color: "#ccd6f6", fontSize: 14, margin: 0 }}>{cat.icon} {cat.name} ({cat.unit})</h3><button onClick={() => { if (confirm("삭제?")) setCategories(p => p.filter(c => c.id !== cat.id)); }} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button></div>
+    {tab === "thresholds" && <div>{categories.map(cat => (<Card key={cat.id}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><h3 style={{ color: "#ccd6f6", fontSize: 14, margin: 0 }}>{cat.icon} {cat.name} ({cat.unit})</h3><button onClick={() => { if (confirm("삭제?")) setCategories(p => p.filter(c => c.id !== cat.id)); }} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ padding: 8, borderRadius: 8, background: lv.bg, border: `1px solid ${lv.border}` }}><div style={{ color: lv.color, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{lv.label}</div><div style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="number" value={cat.thresholds[lk]?.[0] ?? 0} onChange={e => upThr(cat.id, lk, 0, e.target.value)} style={{ width: 55, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={cat.thresholds[lk]?.[1] === Infinity ? "∞" : cat.thresholds[lk]?.[1] ?? 0} onChange={e => upThr(cat.id, lk, 1, e.target.value)} style={{ width: 55, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13 }} /></div></div>))}</div></Card>))}</div>}
 
     {/* Manual */}
@@ -3705,21 +3705,21 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
       {/* 안전관리책임자 */}
       <Card>
-        <h3 style={{ color: "#F44336", fontSize: 15, margin: "0 0 4px" }}>🔴 안전관리책임자</h3>
+        <h3 style={{ color: "#EF5350", fontSize: 15, margin: "0 0 4px" }}>🔴 안전관리책임자</h3>
         <p style={{ color: "#556", fontSize: 14, margin: "0 0 10px" }}>경계/경보 알림 + 조치중/조치완료 SMS 수신</p>
-        {(settings.smsManagers || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(244,67,54,0.05)", borderRadius: 6, border: "1px solid rgba(244,67,54,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsManagers: settings.smsManagers.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
+        {(settings.smsManagers || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(244,67,54,0.05)", borderRadius: 6, border: "1px solid rgba(244,67,54,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsManagers: settings.smsManagers.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#EF5350", cursor: "pointer" }}>✕</button></div>))}
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}><Input placeholder="이름" value={nc.name} onChange={e => setNc({ ...nc, name: e.target.value })} style={{ width: 80 }} /><Input placeholder="01012345678" value={nc.phone} onChange={e => setNc({ ...nc, phone: e.target.value })} style={{ flex: 1 }} /><button onClick={() => { if (nc.name && nc.phone) { setSettings({ ...settings, smsManagers: [...(settings.smsManagers || []), { name: nc.name, phone: nc.phone }] }); setNc({ name: "", phone: "" }); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontWeight: 700, cursor: "pointer" }}>추가</button></div>
       </Card>
 
       {/* 안전요원 */}
       <Card>
-        <h3 style={{ color: "#FF9800", fontSize: 15, margin: "0 0 4px" }}>🟠 안전요원</h3>
+        <h3 style={{ color: "#FFA726", fontSize: 15, margin: "0 0 4px" }}>🟠 안전요원</h3>
         <p style={{ color: "#556", fontSize: 14, margin: "0 0 10px" }}>경계/경보 알림 + 조치중/조치완료 SMS 수신</p>
-        {(settings.smsStaff || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(255,152,0,0.05)", borderRadius: 6, border: "1px solid rgba(255,152,0,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsStaff: settings.smsStaff.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#F44336", cursor: "pointer" }}>✕</button></div>))}
+        {(settings.smsStaff || []).map((c, i) => (<div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: "rgba(255,152,0,0.05)", borderRadius: 6, border: "1px solid rgba(255,152,0,0.1)" }}><span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{c.name}</span><span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{c.phone}</span><button onClick={() => setSettings({ ...settings, smsStaff: settings.smsStaff.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", color: "#EF5350", cursor: "pointer" }}>✕</button></div>))}
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}><Input placeholder="이름" value={nc.name} onChange={e => setNc({ ...nc, name: e.target.value })} style={{ width: 80 }} /><Input placeholder="01012345678" value={nc.phone} onChange={e => setNc({ ...nc, phone: e.target.value })} style={{ flex: 1 }} /><button onClick={() => { if (nc.name && nc.phone) { setSettings({ ...settings, smsStaff: [...(settings.smsStaff || []), { name: nc.name, phone: nc.phone }] }); setNc({ name: "", phone: "" }); } }} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #FF9800, #F57C00)", color: "#fff", boxShadow: "0 4px 12px rgba(255,152,0,0.3)", fontWeight: 700, cursor: "pointer" }}>추가</button></div>
       </Card>
 
-      <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 발송 이력</h3>{(!smsLog || !smsLog.length) ? <p style={{ color: "#445", fontSize: 14 }}>없음</p> : <div style={{ maxHeight: 200, overflow: "auto" }}>{smsLog.map((l, i) => (<div key={i} style={{ padding: "6px 10px", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 13 }}><span style={{ color: l.success ? "#4CAF50" : "#F44336" }}>{l.success ? "✅" : "❌"}</span> <span style={{ color: "#555" }}>{l.time}</span><div style={{ color: "#777", whiteSpace: "pre-wrap", marginTop: 2 }}>{l.preview}</div></div>))}</div>}</Card>
+      <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 발송 이력</h3>{(!smsLog || !smsLog.length) ? <p style={{ color: "#445", fontSize: 14 }}>없음</p> : <div style={{ maxHeight: 200, overflow: "auto" }}>{smsLog.map((l, i) => (<div key={i} style={{ padding: "6px 10px", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 13 }}><span style={{ color: l.success ? "#66BB6A" : "#EF5350" }}>{l.success ? "✅" : "❌"}</span> <span style={{ color: "#555" }}>{l.time}</span><div style={{ color: "#777", whiteSpace: "pre-wrap", marginTop: 2 }}>{l.preview}</div></div>))}</div>}</Card>
     </div>}
 
     {/* Zone Management */}
@@ -3729,7 +3729,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 12px" }}>🗺️ 관리구역 등록</h3>
         {(settings.zones || []).map((z, i) => {
-          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "구역관리", color: "#2196F3", icon: "📍" }, performance: { label: "공연관리", color: "#9C27B0", icon: "🎭" }, safety: { label: "안전관리", color: "#F44336", icon: "🛡️" }, support: { label: "지원관리", color: "#FF9800", icon: "🚑" }, parking: { label: "주차관리", color: "#009688", icon: "🅿️" }, entry: { label: "출입관리", color: "#795548", icon: "🚪" } };
+          const ZTYPES = { none: { label: "속성없음", color: "#8892b0", icon: "⬜" }, normal: { label: "구역관리", color: "#42A5F5", icon: "📍" }, performance: { label: "공연관리", color: "#AB47BC", icon: "🎭" }, safety: { label: "안전관리", color: "#EF5350", icon: "🛡️" }, support: { label: "지원관리", color: "#FFA726", icon: "🚑" }, parking: { label: "주차관리", color: "#009688", icon: "🅿️" }, entry: { label: "출입관리", color: "#795548", icon: "🚪" } };
           const zt = ZTYPES[z.zoneType] || ZTYPES.normal;
           return (
           <div key={z.id} style={{ padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 8, border: `1px solid ${zt.color}33` }}>
@@ -3737,7 +3737,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <span style={{ color: zt.color, fontWeight: 700, fontSize: 14 }}>{zt.icon} {z.name || `구역 ${i+1}`}</span>
               <span style={{ padding: "3px 8px", borderRadius: 4, background: `${zt.color}15`, color: zt.color, fontSize: 12, fontWeight: 700 }}>{zt.label}</span>
               <span style={{ color: "#445", fontSize: 12, flex: 1 }}>{(settings.workSites || []).filter(s => s.zoneId === z.id).length}개 근무지</span>
-              <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>삭제</button>
+              <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
               <div><Label>구역명</Label><Input value={z.name} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, name: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="A구역" /></div>
@@ -3755,8 +3755,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               </select></div>
               <div><Label>대시보드 표시</Label>
                 <div onClick={() => { const zs = [...settings.zones]; zs[i] = { ...z, dashboardShow: !(z.dashboardShow !== false) }; setSettings({ ...settings, zones: zs }); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", cursor: "pointer" }}>
-                  <div style={{ width: 36, height: 20, borderRadius: 10, background: z.dashboardShow !== false ? "#4CAF50" : "#333", position: "relative" }}><div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: z.dashboardShow !== false ? 18 : 2, transition: "all .3s" }} /></div>
-                  <span style={{ color: z.dashboardShow !== false ? "#4CAF50" : "#F44336", fontSize: 13 }}>{z.dashboardShow !== false ? "ON" : "OFF"}</span>
+                  <div style={{ width: 36, height: 20, borderRadius: 10, background: z.dashboardShow !== false ? "#66BB6A" : "#333", position: "relative" }}><div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: z.dashboardShow !== false ? 18 : 2, transition: "all .3s" }} /></div>
+                  <span style={{ color: z.dashboardShow !== false ? "#66BB6A" : "#EF5350", fontSize: 13 }}>{z.dashboardShow !== false ? "ON" : "OFF"}</span>
                 </div>
               </div>
             </div>
@@ -3797,7 +3797,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <option value="">미지정</option>
                 {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
               </select>
-              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
             </div>
           </div>
         ))}
@@ -3813,8 +3813,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {(settings.workTypes || []).map((t, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 6, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
-              <span style={{ color: "#CE93D8", fontSize: 13 }}>{t}</span>
-              <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+              <span style={{ color: "#E1BEE7", fontSize: 13 }}>{t}</span>
+              <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
             </div>
           ))}
           <div style={{ display: "flex", gap: 4 }}>
@@ -3889,10 +3889,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const poolWorkers = pool?.workers || [];
           if (poolWorkers.length === 0) return null;
           return (<div style={{ marginBottom: 14, padding: "12px 14px", borderRadius: 12, background: "rgba(255,152,0,0.06)", border: "1.5px dashed rgba(255,152,0,0.3)" }}
-            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "#FF9800"; }}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = "#FFA726"; }}
             onDragLeave={e => { e.currentTarget.style.borderColor = "rgba(255,152,0,0.3)"; }}
             onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,152,0,0.3)"; const wid = e.dataTransfer.getData("workerId"); const from = e.dataTransfer.getData("fromSite"); if (wid && from && from !== "_pool") { const ws = [...(settings.workSites || [])]; const fi = ws.findIndex(s => s.id === from); const pi = ws.findIndex(s => s.id === "_pool"); if (fi >= 0 && pi >= 0) { const w = ws[fi].workers.find(ww => ww.id === wid); if (w) { ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) }; ws[pi] = { ...ws[pi], workers: [...ws[pi].workers, w] }; setSettings(prev => ({ ...prev, workSites: ws })); } } } }}>
-            <div style={{ color: "#FF9800", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>⚠️ 미배치 근무자 ({poolWorkers.length}명)</div>
+            <div style={{ color: "#FFA726", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>⚠️ 미배치 근무자 ({poolWorkers.length}명)</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {poolWorkers.map(w => {
                 const isEditing = editWorker?.siteId === "_pool" && editWorker?.workerId === w.id;
@@ -3927,11 +3927,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
                     style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                    {w.type && <span style={{ color: "#CE93D8", fontSize: 12 }}>{w.type}</span>}
+                    {w.type && <span style={{ color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
                     {w.role && <span style={{ color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                    {w.accountId && <span style={{ color: "#2196F3", fontSize: 12 }}>🔑</span>}
+                    {w.accountId && <span style={{ color: "#42A5F5", fontSize: 12 }}>🔑</span>}
                     <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>✏️</button>
-                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
                   </div>
                 );
               })}
@@ -3944,7 +3944,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const sites = (settings.workSites || []).filter(s => s.zoneId === zone.id && s.id !== "_pool");
           return (<div key={zone.id} style={{ marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "10px 14px", background: "rgba(33,150,243,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: "#2196F3", fontSize: 15, fontWeight: 800, flex: 1 }}>📍 {zone.name}</span>
+              <span style={{ color: "#42A5F5", fontSize: 15, fontWeight: 800, flex: 1 }}>📍 {zone.name}</span>
               <span style={{ color: "#556", fontSize: 12 }}>{sites.reduce((n, s) => n + (s.workers || []).length, 0)}명</span>
             </div>
             {sites.map(site => {
@@ -3984,7 +3984,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button onClick={() => setEditWorker(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 완료</button>
-                        <button onClick={deleteW} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>
+                        <button onClick={deleteW} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#EF5350", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>
                       </div>
                     </div>
                   ) : (
@@ -3992,15 +3992,15 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                       style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid rgba(255,255,255,0.04)" }}>
                       <span style={{ fontSize: 14, color: "#556" }}>⠿</span>
                       <span style={{ color: "#ccd6f6", fontSize: 15, fontWeight: 700 }}>{w.name}</span>
-                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#CE93D8", fontSize: 12 }}>{w.type}</span>}
+                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
                       {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#2196F3", fontSize: 12 }}>🔑{w.accountId}</span>}
+                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12 }}>🔑{w.accountId}</span>}
                       {w.phone && <span style={{ color: "#556", fontSize: 12 }}>{w.phone}</span>}
                       <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
                         <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteW(); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🗑</button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteW(); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🗑</button>
                       </div>
                     </div>
                   );
@@ -4022,8 +4022,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         {(settings.gates || []).map((g, i) => (
           <div key={g.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ color: "#4CAF50", fontWeight: 700, fontSize: 14 }}>🚪 {g.name || `출입구 ${i + 1}`}</span>
-              <button onClick={() => setSettings({ ...settings, gates: settings.gates.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+              <span style={{ color: "#66BB6A", fontWeight: 700, fontSize: 14 }}>🚪 {g.name || `출입구 ${i + 1}`}</span>
+              <button onClick={() => setSettings({ ...settings, gates: settings.gates.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div><Label>출입구명</Label><Input value={g.name} onChange={e => { const gs = [...settings.gates]; gs[i] = { ...g, name: e.target.value }; setSettings({ ...settings, gates: gs }); }} placeholder="정문, 동문 등" /></div>
@@ -4049,8 +4049,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         {(settings.zones || []).map((z, i) => (
           <div key={z.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ color: "#2196F3", fontWeight: 700, fontSize: 14 }}>📍 {z.name || `구역 ${i + 1}`}</span>
-              <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+              <span style={{ color: "#42A5F5", fontWeight: 700, fontSize: 14 }}>📍 {z.name || `구역 ${i + 1}`}</span>
+              <button onClick={() => setSettings({ ...settings, zones: settings.zones.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div><Label>구역명</Label><Input value={z.name} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, name: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="A구역" /></div>
@@ -4066,14 +4066,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               </div>
             </div>
             {z.accountId && <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 6, background: "rgba(76,175,80,0.06)" }}>
-              <span style={{ color: "#4CAF50", fontSize: 14 }}>✅ {z.accountId} 계정이 로그인하면 이 구역이 자동 선택됩니다</span>
+              <span style={{ color: "#66BB6A", fontSize: 14 }}>✅ {z.accountId} 계정이 로그인하면 이 구역이 자동 선택됩니다</span>
             </div>}
           </div>
         ))}
         <button onClick={() => setSettings({ ...settings, zones: [...(settings.zones || []), { id: "z" + Date.now(), name: "", range: "", assignee: "", accountId: "", count: 0 }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>+ 구역 추가</button>
       </Card>
       <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.12)" }}>
-        <p style={{ color: "#2196F3", fontSize: 13, margin: 0, lineHeight: 1.7 }}>ℹ️ 담당 계정을 지정하면 해당 계수원이 로그인 시 자동으로 배정 구역이 선택됩니다. 구역별 인원 합계가 전체 인파관리 수치로 집계됩니다.</p>
+        <p style={{ color: "#42A5F5", fontSize: 13, margin: 0, lineHeight: 1.7 }}>ℹ️ 담당 계정을 지정하면 해당 계수원이 로그인 시 자동으로 배정 구역이 선택됩니다. 구역별 인원 합계가 전체 인파관리 수치로 집계됩니다.</p>
       </Card>
     </div>}
 
@@ -4086,10 +4086,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <div key={w.id} style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 10, border: `1px solid ${w.role === "manager" ? "rgba(244,67,54,0.2)" : "rgba(255,152,0,0.15)"}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ padding: "3px 8px", borderRadius: 10, background: w.role === "manager" ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.15)", color: w.role === "manager" ? "#F44336" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "🔴 책임자" : "🟠 요원"}</span>
+                <span style={{ padding: "3px 8px", borderRadius: 10, background: w.role === "manager" ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.15)", color: w.role === "manager" ? "#EF5350" : "#FFA726", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "🔴 책임자" : "🟠 요원"}</span>
                 <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{w.name || "이름 미입력"}</span>
               </div>
-              <button onClick={() => setSettings({ ...settings, workers: settings.workers.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+              <button onClick={() => setSettings({ ...settings, workers: settings.workers.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div><Label>이름</Label><Input value={w.name} onChange={e => { const ws = [...settings.workers]; ws[i] = { ...w, name: e.target.value }; setSettings({ ...settings, workers: ws }); }} placeholder="홍길동" /></div>
@@ -4119,7 +4119,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           </div>
           {(settings.workers || []).map(w => (
             <div key={w.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr 80px 1fr 1fr", gap: 6, padding: "6px 10px", borderRadius: 6, background: "rgba(255,255,255,0.02)" }}>
-              <span style={{ color: w.role === "manager" ? "#F44336" : "#FF9800", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "책임자" : "요원"}</span>
+              <span style={{ color: w.role === "manager" ? "#EF5350" : "#FFA726", fontSize: 14, fontWeight: 700 }}>{w.role === "manager" ? "책임자" : "요원"}</span>
               <span style={{ color: "#ccd6f6", fontSize: 13 }}>{w.name}</span>
               <span style={{ color: "#8892b0", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{w.phone}</span>
               <span style={{ color: "#8892b0", fontSize: 14 }}>{w.position || "-"}</span>
@@ -4141,8 +4141,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         {(settings.parkingLots || []).map((lot, i) => (
           <div key={lot.id} style={{ padding: 14, background: "rgba(156,39,176,0.04)", borderRadius: 10, marginBottom: 10, border: "1px solid rgba(156,39,176,0.15)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ color: "#9C27B0", fontWeight: 700, fontSize: 14 }}>🅿️ {lot.name || `주차장 ${i + 1}`}</span>
-              <button onClick={() => setSettings({ ...settings, parkingLots: settings.parkingLots.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+              <span style={{ color: "#AB47BC", fontWeight: 700, fontSize: 14 }}>🅿️ {lot.name || `주차장 ${i + 1}`}</span>
+              <button onClick={() => setSettings({ ...settings, parkingLots: settings.parkingLots.filter((_, j) => j !== i) })} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <div><Label>주차장 이름</Label><Input value={lot.name} onChange={e => { const ls = [...settings.parkingLots]; ls[i] = { ...lot, name: e.target.value }; setSettings({ ...settings, parkingLots: ls }); }} placeholder="제1주차장" /></div>
@@ -4152,7 +4152,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div><Label>담당 주차요원 (계정 ID)</Label><Input value={lot.assigneeId || ""} onChange={e => { const ls = [...settings.parkingLots]; ls[i] = { ...lot, assigneeId: e.target.value }; setSettings({ ...settings, parkingLots: ls }); }} placeholder="parking1" /></div>
           </div>
         ))}
-        <button onClick={() => setSettings({ ...settings, parkingLots: [...(settings.parkingLots || []), { id: "pk" + Date.now(), name: "", address: "", capacity: 100, current: 0, assigneeId: "" }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #9C27B0", background: "transparent", color: "#9C27B0", fontSize: 13, cursor: "pointer" }}>+ 주차장 추가</button>
+        <button onClick={() => setSettings({ ...settings, parkingLots: [...(settings.parkingLots || []), { id: "pk" + Date.now(), name: "", address: "", capacity: 100, current: 0, assigneeId: "" }] })} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #9C27B0", background: "transparent", color: "#AB47BC", fontSize: 13, cursor: "pointer" }}>+ 주차장 추가</button>
       </Card>
       {(settings.parkingLots || []).length > 0 && <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 10px" }}>📋 주차장 현황</h3>
@@ -4162,15 +4162,15 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           return <div key={lot.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 4 }}>
             <span style={{ color: "#ccd6f6", fontSize: 13, fontWeight: 700, minWidth: 80 }}>{lot.name}</span>
             <div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: pct >= 90 ? "#F44336" : pct >= 70 ? "#FF9800" : "#4CAF50", borderRadius: 3, transition: "width .5s" }} />
+              <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: pct >= 90 ? "#EF5350" : pct >= 70 ? "#FFA726" : "#66BB6A", borderRadius: 3, transition: "width .5s" }} />
             </div>
             <span style={{ color: "#8892b0", fontSize: 13, fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>{lot.current || 0}/{lot.capacity}</span>
-            <span style={{ color: remain <= 0 ? "#F44336" : "#4CAF50", fontSize: 14, fontWeight: 700, minWidth: 45 }}>{remain <= 0 ? "만차" : `잔여${remain}`}</span>
+            <span style={{ color: remain <= 0 ? "#EF5350" : "#66BB6A", fontSize: 14, fontWeight: 700, minWidth: 45 }}>{remain <= 0 ? "만차" : `잔여${remain}`}</span>
           </div>;
         })}
       </Card>}
       <Card style={{ background: "rgba(156,39,176,0.04)", border: "1px solid rgba(156,39,176,0.12)" }}>
-        <p style={{ color: "#9C27B0", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
+        <p style={{ color: "#AB47BC", fontSize: 13, margin: 0, lineHeight: 1.7 }}>
           ℹ️ <strong>주차요원 계정 만들기</strong><br/>
           1. 👤 계정관리 탭에서 계정 추가 (권한: 주차요원)<br/>
           2. 여기서 주차장의 "담당 주차요원" 칸에 해당 계정 ID 입력<br/>
@@ -4189,7 +4189,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <span style={{ width: 24, height: 24, borderRadius: 12, background: "#00BCD4", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{i+1}</span>
             <Input value={stop.name} onChange={e => { const ss = [...(settings.shuttleStops||[])]; ss[ss.findIndex(s=>s.id===stop.id)] = {...stop, name: e.target.value}; setSettings({...settings, shuttleStops: ss}); }} placeholder="정류장명" style={{ flex: 1, padding: "8px 10px", fontSize: 13 }} />
             <Input type="number" value={stop.order||i+1} onChange={e => { const ss = [...(settings.shuttleStops||[])]; ss[ss.findIndex(s=>s.id===stop.id)] = {...stop, order: parseInt(e.target.value)||0}; setSettings({...settings, shuttleStops: ss}); }} style={{ width: 50, padding: "10px", fontSize: 14, textAlign: "center" }} />
-            <button onClick={() => setSettings({...settings, shuttleStops: (settings.shuttleStops||[]).filter(s=>s.id!==stop.id)})} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>✕</button>
+            <button onClick={() => setSettings({...settings, shuttleStops: (settings.shuttleStops||[]).filter(s=>s.id!==stop.id)})} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>✕</button>
           </div>
         ))}
         <button onClick={() => { const ord = (settings.shuttleStops||[]).length + 1; setSettings({...settings, shuttleStops: [...(settings.shuttleStops||[]), {id: "st"+Date.now(), name: "", order: ord}]}); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px dashed #00BCD4", background: "transparent", color: "#00BCD4", fontSize: 13, cursor: "pointer", marginTop: 8 }}>+ 정류장 추가</button>
@@ -4203,8 +4203,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span style={{ color: "#00BCD4", fontWeight: 700, fontSize: 14 }}>🚌 {bus.name || `버스 ${i+1}`}</span>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                {bus.status && <span style={{ padding: "3px 8px", borderRadius: 10, background: bus.status==="running"?"rgba(76,175,80,0.15)":bus.status==="stopped"?"rgba(255,152,0,0.15)":"rgba(244,67,54,0.15)", color: bus.status==="running"?"#4CAF50":bus.status==="stopped"?"#FF9800":"#F44336", fontSize: 13, fontWeight: 700 }}>{bus.status==="running"?"운행중":bus.status==="stopped"?"대기":"종료"}</span>}
-                <button onClick={() => setSettings({...settings, shuttleBuses: settings.shuttleBuses.filter((_,j)=>j!==i)})} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>
+                {bus.status && <span style={{ padding: "3px 8px", borderRadius: 10, background: bus.status==="running"?"rgba(76,175,80,0.15)":bus.status==="stopped"?"rgba(255,152,0,0.15)":"rgba(244,67,54,0.15)", color: bus.status==="running"?"#66BB6A":bus.status==="stopped"?"#FFA726":"#EF5350", fontSize: 13, fontWeight: 700 }}>{bus.status==="running"?"운행중":bus.status==="stopped"?"대기":"종료"}</span>}
+                <button onClick={() => setSettings({...settings, shuttleBuses: settings.shuttleBuses.filter((_,j)=>j!==i)})} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
@@ -4218,7 +4218,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div><Label>담당 셔틀요원 (계정 ID)</Label><Input value={bus.assigneeId||""} onChange={e => { const bs=[...(settings.shuttleBuses||[])]; bs[i]={...bus,assigneeId:e.target.value}; setSettings({...settings,shuttleBuses:bs}); }} placeholder="shuttle1" /></div>
             {bus.currentStopName && <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 6, background: "rgba(0,188,212,0.06)", display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "#00BCD4", fontSize: 13 }}>📍 {bus.currentStopName} ({bus.lastUpdated||""})</span>
-              <span style={{ color: (bus.passengers||0)>=(bus.capacity||45)?"#F44336":"#4CAF50", fontSize: 13, fontWeight: 700 }}>👥 {bus.passengers||0}/{bus.capacity||45}</span>
+              <span style={{ color: (bus.passengers||0)>=(bus.capacity||45)?"#EF5350":"#66BB6A", fontSize: 13, fontWeight: 700 }}>👥 {bus.passengers||0}/{bus.capacity||45}</span>
             </div>}
           </div>
         ))}
@@ -4251,11 +4251,11 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div style={{ textAlign: "center", padding: 16, borderRadius: 12, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.15)" }}>
                 <div style={{ color: "#8892b0", fontSize: 13 }}>🏃 체류 인원</div>
-                <div style={{ color: "#4CAF50", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{curVal.toLocaleString()}</div>
+                <div style={{ color: "#66BB6A", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{curVal.toLocaleString()}</div>
               </div>
               <div style={{ textAlign: "center", padding: 16, borderRadius: 12, background: "rgba(33,150,243,0.06)", border: "1px solid rgba(33,150,243,0.15)" }}>
                 <div style={{ color: "#8892b0", fontSize: 13 }}>📊 누적 방문</div>
-                <div style={{ color: "#2196F3", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
+                <div style={{ color: "#42A5F5", fontSize: 32, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{cumVal.toLocaleString()}</div>
               </div>
             </div>
 
@@ -4267,8 +4267,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <button onClick={() => { const v = parseInt(document.getElementById("cum-adj")?.value); if (!isNaN(v) && v >= 0) { const cd = JSON.parse(localStorage.getItem("_crowd") || "{}"); cd.cumulative = v; localStorage.setItem("_crowd", JSON.stringify(cd)); if (window.crowdDB) window.crowdDB.set(cd.total || 0, v, cd.zones || [], "admin"); document.getElementById("cum-adj").value = ""; alert(`✅ 누적 방문객이 ${v.toLocaleString()}명으로 설정되었습니다.`); } else { alert("0 이상의 숫자를 입력하세요."); } }} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>설정</button>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-              <button onClick={() => { const cd = JSON.parse(localStorage.getItem("_crowd") || "{}"); cd.cumulative = 0; localStorage.setItem("_crowd", JSON.stringify(cd)); if (window.crowdDB) window.crowdDB.set(cd.total || 0, 0, cd.zones || [], "admin"); alert("✅ 누적 초기화 완료"); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>누적만 초기화 (0명)</button>
-              <button onClick={() => { const cd = { total: 0, cumulative: 0, zones: (crowdData.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })) }; localStorage.setItem("_crowd", JSON.stringify(cd)); if (window.crowdDB) window.crowdDB.set(0, 0, cd.zones, "admin"); setCategories(p => p.map(c => c.id === "crowd" ? { ...c, currentValue: 0 } : c)); alert("✅ 전체 초기화 완료 (체류 + 누적)"); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 초기화</button>
+              <button onClick={() => { const cd = JSON.parse(localStorage.getItem("_crowd") || "{}"); cd.cumulative = 0; localStorage.setItem("_crowd", JSON.stringify(cd)); if (window.crowdDB) window.crowdDB.set(cd.total || 0, 0, cd.zones || [], "admin"); alert("✅ 누적 초기화 완료"); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>누적만 초기화 (0명)</button>
+              <button onClick={() => { const cd = { total: 0, cumulative: 0, zones: (crowdData.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })) }; localStorage.setItem("_crowd", JSON.stringify(cd)); if (window.crowdDB) window.crowdDB.set(0, 0, cd.zones, "admin"); setCategories(p => p.map(c => c.id === "crowd" ? { ...c, currentValue: 0 } : c)); alert("✅ 전체 초기화 완료 (체류 + 누적)"); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.08)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>전체 초기화</button>
             </div>
 
             {/* 체류 수동 조정 */}
@@ -4285,8 +4285,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 {zoneData.filter(z => z.name).map(z => (
                   <div key={z.id} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
                     <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{z.name}</span>
-                    <span style={{ color: "#4CAF50", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>체류 {(z.count || 0).toLocaleString()}</span>
-                    <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 70, textAlign: "right", marginLeft: 8 }}>누적 {(z.cumulative || 0).toLocaleString()}</span>
+                    <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>체류 {(z.count || 0).toLocaleString()}</span>
+                    <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 70, textAlign: "right", marginLeft: 8 }}>누적 {(z.cumulative || 0).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -4309,8 +4309,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 14 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
                 <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} />
-                <Line type="monotone" dataKey="체류" stroke="#4CAF50" strokeWidth={2} dot={false} name="🏃 체류" />
-                <Line type="monotone" dataKey="누적" stroke="#2196F3" strokeWidth={2} dot={false} name="📊 누적" />
+                <Line type="monotone" dataKey="체류" stroke="#66BB6A" strokeWidth={2} dot={false} name="🏃 체류" />
+                <Line type="monotone" dataKey="누적" stroke="#42A5F5" strokeWidth={2} dot={false} name="📊 누적" />
               </LineChart>
             </ResponsiveContainer>
           );
@@ -4332,8 +4332,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                     <XAxis dataKey="date" tick={{ fill: "#556", fontSize: 13 }} />
                     <YAxis tick={{ fill: "#556", fontSize: 14 }} width={50} />
                     <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} />
-                    <Line type="monotone" dataKey="누적방문" stroke="#2196F3" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="최대체류" stroke="#FF9800" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="누적방문" stroke="#42A5F5" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="최대체류" stroke="#FFA726" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -4343,8 +4343,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             {(settings.dailyRecords || []).map((r, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6 }}>
                 <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{r.date}</span>
-                <span style={{ color: "#2196F3", fontSize: 14, fontWeight: 700, marginRight: 12 }}>누적 {(r.cumulative || 0).toLocaleString()}</span>
-                <span style={{ color: "#FF9800", fontSize: 13 }}>최대 {(r.peakCurrent || 0).toLocaleString()}</span>
+                <span style={{ color: "#42A5F5", fontSize: 14, fontWeight: 700, marginRight: 12 }}>누적 {(r.cumulative || 0).toLocaleString()}</span>
+                <span style={{ color: "#FFA726", fontSize: 13 }}>최대 {(r.peakCurrent || 0).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -4363,8 +4363,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {(settings.workTypes || []).map((t, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, background: "rgba(156,39,176,0.08)", border: "1px solid rgba(156,39,176,0.15)" }}>
-              <span style={{ color: "#CE93D8", fontSize: 13 }}>{t}</span>
-              <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+              <span style={{ color: "#E1BEE7", fontSize: 13 }}>{t}</span>
+              <button onClick={() => setSettings(prev => ({ ...prev, workTypes: prev.workTypes.filter((_, j) => j !== i) }))} style={{ padding: 0, border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
             </div>
           ))}
         </div>
@@ -4391,7 +4391,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <option value="">구역 미지정</option>
                 {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
               </select>
-              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+              <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
             </div>
 
             {/* 근무자 목록 */}
@@ -4407,7 +4407,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                     {(settings.workTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <Input value={w.duty || ""} onChange={e => { const ws = [...(settings.workSites || [])]; const wk = [...(ws[si].workers || [])]; wk[wi] = { ...w, duty: e.target.value }; ws[si] = { ...ws[si], workers: wk }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="담당업무" style={{ flex: 1 }} />
-                  <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: (ws[si].workers || []).filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 12, cursor: "pointer" }}>✕</button>
+                  <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: (ws[si].workers || []).filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
                 </div>
               ))}
               <button onClick={() => { const ws = [...(settings.workSites || [])]; ws[si] = { ...ws[si], workers: [...(ws[si].workers || []), { id: "w_" + Date.now(), name: "", phone: "", type: "", duty: "" }] }; setSettings(prev => ({ ...prev, workSites: ws })); }} style={{ padding: "8px", borderRadius: 8, border: "1px dashed #444", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", width: "100%" }}>+ 근무자 추가</button>
@@ -4426,12 +4426,12 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 28 }}>📖</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#2196F3", fontSize: 16, fontWeight: 700 }}>지역축제장 안전관리 매뉴얼</div>
+            <div style={{ color: "#42A5F5", fontSize: 16, fontWeight: 700 }}>지역축제장 안전관리 매뉴얼</div>
             <div style={{ color: "#556", fontSize: 13 }}>행정안전부 2021 · 5단계 46항목</div>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button onClick={() => window.open("/safety-manual.pdf", "_blank")} style={{ padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📖 매뉴얼 보기</button>
+          <button onClick={() => window.open("/safety-manual.pdf", "_blank")} style={{ padding: "14px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📖 매뉴얼 보기</button>
           <button onClick={() => {
             if (!confirm("매뉴얼 기반 체크리스트를 자동 생성합니다.\n기존 체크리스트가 초기화됩니다.")) return;
             const def = [
@@ -4463,7 +4463,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             ];
             setSettings(prev => ({ ...prev, checklists: def }));
             alert("✅ 5개 카테고리, 46개 항목이 생성되었습니다.");
-          }} style={{ padding: "14px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 자동 생성</button>
+          }} style={{ padding: "14px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#66BB6A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 자동 생성</button>
         </div>
       </Card>
 
@@ -4474,22 +4474,22 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         const fixCount = enabledItems.filter(i => i.checked === "fix").length;
         const total = enabledItems.length;
         const pct = total > 0 ? Math.round(done / total * 100) : 0;
-        const catColors = { plan: "#9C27B0", pre: "#2196F3", during: "#4CAF50", post: "#FF9800", emergency: "#F44336" };
+        const catColors = { plan: "#AB47BC", pre: "#42A5F5", during: "#66BB6A", post: "#FFA726", emergency: "#EF5350" };
         const catLabels = { plan: "계획", pre: "시작 전", during: "진행 중", post: "종료", emergency: "사고대응" };
         const catColor = catColors[cl.category] || "#8892b0";
         return (<Card key={cl.id}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ padding: "6px 12px", borderRadius: 6, background: `${catColor}15`, color: catColor, fontSize: 13, fontWeight: 700 }}>{catLabels[cl.category] || cl.category}</span>
             <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: 0, flex: 1 }}>{cl.title}</h3>
-            <span style={{ color: pct === 100 ? "#4CAF50" : catColor, fontSize: 16, fontWeight: 800 }}>{done}/{total}</span>
-            {fixCount > 0 && <span style={{ color: "#FF9800", fontSize: 13, fontWeight: 700 }}>🔧{fixCount}</span>}
-            <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            <span style={{ color: pct === 100 ? "#66BB6A" : catColor, fontSize: 16, fontWeight: 800 }}>{done}/{total}</span>
+            {fixCount > 0 && <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>🔧{fixCount}</span>}
+            <button onClick={() => { if (confirm(`"${cl.title}" 삭제?`)) setSettings(prev => ({ ...prev, checklists: prev.checklists.filter((_,j) => j !== ci) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
           </div>
-          <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", marginBottom: 12 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4CAF50" : catColor, borderRadius: 3, transition: "width .3s" }} /></div>
+          <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", marginBottom: 12 }}><div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#66BB6A" : catColor, borderRadius: 3, transition: "width .3s" }} /></div>
           {cl.items.map((item, ii) => {
             const isOff = item.enabled === false;
             const status = item.checked === "done" ? "done" : item.checked === "fix" ? "fix" : item.checked === true ? "done" : item.checked ? item.checked : null;
-            const stColor = status === "done" ? "#4CAF50" : status === "fix" ? "#FF9800" : null;
+            const stColor = status === "done" ? "#66BB6A" : status === "fix" ? "#FFA726" : null;
             const setItemStatus = (st) => {
               const cls = JSON.parse(JSON.stringify(settings.checklists || []));
               cls[ci].items[ii] = { ...cls[ci].items[ii], checked: status === st ? false : st, checkedBy: status === st ? "" : (session?.name || ""), checkedAt: status === st ? "" : new Date().toLocaleString("ko-KR") };
@@ -4504,7 +4504,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             return (<div key={item.id} style={{ padding: "12px", borderRadius: 10, background: isOff ? "rgba(255,255,255,0.01)" : status === "done" ? "rgba(76,175,80,0.04)" : status === "fix" ? "rgba(255,152,0,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOff ? "#1a1a2e" : status === "done" ? "rgba(76,175,80,0.2)" : status === "fix" ? "rgba(255,152,0,0.2)" : "#222"}`, marginBottom: 5, opacity: isOff ? 0.35 : 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: !isOff && !status ? 8 : 0 }}>
                 {/* ON/OFF 토글 */}
-                <div onClick={toggleEnabled} style={{ width: 32, height: 18, borderRadius: 9, background: isOff ? "#333" : "#4CAF50", position: "relative", cursor: "pointer", flexShrink: 0 }}>
+                <div onClick={toggleEnabled} style={{ width: 32, height: 18, borderRadius: 9, background: isOff ? "#333" : "#66BB6A", position: "relative", cursor: "pointer", flexShrink: 0 }}>
                   <div style={{ width: 14, height: 14, borderRadius: 7, background: "#fff", position: "absolute", top: 2, left: isOff ? 2 : 16, transition: "all .3s" }} />
                 </div>
                 {/* 텍스트 */}
@@ -4513,16 +4513,16 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   {item.checkedBy && <div style={{ color: "#556", fontSize: 12 }}>👤 {item.checkedBy} · {item.checkedAt} {status === "fix" ? "· 🔧보완필요" : ""}</div>}
                 </div>
                 {/* 상태 뱃지 */}
-                {status === "done" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>완료</span>}
-                {status === "fix" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FF9800", fontSize: 12, fontWeight: 700 }}>보완</span>}
+                {status === "done" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(76,175,80,0.15)", color: "#66BB6A", fontSize: 12, fontWeight: 700 }}>완료</span>}
+                {status === "fix" && <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>보완</span>}
                 {/* 수정/삭제 */}
                 <button onClick={() => { const t = prompt("항목 수정:", item.text); if (t && t !== item.text) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items[ii] = { ...item, text: t }; setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
-                <button onClick={() => { if (confirm("삭제?")) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items.splice(ii, 1); setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
+                <button onClick={() => { if (confirm("삭제?")) { const cls = JSON.parse(JSON.stringify(settings.checklists||[])); cls[ci].items.splice(ii, 1); setSettings(prev => ({ ...prev, checklists: cls })); } }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
               </div>
               {/* 완료/보완 버튼 */}
               {!isOff && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <button onClick={() => setItemStatus("done")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "done" ? "2px solid #4CAF50" : "1px solid #333", background: status === "done" ? "rgba(76,175,80,0.1)" : "transparent", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 완료</button>
-                <button onClick={() => setItemStatus("fix")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "fix" ? "2px solid #FF9800" : "1px solid #333", background: status === "fix" ? "rgba(255,152,0,0.1)" : "transparent", color: "#FF9800", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔧 보완</button>
+                <button onClick={() => setItemStatus("done")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "done" ? "2px solid #4CAF50" : "1px solid #333", background: status === "done" ? "rgba(76,175,80,0.1)" : "transparent", color: "#66BB6A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✅ 완료</button>
+                <button onClick={() => setItemStatus("fix")} style={{ flex: 1, padding: "10px", borderRadius: 8, border: status === "fix" ? "2px solid #FF9800" : "1px solid #333", background: status === "fix" ? "rgba(255,152,0,0.1)" : "transparent", color: "#FFA726", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔧 보완</button>
               </div>}
             </div>);
           })}
@@ -4544,7 +4544,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           <button onClick={() => { const t = document.getElementById("new_cl_title"); const c = document.getElementById("new_cl_cat"); if (!t?.value) return; setSettings(prev => ({ ...prev, checklists: [...(prev.checklists||[]), { id: "cl_"+Date.now(), title: t.value, category: c.value, items: [] }] })); t.value = ""; }} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button>
         </div>
       </Card>
-      <button onClick={() => { if (confirm("모든 체크 초기화? (항목 유지)")) setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 14, cursor: "pointer", marginBottom: 8 }}>🔄 체크 초기화 (항목 유지)</button>
+      <button onClick={() => { if (confirm("모든 체크 초기화? (항목 유지)")) setSettings(prev => ({ ...prev, checklists: (prev.checklists||[]).map(cl => ({ ...cl, items: cl.items.map(i => ({ ...i, checked: false, checkedBy: "", checkedAt: "" })) })) })); }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 14, cursor: "pointer", marginBottom: 8 }}>🔄 체크 초기화 (항목 유지)</button>
     </div>}
 
 
@@ -4563,8 +4563,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             ws["!cols"] = [{wch:12},{wch:10},{wch:10},{wch:25},{wch:15},{wch:8},{wch:10},{wch:15},{wch:30},{wch:8}];
             XLSX.utils.book_append_sheet(wb, ws, "프로그램");
             XLSX.writeFile(wb, "축제프로그램_양식.xlsx");
-          }} style={{ padding: "12px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 양식 다운로드</button>
-          <label style={{ padding: "12px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#4CAF50", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+          }} style={{ padding: "12px", borderRadius: 10, border: "1px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 양식 다운로드</button>
+          <label style={{ padding: "12px", borderRadius: 10, border: "1px solid #4CAF50", background: "rgba(76,175,80,0.08)", color: "#66BB6A", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
             📤 엑셀 업로드
             <input type="file" accept=".xlsx,.xls,.csv" onChange={e => {
               const file = e.target.files?.[0]; if (!file) return;
@@ -4654,7 +4654,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>📥 내보내기</button>
         </div>
         {(settings.programs || []).sort((a,b) => (a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||"")).map((pg) => {
-          const catMap = { O: { l: "공식", c: "#2196F3" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#4CAF50" }, S: { l: "부대", c: "#FF9800" } };
+          const catMap = { O: { l: "공식", c: "#42A5F5" }, P: { l: "공연", c: "#E91E63" }, E: { l: "체험", c: "#66BB6A" }, S: { l: "부대", c: "#FFA726" } };
           const cat = catMap[pg.category] || { l: pg.category, c: "#556" };
           const dateLabel = pg.date === "always" ? "🔄상시" : pg.date ? new Date(pg.date).getMonth()+1 + "/" + new Date(pg.date).getDate() : "";
           const stLabel = pg.pgStatus === "delayed" ? "⏱지연" : pg.pgStatus === "ended" ? "종료" : "";
@@ -4665,7 +4665,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             return (<div key={pg.id} style={{ padding: "16px", borderRadius: 12, background: "rgba(156,39,176,0.04)", border: "2px solid rgba(156,39,176,0.2)", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 18 }}>✏️</span>
-                <h4 style={{ color: "#CE93D8", fontSize: 15, fontWeight: 700, margin: 0, flex: 1 }}>프로그램 수정</h4>
+                <h4 style={{ color: "#E1BEE7", fontSize: 15, fontWeight: 700, margin: 0, flex: 1 }}>프로그램 수정</h4>
                 <button onClick={() => setEditPgId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>닫기 ✕</button>
               </div>
               <div style={{ display: "grid", gap: 10 }}>
@@ -4705,14 +4705,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <div style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{pg.title}</div>
                 <div style={{ color: "#556", fontSize: 12 }}>{pg.location ? "📍"+pg.location : ""} {pg.manager ? "👤"+pg.manager : ""}</div>
               </div>
-              {stLabel && <span style={{ color: pg.pgStatus === "delayed" ? "#FF9800" : "#556", fontSize: 12, fontWeight: 700 }}>{stLabel}</span>}
-              <button onClick={() => setEditPgId(pg.id)} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#CE93D8", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
-              <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
+              {stLabel && <span style={{ color: pg.pgStatus === "delayed" ? "#FFA726" : "#556", fontSize: 12, fontWeight: 700 }}>{stLabel}</span>}
+              <button onClick={() => setEditPgId(pg.id)} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#E1BEE7", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✏️</button>
+              <button onClick={() => { if (confirm(`"${pg.title}" 삭제?`)) setSettings(prev => ({ ...prev, programs: prev.programs.filter(p => p.id !== pg.id) })); }} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>🗑</button>
             </div>
           </div>);
         })}
       </Card>
-      <button onClick={() => { if (confirm("프로그램 전체 초기화?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
+      <button onClick={() => { if (confirm("프로그램 전체 초기화?")) setSettings(prev => ({ ...prev, programs: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🔄 프로그램 초기화</button>
     </div>}
 
 
@@ -4721,12 +4721,12 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 10px" }}>🏥 응급환자 기록</h3>
         <button onClick={() => setSettings(prev => ({ ...prev, medicalRecords: [{ id: "med_"+Date.now(), time: new Date().toLocaleString("ko-KR"), location: "", symptoms: "", action: "", status: "treating", patient: "", responder: session?.name || "" }, ...(prev.medicalRecords||[])] }))} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 14 }}>🆘 응급환자 발생 등록</button>
         {(settings.medicalRecords || []).map((mr, mi) => {
-          const stMap = { treating: { label: "치료중", color: "#FF9800" }, transferred: { label: "이송완료", color: "#2196F3" }, discharged: { label: "귀가", color: "#4CAF50" } };
+          const stMap = { treating: { label: "치료중", color: "#FFA726" }, transferred: { label: "이송완료", color: "#42A5F5" }, discharged: { label: "귀가", color: "#66BB6A" } };
           const mst = stMap[mr.status] || stMap.treating;
           const upMed = (field, val) => { const m = [...(settings.medicalRecords||[])]; m[mi] = { ...mr, [field]: val }; setSettings(prev => ({ ...prev, medicalRecords: m })); };
           return (<div key={mr.id} style={{ padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${mst.color}33`, marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ color: "#F44336", fontSize: 14, fontWeight: 700 }}>🏥 #{mi+1}</span>
+              <span style={{ color: "#EF5350", fontSize: 14, fontWeight: 700 }}>🏥 #{mi+1}</span>
               <span style={{ color: "#556", fontSize: 12, flex: 1 }}>{mr.time}</span>
               <div style={{ display: "flex", gap: 4 }}>
                 {Object.entries(stMap).map(([k, v]) => (
@@ -4742,13 +4742,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <div style={{ marginTop: 6 }}><Label>조치사항</Label><Input value={mr.action} onChange={e => upMed("action", e.target.value)} placeholder="응급처치 후 119 이송" /></div>
             <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
               <span style={{ color: "#556", fontSize: 12 }}>담당: {mr.responder}</span>
-              <button onClick={() => { if (confirm("이 기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: prev.medicalRecords.filter((_,i)=>i!==mi) })); }} style={{ marginLeft: "auto", padding: "3px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>삭제</button>
+              <button onClick={() => { if (confirm("이 기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: prev.medicalRecords.filter((_,i)=>i!==mi) })); }} style={{ marginLeft: "auto", padding: "3px 8px", borderRadius: 4, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>삭제</button>
             </div>
           </div>);
         })}
         {(settings.medicalRecords||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>응급환자 기록이 없습니다.</div>}
       </Card>
-      <button onClick={() => { if (confirm("모든 의료기록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 의료기록 초기화</button>
+      <button onClick={() => { if (confirm("모든 의료기록을 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, medicalRecords: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🔄 의료기록 초기화</button>
     </div>}
 
     {/* 상황일지 */}
@@ -4764,7 +4764,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         </div>
         {(settings.timeline || []).slice().reverse().map(tl => {
           const typeIcon = { check: "✅", emergency: "🚨", medical: "🏥", request: "📨", manual: "📝", congestion: "🚦", status: "📊" }[tl.type] || "📌";
-          const typeColor = { emergency: "#F44336", medical: "#FF9800", manual: "#2196F3" }[tl.type] || "#8892b0";
+          const typeColor = { emergency: "#EF5350", medical: "#FFA726", manual: "#42A5F5" }[tl.type] || "#8892b0";
           return (<div key={tl.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
             <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}><div style={{ color: "#556", fontSize: 12 }}>{tl.time?.split(" ")[0]}</div><div style={{ color: "#8892b0", fontSize: 12, fontWeight: 700 }}>{tl.time?.split(" ")[1]}</div></div>
             <div style={{ width: 3, background: typeColor, borderRadius: 2, flexShrink: 0 }} />
@@ -4776,7 +4776,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         })}
         {(settings.timeline||[]).length === 0 && <div style={{ textAlign: "center", padding: 20, color: "#556" }}>기록이 없습니다.</div>}
       </Card>
-      <button onClick={() => { if (confirm("상황일지를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, timeline: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 13, cursor: "pointer" }}>🔄 상황일지 초기화</button>
+      <button onClick={() => { if (confirm("상황일지를 초기화하시겠습니까?")) setSettings(prev => ({ ...prev, timeline: [] })); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 13, cursor: "pointer" }}>🔄 상황일지 초기화</button>
     </div>}
 
     {tab === "custom" && <Card><h3 style={{ color: "#ccd6f6", fontSize: 15, margin: "0 0 14px" }}>➕ 항목 추가</h3><div style={{ display: "grid", gap: 10 }}>{[{ l: "항목명", k: "name" }, { l: "단위", k: "unit" }, { l: "아이콘", k: "icon" }].map(f => (<div key={f.k}><Label>{f.l}</Label><Input value={newCat[f.k]} onChange={e => setNewCat({ ...newCat, [f.k]: e.target.value })} /></div>))}<div><Label>기상청 카테고리</Label><select value={newCat.kmaCategory || ""} onChange={e => setNewCat({ ...newCat, kmaCategory: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff" }}><option value="">없음</option>{Object.entries(KMA_CODES).map(([code, info]) => <option key={code} value={code}>{code} — {info.name}</option>)}</select></div>{Object.entries(LEVELS).map(([lk, lv]) => (<div key={lk} style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ color: lv.color, fontSize: 13, fontWeight: 700, minWidth: 36 }}>{lv.label}</span><input type="number" value={newCat.thresholds[lk][0]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [parseFloat(e.target.value) || 0, t[lk][1]]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }} /><span style={{ color: "#444" }}>~</span><input type="text" value={newCat.thresholds[lk][1] === Infinity ? "∞" : newCat.thresholds[lk][1]} onChange={e => { const t = { ...newCat.thresholds }; t[lk] = [t[lk][0], e.target.value === "∞" ? Infinity : parseFloat(e.target.value) || 0]; setNewCat({ ...newCat, thresholds: t }); }} style={{ width: 65, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }} /></div>))}<button onClick={() => { if (!newCat.name) return; setCategories(p => [...p, { ...newCat, id: "c_" + Date.now(), source: newCat.kmaCategory ? "api" : "manual" }]); }} style={{ padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #2196F3, #1976D2)", color: "#fff", boxShadow: "0 4px 12px rgba(33,150,243,0.3)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>추가</button></div></Card>}
@@ -4831,10 +4831,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
               const isToday = d === new Date().toISOString().slice(0, 10);
               return <div key={d} style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 12px", borderRadius: 10, background: isToday ? "rgba(76,175,80,0.1)" : "rgba(33,150,243,0.06)", border: isToday ? "1.5px solid rgba(76,175,80,0.3)" : "1px solid rgba(33,150,243,0.12)" }}>
-                <span style={{ color: isToday ? "#4CAF50" : "#2196F3", fontSize: 14, fontWeight: 700 }}>{i+1}일차</span>
+                <span style={{ color: isToday ? "#66BB6A" : "#42A5F5", fontSize: 14, fontWeight: 700 }}>{i+1}일차</span>
                 <span style={{ color: "#ccd6f6", fontSize: 14 }}>{dt.getMonth()+1}/{dt.getDate()}</span>
                 <span style={{ color: "#556", fontSize: 12 }}>({dayNames[dt.getDay()]})</span>
-                {isToday && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>오늘</span>}
+                {isToday && <span style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700 }}>오늘</span>}
                 <button onClick={() => setSettings({...settings, festivalDates: (settings.festivalDates||[]).filter(x => x !== d)})} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "transparent", color: "#a33", fontSize: 12, cursor: "pointer", marginLeft: 4 }}>✕</button>
               </div>;
             })}
@@ -4861,8 +4861,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           {(settings.dailyRecords || []).map((r, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: i % 2 ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: 6 }}>
               <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700 }}>{r.date}</span>
-              <span style={{ color: "#2196F3", fontSize: 14 }}>누적 {(r.cumulative||0).toLocaleString()}명</span>
-              <span style={{ color: "#4CAF50", fontSize: 13 }}>최대 {(r.peakCurrent||0).toLocaleString()}</span>
+              <span style={{ color: "#42A5F5", fontSize: 14 }}>누적 {(r.cumulative||0).toLocaleString()}명</span>
+              <span style={{ color: "#66BB6A", fontSize: 13 }}>최대 {(r.peakCurrent||0).toLocaleString()}</span>
             </div>
           ))}
         </div>}
@@ -4873,8 +4873,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         <h3 style={{ color: "#ccd6f6", fontSize: 18, margin: "0 0 4px", fontWeight: 800 }}>📍 행사장 위치</h3>
         <p style={{ color: "#556", fontSize: 12, margin: "0 0 14px" }}>기상청 API 연동에 사용됩니다</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-          <button onClick={autoLocate} disabled={locLoading} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "auto" ? "2px solid #4CAF50" : "1px solid #333", background: loc.mode === "auto" ? "rgba(76,175,80,0.08)" : "transparent", color: loc.mode === "auto" ? "#4CAF50" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{locLoading ? "📡 확인 중..." : "📡 자동 위치"}</button>
-          <button onClick={() => setSettings({...settings, location: {...loc, mode: "manual"}})} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "manual" ? "2px solid #FF9800" : "1px solid #333", background: loc.mode === "manual" ? "rgba(255,152,0,0.08)" : "transparent", color: loc.mode === "manual" ? "#FF9800" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>✏️ 수동 입력</button>
+          <button onClick={autoLocate} disabled={locLoading} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "auto" ? "2px solid #4CAF50" : "1px solid #333", background: loc.mode === "auto" ? "rgba(76,175,80,0.08)" : "transparent", color: loc.mode === "auto" ? "#66BB6A" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{locLoading ? "📡 확인 중..." : "📡 자동 위치"}</button>
+          <button onClick={() => setSettings({...settings, location: {...loc, mode: "manual"}})} style={{ padding: "14px", borderRadius: 10, border: loc.mode === "manual" ? "2px solid #FF9800" : "1px solid #333", background: loc.mode === "manual" ? "rgba(255,152,0,0.08)" : "transparent", color: loc.mode === "manual" ? "#FFA726" : "#8892b0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>✏️ 수동 입력</button>
         </div>
         <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
           <div><Label>위치명</Label><Input value={loc.name||""} onChange={e => setSettings({...settings, location: {...loc, name: e.target.value, mode: "manual"}})} placeholder="진주성" /></div>
@@ -4913,7 +4913,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             } else {
               navigator.serviceWorker?.getRegistration().then(r => { if (r) r.update().then(() => setTimeout(() => alert("✅ 최신 버전입니다."), 2000)); }).catch(() => alert("✅ 최신 버전입니다."));
             }
-          }} style={{ padding: "10px 20px", borderRadius: 10, border: updateAvailable ? "none" : "1px solid #333", background: updateAvailable ? "#2196F3" : "transparent", color: updateAvailable ? "#fff" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{updateAvailable ? "🔄 업데이트" : "🔍 확인"}</button>
+          }} style={{ padding: "10px 20px", borderRadius: 10, border: updateAvailable ? "none" : "1px solid #333", background: updateAvailable ? "#42A5F5" : "transparent", color: updateAvailable ? "#fff" : "#8892b0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{updateAvailable ? "🔄 업데이트" : "🔍 확인"}</button>
         </div>
       </Card>
 
@@ -4931,7 +4931,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           }} style={{ padding: "14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
             📥 설정 다운로드
           </button>
-          <button onClick={() => document.getElementById("settings-upload").click()} style={{ padding: "14px", borderRadius: 10, border: "1.5px solid #FF9800", background: "rgba(255,152,0,0.08)", color: "#FF9800", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={() => document.getElementById("settings-upload").click()} style={{ padding: "14px", borderRadius: 10, border: "1.5px solid #FF9800", background: "rgba(255,152,0,0.08)", color: "#FFA726", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
             📤 설정 불러오기
           </button>
         </div>
@@ -4958,32 +4958,32 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       </Card>
 
       <Card>
-        <h3 style={{ color: "#F44336", fontSize: 16, margin: "0 0 4px" }}>🔄 데이터 초기화</h3>
+        <h3 style={{ color: "#EF5350", fontSize: 16, margin: "0 0 4px" }}>🔄 데이터 초기화</h3>
         <p style={{ color: "#556", fontSize: 13, margin: "0 0 14px" }}>운영 중 수동 입력된 데이터를 항목별로 초기화합니다. 설정은 유지됩니다.</p>
         <div style={{ display: "grid", gap: 8 }}>
 
-          <button onClick={() => { if (confirm("인파관리 데이터를 초기화하시겠습니까?\n현재 인원수가 0으로 리셋됩니다.")) { setCategories(p => p.map(c => c.id === "crowd" ? { ...c, currentValue: 0, history: [], actionStatus: null, actionReport: null } : c)); setSettings(prev => ({ ...prev, zones: (prev.zones || []).map(z => ({ ...z, count: 0 })) })); if (window.crowdDB) window.crowdDB.set(0, 0, (settings.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })), "reset"); onDataReset?.(); alert("✅ 인파관리 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#F44336", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => { if (confirm("인파관리 데이터를 초기화하시겠습니까?\n현재 인원수가 0으로 리셋됩니다.")) { setCategories(p => p.map(c => c.id === "crowd" ? { ...c, currentValue: 0, history: [], actionStatus: null, actionReport: null } : c)); setSettings(prev => ({ ...prev, zones: (prev.zones || []).map(z => ({ ...z, count: 0 })) })); if (window.crowdDB) window.crowdDB.set(0, 0, (settings.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })), "reset"); onDataReset?.(); alert("✅ 인파관리 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#EF5350", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
             👥 인파관리 초기화 <span style={{ color: "#888", fontSize: 14, marginLeft: 8 }}>전체 인원 + 구역별 인원 → 0</span>
           </button>
 
-          <button onClick={() => { if (confirm("주차장 현황을 초기화하시겠습니까?\n모든 주차장의 현재 대수가 0으로 리셋됩니다.")) { setSettings(prev => ({ ...prev, parkingLots: (prev.parkingLots || []).map(l => ({ ...l, current: 0 })) })); onDataReset?.(); alert("✅ 주차장 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#F44336", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => { if (confirm("주차장 현황을 초기화하시겠습니까?\n모든 주차장의 현재 대수가 0으로 리셋됩니다.")) { setSettings(prev => ({ ...prev, parkingLots: (prev.parkingLots || []).map(l => ({ ...l, current: 0 })) })); onDataReset?.(); alert("✅ 주차장 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#EF5350", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
             🅿️ 주차장 초기화 <span style={{ color: "#888", fontSize: 14, marginLeft: 8 }}>모든 주차장 현재 대수 → 0</span>
           </button>
 
-          <button onClick={() => { if (confirm("메시지 및 공지를 모두 삭제하시겠습니까?")) { setSettings(prev => ({ ...prev, messages: [], notices: [] })); alert("✅ 메시지/공지 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#F44336", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => { if (confirm("메시지 및 공지를 모두 삭제하시겠습니까?")) { setSettings(prev => ({ ...prev, messages: [], notices: [] })); alert("✅ 메시지/공지 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#EF5350", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
             💬 메시지/공지 초기화 <span style={{ color: "#888", fontSize: 14, marginLeft: 8 }}>발송이력 + 대시보드 공지 삭제</span>
           </button>
 
-          <button onClick={() => { if (confirm("알림 이력을 모두 삭제하시겠습니까?")) { setAlerts([]); alert("✅ 알림 이력 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#F44336", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => { if (confirm("알림 이력을 모두 삭제하시겠습니까?")) { setAlerts([]); alert("✅ 알림 이력 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#EF5350", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
             🔔 알림 이력 초기화 <span style={{ color: "#888", fontSize: 14, marginLeft: 8 }}>경보 알림 이력 전체 삭제</span>
           </button>
 
-          <button onClick={() => { if (confirm("조치사항 이력을 모두 삭제하시겠습니까?")) { setSettings(prev => ({ ...prev, resolvedHistory: [] })); setCategories(p => p.map(c => ({ ...c, actionStatus: null, actionReport: null }))); alert("✅ 조치사항 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#F44336", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => { if (confirm("조치사항 이력을 모두 삭제하시겠습니까?")) { setSettings(prev => ({ ...prev, resolvedHistory: [] })); setCategories(p => p.map(c => ({ ...c, actionStatus: null, actionReport: null }))); alert("✅ 조치사항 초기화 완료"); }}} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(244,67,54,0.2)", background: "rgba(244,67,54,0.05)", color: "#EF5350", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
             📋 조치사항 초기화 <span style={{ color: "#888", fontSize: 14, marginLeft: 8 }}>지시/조치 이력 + 진행상태 삭제</span>
           </button>
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10, marginTop: 4 }}>
-            <button onClick={() => { if (confirm("⚠️ 모든 운영 데이터를 초기화하시겠습니까?\n\n인파, 주차장, 메시지, 알림, 조치사항이 모두 리셋됩니다.\n(설정/계정/구역/근무자/기상데이터는 유지)")) { setCategories(p => p.map(c => { if (c.id === "crowd") return { ...c, currentValue: 0, history: [], actionStatus: null, actionReport: null }; return { ...c, actionStatus: null, actionReport: null }; })); setSettings(prev => ({ ...prev, zones: (prev.zones || []).map(z => ({ ...z, count: 0 })), parkingLots: (prev.parkingLots || []).map(l => ({ ...l, current: 0 })), messages: [], notices: [], resolvedHistory: [] })); setAlerts([]); if (window.crowdDB) window.crowdDB.set(0, 0, [], "reset"); onDataReset?.(); alert("✅ 전체 운영 데이터 초기화 완료\n(기상 실황/예보 데이터는 유지됩니다)"); }}} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "2px solid #F44336", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            <button onClick={() => { if (confirm("⚠️ 모든 운영 데이터를 초기화하시겠습니까?\n\n인파, 주차장, 메시지, 알림, 조치사항이 모두 리셋됩니다.\n(설정/계정/구역/근무자/기상데이터는 유지)")) { setCategories(p => p.map(c => { if (c.id === "crowd") return { ...c, currentValue: 0, history: [], actionStatus: null, actionReport: null }; return { ...c, actionStatus: null, actionReport: null }; })); setSettings(prev => ({ ...prev, zones: (prev.zones || []).map(z => ({ ...z, count: 0 })), parkingLots: (prev.parkingLots || []).map(l => ({ ...l, current: 0 })), messages: [], notices: [], resolvedHistory: [] })); setAlerts([]); if (window.crowdDB) window.crowdDB.set(0, 0, [], "reset"); onDataReset?.(); alert("✅ 전체 운영 데이터 초기화 완료\n(기상 실황/예보 데이터는 유지됩니다)"); }}} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "2px solid #F44336", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               ⚠️ 전체 초기화 (운영 데이터 일괄 리셋)
             </button>
           </div>
@@ -5021,12 +5021,12 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           {g.items.map(f => {
             const on = settings.features?.[f.k] !== false;
             return (<div key={f.k} onClick={() => setSettings({ ...settings, features: { ...(settings.features || {}), [f.k]: !on } })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: on ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 8, marginBottom: 3, cursor: "pointer", border: `1px solid ${on ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
-              <div style={{ width: 36, height: 20, borderRadius: 10, background: on ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
+              <div style={{ width: 36, height: 20, borderRadius: 10, background: on ? "#66BB6A" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
                 <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: on ? 18 : 2, transition: "all .3s" }} />
               </div>
               <span style={{ fontSize: 16 }}>{f.icon}</span>
               <span style={{ color: on ? "#ccd6f6" : "#556", fontSize: 13, fontWeight: 700, flex: 1 }}>{f.label}</span>
-              <span style={{ color: on ? "#4CAF50" : "#F44336", fontSize: 12, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
+              <span style={{ color: on ? "#66BB6A" : "#EF5350", fontSize: 12, fontWeight: 700 }}>{on ? "ON" : "OFF"}</span>
             </div>);
           })}
         </div>))}
@@ -5050,7 +5050,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             <button key={r.label} onClick={() => { if (confirm(`${r.label} 데이터를 초기화하시겠습니까?`)) r.action(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)", cursor: "pointer", textAlign: "left" }}>
               <span style={{ fontSize: 16 }}>{r.icon}</span>
               <span style={{ color: "#ccd6f6", fontSize: 14, flex: 1 }}>{r.label}</span>
-              <span style={{ color: "#F44336", fontSize: 12, fontWeight: 700 }}>초기화</span>
+              <span style={{ color: "#EF5350", fontSize: 12, fontWeight: 700 }}>초기화</span>
             </button>
           ))}
         </div>
@@ -5097,7 +5097,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 <span style={{ fontSize: 14, color: "#556" }}>⠿</span>
                 <span style={{ fontSize: 22 }}>{item.icon}</span>
                 <span style={{ color: "#ccd6f6", fontSize: 16, fontWeight: 700, flex: 1 }}>{item.label}</span>
-                {!enabled && <span style={{ color: "#F44336", fontSize: 12 }}>OFF</span>}
+                {!enabled && <span style={{ color: "#EF5350", fontSize: 12 }}>OFF</span>}
                 <button onClick={(e) => { e.stopPropagation(); moveNav(item.id, -1); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 16, cursor: "pointer" }}>▲</button>
                 <button onClick={(e) => { e.stopPropagation(); moveNav(item.id, 1); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 16, cursor: "pointer" }}>▼</button>
               </div>);
@@ -5112,7 +5112,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         {categories.map(cat => {
           const vis = settings.dashboardVisible?.[cat.id] !== false;
           return <div key={cat.id} onClick={() => setSettings({ ...settings, dashboardVisible: { ...(settings.dashboardVisible || {}), [cat.id]: !vis } })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: vis ? "rgba(76,175,80,0.04)" : "rgba(255,255,255,0.01)", borderRadius: 8, marginBottom: 4, cursor: "pointer", border: `1px solid ${vis ? "rgba(76,175,80,0.12)" : "#1a1a2e"}` }}>
-            <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#4CAF50" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 20, borderRadius: 10, background: vis ? "#66BB6A" : "#333", position: "relative", transition: "all .3s", flexShrink: 0 }}>
               <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: vis ? 18 : 2, transition: "all .3s" }} />
             </div>
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
@@ -5123,7 +5123,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
       </Card>
     </div>}
 
-    {tab === "alerts" && <div>{alerts.length === 0 && <p style={{ color: "#445", textAlign: "center", padding: 20 }}>이력 없음</p>}{alerts.map((a, i) => { const li = LEVELS[a.level]; return (<div key={i} style={{ background: li.bg, borderRadius: 10, padding: 12, marginBottom: 8, border: `1px solid ${li.border}` }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 14 }}>{li.icon}{a.category}</span><span style={{ color: "#445", fontSize: 14 }}>{a.time}</span></div><pre style={{ color: "#bbb", fontSize: 13, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, fontFamily: "inherit" }}>{a.message}</pre></div>); })}{alerts.length > 0 && <button onClick={() => setAlerts([])} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>}</div>}
+    {tab === "alerts" && <div>{alerts.length === 0 && <p style={{ color: "#445", textAlign: "center", padding: 20 }}>이력 없음</p>}{alerts.map((a, i) => { const li = LEVELS[a.level]; return (<div key={i} style={{ background: li.bg, borderRadius: 10, padding: 12, marginBottom: 8, border: `1px solid ${li.border}` }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 14 }}>{li.icon}{a.category}</span><span style={{ color: "#445", fontSize: 14 }}>{a.time}</span></div><pre style={{ color: "#bbb", fontSize: 13, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5, fontFamily: "inherit" }}>{a.message}</pre></div>); })}{alerts.length > 0 && <button onClick={() => setAlerts([])} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>전체 삭제</button>}</div>}
 
     </div></div>);
 }
@@ -5368,14 +5368,14 @@ const DEFAULT_FESTIVALS = [
 
 const ROLES = {
   sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#F44336", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FF9800", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "chat", "status", "program", "stage", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
   zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "status", "program", "inbox"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
-  stagemgr: { label: "무대관리자", color: "#9C27B0", pages: ["dashboard", "stage", "status", "program", "chat"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
-  counter: { label: "계수원", color: "#4CAF50", pages: ["counter", "congestion", "dashboard", "chat", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#9C27B0", pages: ["parking", "dashboard", "chat", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
+  stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
+  counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#AB47BC", pages: ["parking", "dashboard", "chat", "status", "program", "program"], desc: "주차장 관리 + 대시보드 조회" },
   shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "program"], desc: "셔틀버스 위치 관리" },
-  viewer: { label: "뷰어", color: "#2196F3", pages: ["dashboard", "chat", "status", "program"], desc: "대시보드 조회만 가능" },
+  viewer: { label: "뷰어", color: "#42A5F5", pages: ["dashboard", "chat", "status", "program"], desc: "대시보드 조회만 가능" },
 };
 
 // ─── Login Page ──────────────────────────────────────────────────
@@ -5420,7 +5420,7 @@ function LoginPage({ onLogin, accounts }) {
             </div>
           </div>
           {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(244,67,54,0.1)", border: "1px solid rgba(244,67,54,0.2)", marginBottom: 16 }}>
-            <span style={{ color: "#F44336", fontSize: 13 }}>❌ {error}</span>
+            <span style={{ color: "#EF5350", fontSize: 13 }}>❌ {error}</span>
           </div>}
           <button onClick={handleLogin} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2196F3,#1565C0)", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(33,150,243,0.3)" }}>
             로그인
@@ -5498,15 +5498,15 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
             <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 4, background: isOnline ? "#4CAF50" : "#556", flexShrink: 0 }} />
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: isOnline ? "#66BB6A" : "#556", flexShrink: 0 }} />
                   <span style={{ color: "#ccd6f6", fontWeight: 700, fontSize: 14 }}>{acc.name}</span>
                   <span style={{ color: "#556", fontSize: 14 }}>({acc.id})</span>
                   <span style={{ padding: "3px 8px", borderRadius: 10, background: `${rl.color}22`, border: `1px solid ${rl.color}44`, color: rl.color, fontSize: 14, fontWeight: 700 }}>{rl.label}</span>
-                  {isOnline && <span style={{ color: "#4CAF50", fontSize: 12, fontWeight: 700 }}>● 접속중</span>}
+                  {isOnline && <span style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700 }}>● 접속중</span>}
                   {!isOnline && lastSeenLabel && <span style={{ color: "#556", fontSize: 12 }}>{lastSeenLabel}</span>}
-                  {isSelf && <span style={{ color: "#2196F3", fontSize: 14 }}>← 현재</span>}
+                  {isSelf && <span style={{ color: "#42A5F5", fontSize: 14 }}>← 현재</span>}
                 </div>
-                {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#F44336", fontSize: 14, cursor: "pointer" }}>삭제</button>}
+                {editable && <button onClick={() => deleteAcc(acc.id)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #a33", background: "rgba(244,67,54,0.1)", color: "#EF5350", fontSize: 14, cursor: "pointer" }}>삭제</button>}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {editable && (
@@ -5549,7 +5549,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
                         const cur = [...(acc.enabledPages || rolePg)];
                         const next = on ? cur.filter(x => x !== p.id) : [...cur, p.id];
                         setAccounts(accounts.map(a => a.id === acc.id ? { ...a, enabledPages: next } : a));
-                      }} style={{ padding: "6px 12px", borderRadius: 6, border: on ? "1.5px solid #4CAF50" : "1px solid #333", background: on ? "rgba(76,175,80,0.08)" : "transparent", color: on ? "#4CAF50" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      }} style={{ padding: "6px 12px", borderRadius: 6, border: on ? "1.5px solid #4CAF50" : "1px solid #333", background: on ? "rgba(76,175,80,0.08)" : "transparent", color: on ? "#66BB6A" : "#556", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         {p.icon} {p.label}{!isDefault && on ? " +" : ""}
                       </button>);
                     })}
@@ -5560,7 +5560,7 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
           );
         })}
       </Card>
-      {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <button onClick={() => { if (confirm("모든 접속 기기에 설정을 동기화합니다.\n다른 기기는 자동으로 새로고침됩니다.")) { onForceSync?.(); alert("✅ 전체 동기화 완료\n다른 기기가 자동으로 새로고침됩니다."); } }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "2px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#2196F3", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>🔄 전체 기기 동기화</button>}
+      {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <button onClick={() => { if (confirm("모든 접속 기기에 설정을 동기화합니다.\n다른 기기는 자동으로 새로고침됩니다.")) { onForceSync?.(); alert("✅ 전체 동기화 완료\n다른 기기가 자동으로 새로고침됩니다."); } }} style={{ width: "100%", padding: "14px", borderRadius: 10, border: "2px solid #2196F3", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>🔄 전체 기기 동기화</button>}
       {(currentUser.role === "admin" || currentUser.role === "sysadmin") && <Card>
         <h3 style={{ color: "#ccd6f6", fontSize: 16, margin: "0 0 14px" }}>➕ 계정 추가</h3>
         <div style={{ display: "grid", gap: 10 }}>
@@ -5601,7 +5601,7 @@ export default function App() {
     return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 400, textAlign: "center" }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>⚠️</div>
-        <h2 style={{ color: "#F44336", fontSize: 20, fontWeight: 800, margin: "0 0 8px" }}>앱 오류 발생</h2>
+        <h2 style={{ color: "#EF5350", fontSize: 20, fontWeight: 800, margin: "0 0 8px" }}>앱 오류 발생</h2>
         <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 16px" }}>{String(fatalError)}</p>
         <button onClick={() => { localStorage.clear(); sessionStorage.clear(); location.reload(); }} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>🔄 초기화 후 재시작</button>
         <button onClick={() => setFatalError(null)} style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#888", fontSize: 13, cursor: "pointer" }}>다시 시도</button>
@@ -5615,7 +5615,7 @@ export default function App() {
     return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 400, textAlign: "center" }}>
         <div style={{ fontSize: 64 }}>💥</div>
-        <h2 style={{ color: "#F44336", fontSize: 18, margin: "8px 0" }}>렌더링 오류</h2>
+        <h2 style={{ color: "#EF5350", fontSize: 18, margin: "8px 0" }}>렌더링 오류</h2>
         <p style={{ color: "#888", fontSize: 13 }}>{String(e)}</p>
         <button onClick={() => { localStorage.clear(); sessionStorage.clear(); location.reload(); }} style={{ marginTop: 16, padding: "12px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>🔄 초기화</button>
       </div>
@@ -5768,7 +5768,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
           <div key={f.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, gap: 10 }}>
             <span style={{ color: "#ccd6f6", fontSize: 14, fontWeight: 700, flex: 1 }}>🏮 {f.name}</span>
             <span style={{ color: "#445", fontSize: 12 }}>{f.dates || ""}</span>
-            {f.id !== "default" && <button onClick={() => deleteFestival(f.id)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#F44336", fontSize: 12, cursor: "pointer" }}>🗑</button>}
+            {f.id !== "default" && <button onClick={() => deleteFestival(f.id)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>}
           </div>
         ))}
       </div>
@@ -5791,7 +5791,7 @@ function FestivalManager({ festivals, setFestivals, accounts, setAccounts }) {
                   const newFests = assigned ? curFests.filter(x => x !== f.id) : [...curFests, f.id];
                   if (newFests.length === 0) { alert("최소 1개 축제에 배정해야 합니다."); return; }
                   setAccounts(p => p.map(a => a.id === acc.id ? { ...a, festivals: newFests, festivalId: newFests[0] } : a));
-                }} style={{ padding: "6px 12px", borderRadius: 6, border: assigned ? "1px solid #4CAF50" : "1px solid #333", background: assigned ? "rgba(76,175,80,0.1)" : "transparent", color: assigned ? "#4CAF50" : "#556", fontSize: 12, cursor: "pointer" }}>{assigned ? "✅" : "⬜"} {f.name}</button>;
+                }} style={{ padding: "6px 12px", borderRadius: 6, border: assigned ? "1px solid #4CAF50" : "1px solid #333", background: assigned ? "rgba(76,175,80,0.1)" : "transparent", color: assigned ? "#66BB6A" : "#556", fontSize: 12, cursor: "pointer" }}>{assigned ? "✅" : "⬜"} {f.name}</button>;
               })}
             </div>
           </div>
@@ -6011,7 +6011,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#FF9800", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
+        {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#FFA726", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
         <button onClick={onLogout} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#556", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
       </div>
     </div>
@@ -6027,11 +6027,13 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
             const pinned = navs.slice(0, MAX - 1).map(n => n.id);
             const isInPinned = pinned.includes(page);
             const visibleIds = isInPinned ? pinned : [...pinned.slice(0, MAX - 2), page];
-            return navs.filter(n => !visibleIds.includes(n.id)).map(n => (
-              <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "12px 4px", borderRadius: 12, border: page === n.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: page === n.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: page === n.id ? "#2196F3" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative", transition: "all 0.2s" }}>
+            const hidden = navs.filter(n => !visibleIds.includes(n.id));
+            if (hidden.length === 0) return <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 20, color: "#556", fontSize: 13 }}>모든 메뉴가 표시되어 있습니다</div>;
+            return hidden.map(n => (
+              <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ padding: "12px 4px", borderRadius: 12, border: page === n.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: page === n.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: page === n.id ? "#42A5F5" : "#8892b0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative", transition: "all 0.2s" }}>
                 <span style={{ fontSize: 22, lineHeight: 1 }}>{n.icon}</span>
                 <span style={{ fontSize: 12, fontWeight: page === n.id ? 700 : 500 }}>{n.label}</span>
-                {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: 8, width: 7, height: 7, borderRadius: 4, background: "#2196F3", boxShadow: "0 0 8px rgba(33,150,243,0.6)" }} />}
+                {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: 8, width: 7, height: 7, borderRadius: 4, background: "#42A5F5", boxShadow: "0 0 8px rgba(33,150,243,0.6)" }} />}
                 {n.id === "inbox" && unreadCount > 0 && <span style={{ position: "absolute", top: 4, right: 6, padding: "1px 5px", borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", fontSize: 10, fontWeight: 700 }}>{unreadCount > 9 ? "9+" : unreadCount}</span>}
               </button>
             ));
@@ -6044,10 +6046,10 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {(() => {
         const MAX = 5;
         if (navs.length <= MAX) {
-          return navs.map(n => <button key={n.id} onClick={() => { setPage(n.id); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: page === n.id ? "#2196F3" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
+          return navs.map(n => <button key={n.id} onClick={() => { setPage(n.id); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: page === n.id ? "#42A5F5" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
             <span style={{ fontSize: 20 }}>{n.icon}</span><span style={{ fontSize: 13, fontWeight: page === n.id ? 700 : 400 }}>{n.label}</span>
             {n.id === "inbox" && unreadCount > 0 && <span style={{ position: "absolute", top: 6, right: "calc(50% - 18px)", width: 16, height: 16, borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>}
-            {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 8, height: 8, borderRadius: 4, background: "#2196F3" }} />}
+            {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 8, height: 8, borderRadius: 4, background: "#42A5F5" }} />}
           </button>);
         }
         // 5개 이상이면 4개 + 더보기
@@ -6056,12 +6058,12 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         const visibleNavs = isInPinned ? pinned : [...pinned.slice(0, MAX - 2), navs.find(n => n.id === page) || pinned[pinned.length - 1]];
 
         return (<>
-          {visibleNavs.filter(Boolean).map(n => <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: page === n.id ? "#2196F3" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
+          {visibleNavs.filter(Boolean).map(n => <button key={n.id} onClick={() => { setPage(n.id); setShowMore(false); if (n.id !== "cms") { setCmsTab(null); setCmsCatId(null); } }} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: page === n.id ? "#42A5F5" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
             <span style={{ fontSize: 20 }}>{n.icon}</span><span style={{ fontSize: 13, fontWeight: page === n.id ? 700 : 400 }}>{n.label}</span>
             {n.id === "inbox" && unreadCount > 0 && <span style={{ position: "absolute", top: 6, right: "calc(50% - 18px)", width: 16, height: 16, borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>}
-            {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 8, height: 8, borderRadius: 4, background: "#2196F3" }} />}
+            {n.id === "cms" && updateAvailable && <span style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 8, height: 8, borderRadius: 4, background: "#42A5F5" }} />}
           </button>)}
-          <button onClick={() => setShowMore(!showMore)} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: showMore ? "#2196F3" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <button onClick={() => setShowMore(!showMore)} style={{ flex: 1, maxWidth: 130, padding: "12px 0 10px", border: "none", background: "none", color: showMore ? "#42A5F5" : "#556", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <span style={{ fontSize: 20 }}>⋯</span><span style={{ fontSize: 13, fontWeight: showMore ? 700 : 400 }}>더보기</span>
           </button>
         </>);
