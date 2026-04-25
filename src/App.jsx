@@ -818,7 +818,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
   }
 
   // ── Main Dashboard View ──
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "16px 12px 80px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "16px max(12px, env(safe-area-inset-right)) 80px max(12px, env(safe-area-inset-left))" }}>
     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:0.9}}`}</style>
 
     {/* CueFlow 스타일 헤더 카드 */}
@@ -886,7 +886,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>축제장 인원관리</span>
       <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(33,150,243,0.2), transparent)" }} />
     </div>
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+    <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))", gap: 10 }}>
       {categories.filter(c => c.id === "crowd" && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0];
         const crowdLS = (() => { try { return JSON.parse(localStorage.getItem("_crowd") || "{}"); } catch { return {}; } })();
         const cumVal = crowdLS.cumulative || 0;
@@ -937,7 +937,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         </div>); })}
     </div>
     {/* 구역별 혼잡도 */}
-    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+    {settings.features?.congestion !== false && (settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).length > 0 && <div style={{ maxWidth: 1100, margin: "8px auto 0", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 8 }}>
       {(settings.zones || []).filter(z => z.name && z.dashboardShow !== false && (!z.zoneType || z.zoneType === "normal" || z.zoneType === "performance" || z.zoneType === "parking")).map(z => {
         const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
         const CL = { smooth: { label: "원활", color: "#66BB6A", icon: "🟢" }, crowded: { label: "혼잡", color: "#FFA726", icon: "🟡" }, danger: { label: "위험", color: "#EF5350", icon: "🔴" } };
@@ -1466,7 +1466,7 @@ function ParkingPage({ settings, setSettings, session }) {
     return "BLUE";
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px 16px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🅿️ 주차장 관리</h2>
     <p style={{ color: "#8892b0", fontSize: 14, textAlign: "center", margin: "0 0 20px" }}>{settings.festivalName} | {fmtTime(now)}</p>
 
@@ -1543,7 +1543,7 @@ function ShuttlePage({ settings, setSettings, session }) {
     
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px 16px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🚌 셔틀버스 관리</h2>
     <p style={{ color: "#8892b0", fontSize: 14, textAlign: "center", margin: "0 0 20px" }}>{settings.festivalName} | {fmtTime(now)}</p>
 
@@ -1846,7 +1846,7 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
     </div>);
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px 16px 80px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
         <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 2px" }}>🎪 {settings.festivalName || "축제관리"}</h2>
@@ -2355,7 +2355,7 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     timeGroups[key].push(pg);
   });
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px 16px 80px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
       <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎭 축제 프로그램</h2>
       <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 10px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
@@ -2722,7 +2722,7 @@ function StageMgmtPage({ settings, setSettings, session }) {
   const dateGroups = {};
   sorted.forEach(pf => { const d = pf.date || "미지정"; if (!dateGroups[d]) dateGroups[d] = []; dateGroups[d].push(pf); });
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px 16px 80px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
 
       {/* 상세 뷰 */}
@@ -2848,7 +2848,7 @@ function CongestionPage({ settings, setSettings, session }) {
   const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
   const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px 16px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 6px" }}>🚦 인파혼잡도 관리</h2>
     <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>① 단계 선택 → ② 사진/메모 → ③ 보고 완료</p>
 
@@ -3449,7 +3449,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
   ];
   const allTabs = tabGroups.flatMap(g => g.tabs);
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px 16px 80px" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     {/* CueFlow 스타일 CMS 헤더 */}
     <div style={{ maxWidth: 800, margin: "0 auto 16px", padding: "16px 18px", borderRadius: 18, background: "linear-gradient(135deg, rgba(244,67,54,0.06), rgba(244,67,54,0.01))", border: "1px solid rgba(244,67,54,0.2)", boxShadow: "0 0 0 1px rgba(244,67,54,0.06), 0 4px 24px rgba(244,67,54,0.1), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
