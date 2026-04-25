@@ -434,6 +434,56 @@ async function sendSolapi(s, text, contacts) {
 
 // ─── UI Components ───────────────────────────────────────────────
 const Card = ({ children, style, onClick }) => <div onClick={onClick} style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))", borderRadius: 16, padding: 20, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.2)", backdropFilter: "blur(10px)", ...style }}>{children}</div>;
+
+// ─── 공통 페이지 컴포넌트 (전체 일관성) ─────────────────────────────
+const PageContainer = ({ children, maxWidth = 800, accent = "#42A5F5" }) => (
+  <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <div style={{ maxWidth, margin: "0 auto" }}>{children}</div>
+  </div>
+);
+
+const PageHeader = ({ icon, title, subtitle, accent = "#42A5F5", action }) => (
+  <div style={{ padding: "16px 18px", borderRadius: 18, background: `linear-gradient(135deg, ${accent}14, ${accent}03)`, border: `1px solid ${accent}33`, marginBottom: 16, display: "flex", alignItems: "center", gap: 14 }}>
+    <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${accent}33, ${accent}0A)`, border: `1px solid ${accent}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{icon}</div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <h1 style={{ color: "#fff", fontSize: 18, fontWeight: 700, letterSpacing: -0.4, margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</h1>
+      {subtitle && <p style={{ color: "#94A3B8", fontSize: 12, margin: "2px 0 0", fontWeight: 500 }}>{subtitle}</p>}
+    </div>
+    {action}
+  </div>
+);
+
+const SectionTitle = ({ icon, children, action, accent = "#42A5F5" }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 10px" }}>
+    {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
+    <span style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 700, letterSpacing: -0.2 }}>{children}</span>
+    <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${accent}30, transparent)` }} />
+    {action}
+  </div>
+);
+
+const EmptyState = ({ icon = "📭", title = "데이터가 없습니다", description }) => (
+  <div style={{ padding: "40px 20px", borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", textAlign: "center" }}>
+    <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.5 }}>{icon}</div>
+    <div style={{ color: "#CBD5E1", fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+    {description && <div style={{ color: "#94A3B8", fontSize: 12 }}>{description}</div>}
+  </div>
+);
+
+// 통일된 액션 버튼
+const Btn = ({ variant = "primary", icon, children, onClick, disabled, style, color }) => {
+  const variants = {
+    primary: { background: `linear-gradient(135deg, ${color || "#42A5F5"}, ${color ? color : "#1976D2"})`, color: "#fff", border: "none" },
+    secondary: { background: "rgba(255,255,255,0.04)", color: "#CBD5E1", border: "1px solid rgba(255,255,255,0.1)" },
+    outline: { background: "transparent", color: color || "#42A5F5", border: `1.5px solid ${color || "#42A5F5"}50` },
+    ghost: { background: "transparent", color: "#94A3B8", border: "1px solid rgba(255,255,255,0.06)" },
+    danger: { background: "transparent", color: "#EF5350", border: "1px solid rgba(244,67,54,0.25)" },
+  };
+  return (<button onClick={onClick} disabled={disabled} style={{ padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, transition: "all 0.2s", display: "inline-flex", alignItems: "center", gap: 6, ...variants[variant], ...style }}>
+    {icon && <span>{icon}</span>}{children}
+  </button>);
+};
+
 const Label = ({ children }) => <label style={{ color: "#8892b0", fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6, letterSpacing: 0.2 }}>{children}</label>;
 const Input = ({ style, ...p }) => <input {...p} style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14, boxSizing: "border-box", transition: "all 0.2s", ...style }} />;
 const Toggle = ({ on, onToggle, labelOn, labelOff }) => (<div style={{ display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 56, height: 30, borderRadius: 15, background: on ? "#66BB6A" : "#333", cursor: "pointer", position: "relative", transition: "all .3s" }} onClick={onToggle}><div style={{ width: 24, height: 24, borderRadius: 12, background: "#fff", position: "absolute", top: 3, left: on ? 29 : 3, transition: "all .3s", boxShadow: "0 2px 4px rgba(0,0,0,.3)" }} /></div><span style={{ color: on ? "#66BB6A" : "#666", fontWeight: 700, fontSize: 14 }}>{on ? labelOn : labelOff}</span></div>);
@@ -1345,9 +1395,10 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     </div>
   );
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 16px" }}>
-    <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 4px" }}>{settings.festivalName} 인파 계수</h2>
-    <p style={{ color: "#8892b0", fontSize: 14, margin: "0 0 16px" }}>{fmtTime(now)}</p>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <div style={{ width: "100%", maxWidth: 500 }}>
+      <PageHeader icon="👥" title="인파 계수" subtitle={fmtTime(now)} accent="#66BB6A" />
+    </div>
 
     {showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === myGate.id); return z ? (
       <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, padding: 16, borderRadius: 16, background: "rgba(76,175,80,0.06)", border: "1.5px solid rgba(76,175,80,0.2)", textAlign: "center" }}>
@@ -1476,15 +1527,11 @@ function ParkingPage({ settings, setSettings, session }) {
     return "BLUE";
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
-    <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🅿️ 주차장 관리</h2>
-    <p style={{ color: "#8892b0", fontSize: 14, textAlign: "center", margin: "0 0 20px" }}>{settings.festivalName} | {fmtTime(now)}</p>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <PageHeader icon="🅿️" title="주차장 관리" subtitle={`${fmtTime(now)} 기준`} accent="#AB47BC" />
 
-    {myLots.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>🅿️</div>
-      <p style={{ fontSize: 14 }}>배정된 주차장이 없습니다</p>
-      <p style={{ fontSize: 14, color: "#94A3B8" }}>관리자에게 주차장 배정을 요청하세요</p>
-    </div>}
+    {myLots.length === 0 && <EmptyState icon="🅿️" title="배정된 주차장이 없습니다" description="관리자에게 주차장 배정을 요청하세요" />}
 
     {myLots.map(lot => {
       const lv = getParkingLevel(lot); const li = LEVELS[lv];
@@ -1533,6 +1580,7 @@ function ParkingPage({ settings, setSettings, session }) {
         </div>
       );
     })}
+    </div>
   </div>);
 }
 
@@ -1553,15 +1601,11 @@ function ShuttlePage({ settings, setSettings, session }) {
     
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
-    <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 4px" }}>🚌 셔틀버스 관리</h2>
-    <p style={{ color: "#8892b0", fontSize: 14, textAlign: "center", margin: "0 0 20px" }}>{settings.festivalName} | {fmtTime(now)}</p>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <PageHeader icon="🚌" title="셔틀버스 관리" subtitle={`${fmtTime(now)} 기준`} accent="#00BCD4" />
 
-    {myBuses.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>🚌</div>
-      <p style={{ fontSize: 14 }}>배정된 셔틀버스가 없습니다</p>
-      <p style={{ fontSize: 14, color: "#94A3B8" }}>관리자에게 배정을 요청하세요</p>
-    </div>}
+    {myBuses.length === 0 && <EmptyState icon="🚌" title="배정된 셔틀버스가 없습니다" description="관리자에게 배정을 요청하세요" />}
 
     {myBuses.map(bus => {
       const statusColors = { running: "#66BB6A", stopped: "#FFA726", off: "#EF5350" };
@@ -1650,6 +1694,7 @@ function ShuttlePage({ settings, setSettings, session }) {
         </div>
       );
     })}
+    </div>
   </div>);
 }
 
@@ -1856,12 +1901,9 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
     </div>);
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: 12 }}>
-        <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: "0 0 2px" }}>🎪 {settings.festivalName || "축제관리"}</h2>
-        <div style={{ color: "#8892b0", fontSize: 13 }}>🕐 {opStart}~{opEnd} · 현재 {now.toLocaleTimeString("ko-KR")}</div>
-      </div>
+      <PageHeader icon="🎪" title={settings.festivalName || "축제관리"} subtitle={`운영 ${opStart}~${opEnd} · ${now.toLocaleTimeString("ko-KR")}`} accent="#FFA726" />
 
       {/* 긴급상황 배너 */}
       {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
@@ -2365,13 +2407,9 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     timeGroups[key].push(pg);
   });
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 2px" }}>🎭 축제 프로그램</h2>
-      <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 10px" }}>{settings.festivalName || "축제"} · {programs.length}개 프로그램</p>
-      {["admin","manager","sysadmin"].includes(session?.role) && <div style={{ textAlign: "center", marginBottom: 14 }}>
-        <button onClick={onManage} style={{ padding: "10px 24px", borderRadius: 10, border: "1px solid #9C27B0", background: "rgba(156,39,176,0.08)", color: "#E1BEE7", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>⚙️ 프로그램 관리</button>
-      </div>}
+      <PageHeader icon="🎭" title="축제 프로그램" subtitle={`${programs.length}개 프로그램`} accent="#AB47BC" action={["admin","manager","sysadmin"].includes(session?.role) ? <Btn variant="outline" color="#AB47BC" icon="⚙️" onClick={onManage} style={{ padding: "8px 12px", fontSize: 12 }}>관리</Btn> : null} />
 
       {/* 일자 선택 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
@@ -2884,7 +2922,7 @@ function HeatmapPage({ settings, setSettings, session }) {
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <style>{`@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor) drop-shadow(0 0 32px currentColor)}}`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, textAlign: "center", margin: "0 0 14px" }}>🗺️ 히트맵 지도</h2>
+      <PageHeader icon="🗺️" title="히트맵 지도" subtitle="구역별 실시간 혼잡도 시각화" accent="#42A5F5" />
 
       {!settings.mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
@@ -3070,7 +3108,7 @@ function LocationPage({ settings, setSettings, session }) {
 
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 700, margin: "0 auto" }}>
-      <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, textAlign: "center", margin: "0 0 14px" }}>📍 위치 공유</h2>
+      <PageHeader icon="📍" title="위치 공유" subtitle="GPS 기반 근무자 실시간 위치" accent="#66BB6A" />
 
       {/* 내 상태 */}
       <Card style={{ background: tracking ? "linear-gradient(135deg, rgba(76,175,80,0.1), rgba(76,175,80,0.02))" : "linear-gradient(135deg, rgba(244,67,54,0.06), rgba(244,67,54,0.01))", border: `1px solid ${tracking ? "rgba(76,175,80,0.3)" : "rgba(244,67,54,0.2)"}` }}>
@@ -3236,7 +3274,7 @@ function AssetsPage({ settings, setSettings, session }) {
 
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, textAlign: "center", margin: "0 0 14px" }}>📦 장비/물품 관리</h2>
+      <PageHeader icon="📦" title="장비/물품 관리" subtitle="자산 인벤토리 + 무전기 할당" accent="#42A5F5" />
 
       {/* 통계 */}
       <Card>
@@ -3424,11 +3462,11 @@ function CongestionPage({ settings, setSettings, session }) {
   const myZoneNormal = normalOnly.find(z => z.accountId === session?.id);
   const viewZones = isAdmin ? normalOnly : myZoneNormal ? [myZoneNormal] : [];
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "24px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
-    <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 6px" }}>🚦 인파혼잡도 관리</h2>
-    <p style={{ color: "#8892b0", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>① 단계 선택 → ② 사진/메모 → ③ 보고 완료</p>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <PageHeader icon="🚦" title="인파혼잡도 관리" subtitle="① 단계 선택 → ② 사진/메모 → ③ 보고 완료" accent="#FFA726" />
 
-    {viewZones.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>배정된 구역이 없습니다.<br/>관리자가 구역을 설정하고 계정에 배정해주세요.</div>}
+    {viewZones.length === 0 && <EmptyState icon="🚦" title="배정된 구역이 없습니다" description="관리자가 구역을 설정하고 계정에 배정해주세요" />}
 
     {viewZones.map(zone => {
       const cur = congestion.find(c => c.zoneId === zone.id);
@@ -3534,6 +3572,7 @@ function CongestionPage({ settings, setSettings, session }) {
       }));
       setViewPhoto(null);
     } : null} />
+    </div>
   </div>);
 }
 
@@ -3631,12 +3670,12 @@ function ChatPage({ settings, setSettings, accounts, session }) {
   const dmAccounts = chatAccounts.filter(a => allMessages.some(m => m.type === "target" && ((m.to === session?.id && m.createdById === a.id) || (m.createdById === session?.id && m.to === a.id))));
 
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", flexDirection: "column" }}>
-    <div style={{ padding: "14px 16px 8px", background: "#0d1117", borderBottom: "1px solid #222" }}>
-      <h2 style={{ color: "#fff", fontSize: 18, fontWeight: 800, textAlign: "center", margin: "0 0 8px" }}>💬 메시지</h2>
+    <div style={{ padding: "calc(env(safe-area-inset-top) + 50px) 14px 8px", background: "rgba(13,17,23,0.95)", borderBottom: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(10px)" }}>
+      <PageHeader icon="💬" title="메시지" subtitle="실시간 소통" accent="#42A5F5" />
       <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
         {[{ id: "all", label: "📣 전체" }, { id: "notice", label: "📢 공지" }].map(ch => {
           const unread = getUnread(ch.id);
-          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "2px solid #2196F3" : "1px solid #333", background: channel === ch.id ? "rgba(33,150,243,0.15)" : "transparent", color: channel === ch.id ? "#42A5F5" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
+          return (<button key={ch.id} onClick={() => setChannel(ch.id)} style={{ padding: "7px 14px", borderRadius: 20, border: channel === ch.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: channel === ch.id ? "linear-gradient(135deg, rgba(33,150,243,0.12), rgba(33,150,243,0.04))" : "rgba(255,255,255,0.02)", color: channel === ch.id ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", position: "relative", flexShrink: 0 }}>
             {ch.label}
             {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
           </button>);
