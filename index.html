@@ -2,31 +2,111 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="안전관리" />
-  <meta name="theme-color" content="#0a0a1a" />
+  <meta name="apple-mobile-web-app-title" content="SAFEFLOW" />
+  <meta name="application-name" content="SAFEFLOW" />
+  <meta name="theme-color" content="#0a0d1a" />
+  <meta name="description" content="SAFEFLOW - 축제 재난안전 통합관리 플랫폼" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <title>축제 안전관리시스템</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>SAFEFLOW · 축제 안전관리</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#0a0a1a;-webkit-font-smoothing:antialiased}
-    #error-fallback{display:none;min-height:100vh;background:#0a0a1a;align-items:center;justify-content:center;padding:24px;font-family:-apple-system,sans-serif}
+    html,body{background:#0a0d1a;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard',Roboto,sans-serif;overscroll-behavior:none}
+
+    /* Splash Screen */
+    #splash{
+      position:fixed;inset:0;z-index:99999;
+      background:linear-gradient(180deg,#0a0d1a 0%,#0b0e17 100%);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      transition:opacity 0.6s ease-out,visibility 0.6s ease-out;
+    }
+    #splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+    #splash::before{
+      content:"";position:absolute;
+      width:600px;height:600px;border-radius:50%;
+      background:radial-gradient(circle,rgba(66,165,245,0.15) 0%,transparent 70%);
+      filter:blur(40px);
+      animation:pulse-bg 4s ease-in-out infinite;
+    }
+    .splash-logo{
+      position:relative;z-index:1;
+      width:120px;height:120px;border-radius:32px;
+      background:linear-gradient(135deg,rgba(66,165,245,0.3),rgba(66,165,245,0.05));
+      border:1px solid rgba(66,165,245,0.4);
+      box-shadow:0 0 40px rgba(66,165,245,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+      display:flex;align-items:center;justify-content:center;
+      animation:logo-float 3s ease-in-out infinite;
+      margin-bottom:32px;
+    }
+    .splash-logo svg{width:64px;height:64px}
+    .splash-title{
+      position:relative;z-index:1;
+      color:#fff;font-size:38px;font-weight:800;
+      letter-spacing:6px;margin-bottom:12px;
+      text-shadow:0 0 30px rgba(66,165,245,0.5);
+    }
+    .splash-sub{
+      position:relative;z-index:1;
+      color:#94A3B8;font-size:14px;font-weight:500;
+      letter-spacing:2px;text-transform:uppercase;
+      margin-bottom:48px;
+    }
+    .splash-loading{
+      position:relative;z-index:1;
+      width:200px;height:3px;
+      background:rgba(255,255,255,0.05);
+      border-radius:2px;overflow:hidden;
+    }
+    .splash-loading::after{
+      content:"";display:block;width:40%;height:100%;
+      background:linear-gradient(90deg,transparent,#42A5F5,transparent);
+      animation:loading-slide 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-bg{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.1);opacity:0.9}}
+    @keyframes logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes loading-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+
+    #error-fallback{display:none;min-height:100vh;background:#0a0d1a;align-items:center;justify-content:center;padding:24px}
     #error-fallback.show{display:flex}
   </style>
 </head>
 <body>
+  <!-- Splash Screen -->
+  <div id="splash">
+    <div class="splash-logo">
+      <svg viewBox="0 0 64 64" fill="none">
+        <path d="M32 4L8 14V30C8 44 18 56 32 60C46 56 56 44 56 30V14L32 4Z" stroke="#42A5F5" stroke-width="2.5" fill="rgba(66,165,245,0.1)"/>
+        <path d="M22 32L29 39L42 24" stroke="#42A5F5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="splash-title">SAFEFLOW</div>
+    <div class="splash-sub">축제 안전관리 플랫폼</div>
+    <div class="splash-loading"></div>
+  </div>
+
   <script>
-    // ?reset=1 → 앱 로드 전에 즉시 초기화
     if(location.search.includes('reset=1')){
       try{localStorage.clear();sessionStorage.clear();}catch(e){}
       location.replace(location.pathname);
     }
+    window.addEventListener('load', function(){
+      setTimeout(function(){
+        var splash = document.getElementById('splash');
+        if(splash) {
+          splash.classList.add('hide');
+          setTimeout(function(){ splash.remove(); }, 700);
+        }
+      }, 1200);
+    });
   </script>
+
   <div id="root"></div>
+
   <div id="error-fallback">
     <div style="max-width:420px;text-align:center">
       <div style="font-size:64px;margin-bottom:16px">⚠️</div>
@@ -36,14 +116,17 @@
       <p style="color:#556;font-size:12px;margin-top:12px">또는 URL에 ?reset=1 추가</p>
     </div>
   </div>
+
   <script>
     document.getElementById('btn-reset').addEventListener('click', function(){
       try{localStorage.clear();sessionStorage.clear();}catch(e){}
       location.replace(location.pathname);
     });
   </script>
+
   <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show')"></script>
-  <script>setTimeout(function(){if(!document.getElementById('root').children.length)document.getElementById('error-fallback').classList.add('show')},8000)</script>
+  <script>setTimeout(function(){if(!document.getElementById('root').children.length){document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();}},8000)</script>
+
   <script>
   if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').then(function(reg) {
@@ -68,14 +151,32 @@
     window.applySwUpdate = function() {
       window._swUpdating = true;
       navigator.serviceWorker.getRegistration().then(function(reg) {
-        if (reg && reg.waiting) {
-          reg.waiting.postMessage('skipWaiting');
-        } else {
-          window.location.reload();
-        }
+        if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');
+        else window.location.reload();
       });
     };
   }
+
+  // PWA 설치 프롬프트
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    window._pwaInstallable = true;
+    window.dispatchEvent(new CustomEvent('pwa-installable'));
+  });
+  window.installPWA = function(){
+    if(!deferredPrompt){ alert('이미 설치되어 있거나 이 브라우저에서는 설치를 지원하지 않습니다.\n\niOS Safari: 공유 → 홈 화면에 추가\nAndroid Chrome: 메뉴 → 앱 설치'); return; }
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(){
+      deferredPrompt = null;
+      window._pwaInstallable = false;
+    });
+  };
+  window.addEventListener('appinstalled', function(){
+    window._pwaInstallable = false;
+    deferredPrompt = null;
+  });
   </script>
 </body>
 </html>
