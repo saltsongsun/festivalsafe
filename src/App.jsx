@@ -68,7 +68,7 @@ const DEFAULT_CATEGORIES = [
     thresholds: { BLUE: [-50, 50], YELLOW: [0, 0], ORANGE: [0, 0], RED: [0, 0] },
     isTempDual: true,
     currentValue: 0, actionItems: ["그늘막/방한용품 설치", "음료수/핫팩 배부", "의료진 대기 강화", "행사 중단 검토"],
-    alertMessages: { BLUE: "기온 적정", YELLOW: "기온 변동 주의", ORANGE: "⚠️ 폭염/저온 경계!", RED: "🚨 폭염/저온 경보! 행사 중단 검토" },
+    alertMessages: { BLUE: "기온 적정", YELLOW: "고온/저온 경고", ORANGE: "⚠️ 폭염/한파 경계!", RED: "🚨 폭염/한파 경보! 행사 중단 검토" },
     apiConfig: { url: "", method: "GET", headers: "", responsePath: "", enabled: false }, kmaCategory: "T1H", history: [] },
   { id: "humidity", name: "습도", unit: "%", source: "api", icon: "💧", apiInterval: 10,
     thresholds: { BLUE: [30, 70], YELLOW: [70, 80], ORANGE: [80, 90], RED: [90, Infinity] },
@@ -265,11 +265,11 @@ function getLevel(cat) {
   if (cat.id === "temp" || cat.isTempDual) {
     if (v <= -5) return "RED";         // -5 이하 → 경보 (한파)
     if (v <= 0) return "ORANGE";       // -5~0 → 경계
-    if (v <= 5) return "YELLOW";       // 0~5 → 주의 (저온)
+    if (v <= 10) return "YELLOW";      // 0~10 → 저온경고
     if (v >= 38) return "RED";         // 38+ → 경보 (폭염)
     if (v >= 35) return "ORANGE";      // 35~38 → 경계
-    if (v >= 33) return "YELLOW";      // 33~35 → 주의 (고온)
-    return "BLUE";                     // 5~33 → 정상
+    if (v >= 30) return "YELLOW";      // 30~35 → 고온경고
+    return "BLUE";                     // 10~30 → 정상
   }
   for (const [lv, [min, max]] of Object.entries(cat.thresholds)) { if (v >= min && v < max) return lv; }
   return "RED";
@@ -277,8 +277,10 @@ function getLevel(cat) {
 function getTempLabel(cat) {
   if (cat.id !== "temp" && !cat.isTempDual) return null;
   const v = cat.currentValue;
-  if (v <= 5) return "🥶 저온주의";
-  if (v >= 33) return "🔥 폭염주의";
+  if (v <= 0) return "🥶 한파경보";
+  if (v <= 10) return "❄️ 저온경고";
+  if (v >= 35) return "🔥 폭염경보";
+  if (v >= 30) return "☀️ 고온경고";
   return null;
 }
 // 종합경보에서 제외할 항목 (기온, 습도는 참고용)
@@ -1012,7 +1014,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ color: "#E2E8F0", fontWeight: 700, fontSize: 17 }}>{cat.name}</span>
-                {tl && <span style={{ color: tl.includes("저온") ? "#42A5F5" : "#EF5350", fontSize: 13, fontWeight: 700 }}>{tl}</span>}
+                {tl && <span style={{ padding: "3px 10px", borderRadius: 8, background: tl.includes("저온") || tl.includes("한파") ? "rgba(66,165,245,0.15)" : "rgba(239,83,80,0.15)", border: `1px solid ${tl.includes("저온") || tl.includes("한파") ? "rgba(66,165,245,0.35)" : "rgba(239,83,80,0.35)"}`, color: tl.includes("저온") || tl.includes("한파") ? "#42A5F5" : "#EF5350", fontSize: 12, fontWeight: 700 }}>{tl}</span>}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
                 <span style={{ fontSize: 32, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{cat.currentValue.toLocaleString()}</span>
@@ -4913,6 +4915,28 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
 
 
+      {/* PWA 설치 */}
+      <Card style={{ background: "linear-gradient(135deg, rgba(66,165,245,0.08), rgba(66,165,245,0.02))", border: "1px solid rgba(66,165,245,0.2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(66,165,245,0.25), rgba(66,165,245,0.05))", border: "1px solid rgba(66,165,245,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg viewBox="0 0 64 64" width="26" height="26" fill="none">
+              <path d="M32 4L8 14V30C8 44 18 56 32 60C46 56 56 44 56 30V14L32 4Z" stroke="#42A5F5" strokeWidth="2.5" fill="rgba(66,165,245,0.1)"/>
+              <path d="M22 32L29 39L42 24" stroke="#42A5F5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700, letterSpacing: 1 }}>SAFEFLOW 앱 설치</div>
+            <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>홈 화면에서 빠르게 실행</div>
+          </div>
+          <button onClick={() => { if (window.installPWA) window.installPWA(); else alert("브라우저 메뉴에서 '홈 화면에 추가' 또는 '앱 설치'를 선택하세요."); }} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📥 설치</button>
+        </div>
+        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.04)", color: "#94A3B8", fontSize: 12, lineHeight: 1.5 }}>
+          <strong style={{ color: "#CBD5E1" }}>📱 모바일 설치 방법:</strong><br/>
+          • <strong style={{ color: "#42A5F5" }}>iOS Safari</strong>: 공유 → 홈 화면에 추가<br/>
+          • <strong style={{ color: "#42A5F5" }}>Android Chrome</strong>: 메뉴 → 앱 설치
+        </div>
+      </Card>
+
       {/* 앱 업데이트 */}
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -5411,12 +5435,20 @@ function LoginPage({ onLogin, accounts }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(145deg,#0a0a1a 0%,#0d1b2a 50%,#0a0a1a 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 400 }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, position: "relative", overflow: "hidden" }}>
+      {/* 배경 글로우 효과 */}
+      <div style={{ position: "absolute", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.12) 0%, transparent 70%)", filter: "blur(40px)", animation: "pulse-bg 4s ease-in-out infinite" }} />
+      <style>{`@keyframes pulse-bg{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.1);opacity:0.9}}@keyframes logo-glow{0%,100%{box-shadow:0 0 30px rgba(66,165,245,0.3),inset 0 1px 0 rgba(255,255,255,0.1)}50%{box-shadow:0 0 50px rgba(66,165,245,0.5),inset 0 1px 0 rgba(255,255,255,0.15)}}`}</style>
+      <div style={{ width: "100%", maxWidth: 400, position: "relative", zIndex: 1 }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 64, marginBottom: 12 }}>🏮</div>
-          <h1 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: "0 0 4px", letterSpacing: 2 }}>축제 안전관리시스템</h1>
-          <p style={{ color: "#94A3B8", fontSize: 13 }}>축제 안전관리시스템</p>
+          <div style={{ width: 88, height: 88, borderRadius: 24, background: "linear-gradient(135deg, rgba(66,165,245,0.25), rgba(66,165,245,0.05))", border: "1px solid rgba(66,165,245,0.4)", boxShadow: "0 0 30px rgba(66,165,245,0.3), inset 0 1px 0 rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", animation: "logo-glow 3s ease-in-out infinite" }}>
+            <svg viewBox="0 0 64 64" width="48" height="48" fill="none">
+              <path d="M32 4L8 14V30C8 44 18 56 32 60C46 56 56 44 56 30V14L32 4Z" stroke="#42A5F5" strokeWidth="2.5" fill="rgba(66,165,245,0.1)"/>
+              <path d="M22 32L29 39L42 24" stroke="#42A5F5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h1 style={{ color: "#fff", fontSize: 30, fontWeight: 800, margin: "0 0 6px", letterSpacing: 5, textShadow: "0 0 20px rgba(66,165,245,0.4)" }}>SAFEFLOW</h1>
+          <p style={{ color: "#94A3B8", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 500 }}>축제 안전관리 플랫폼</p>
         </div>
         <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: 32, border: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ marginBottom: 20 }}>
