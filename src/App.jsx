@@ -3427,16 +3427,25 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
   ];
   const allTabs = tabGroups.flatMap(g => g.tabs);
 
-  return (<div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
-    <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, textAlign: "center", margin: "0 0 16px" }}>🛡️ {settings.festivalName} 관리</h2>
-    
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px 16px 80px" }}>
+    {/* CueFlow 스타일 CMS 헤더 */}
+    <div style={{ maxWidth: 800, margin: "0 auto 16px", padding: "16px 18px", borderRadius: 18, background: "linear-gradient(135deg, rgba(244,67,54,0.06), rgba(244,67,54,0.01))", border: "1px solid rgba(244,67,54,0.2)", boxShadow: "0 0 0 1px rgba(244,67,54,0.06), 0 4px 24px rgba(244,67,54,0.1), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, rgba(244,67,54,0.22), rgba(244,67,54,0.06))", border: "1px solid rgba(244,67,54,0.3)", boxShadow: "0 0 16px rgba(244,67,54,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🛡️</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: -0.3, margin: 0, lineHeight: 1.2 }}>{settings.festivalName || "축제"} 관리</h2>
+          <p style={{ color: "#94A3B8", fontSize: 12, margin: "2px 0 0" }}>시스템 · 기능 · 데이터 설정</p>
+        </div>
+      </div>
+    </div>
+
     {/* 그룹별 탭 네비게이션 */}
     <div style={{ maxWidth: 800, margin: "0 auto 20px" }}>
-      {tabGroups.map(g => (
-        <div key={g.label} style={{ marginBottom: 8 }}>
-          <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>{g.label}</div>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {g.tabs.map(t => <button key={t.id} onClick={() => { if ((extraTabs||[]).find(et => et.id === t.id)) { onExtraTab?.(t.id); return; } setTab(t.id); if (t.id !== "apiconfig") setFocusCat(null); }} style={{ padding: "8px 14px", borderRadius: 8, border: tab === t.id ? "1.5px solid #2196F3" : "1px solid #252525", background: tab === t.id ? "rgba(33,150,243,0.15)" : "rgba(255,255,255,0.02)", color: tab === t.id ? "#42A5F5" : "#8892b0", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", transition: "all .2s" }}>{t.label}</button>)}
+      {tabGroups.map((g, gi) => (
+        <div key={g.label} style={{ marginBottom: gi === tabGroups.length - 1 ? 0 : 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 8, paddingLeft: 4, letterSpacing: 0.3, textTransform: "uppercase" }}>{g.label}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {g.tabs.map(t => <button key={t.id} onClick={() => { if ((extraTabs||[]).find(et => et.id === t.id)) { onExtraTab?.(t.id); return; } setTab(t.id); if (t.id !== "apiconfig") setFocusCat(null); }} style={{ padding: "8px 14px", borderRadius: 10, border: tab === t.id ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === t.id ? "linear-gradient(135deg, rgba(33,150,243,0.15), rgba(33,150,243,0.05))" : "rgba(255,255,255,0.02)", color: tab === t.id ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", transition: "all .2s", boxShadow: tab === t.id ? "0 0 12px rgba(33,150,243,0.2)" : "none" }}>{t.label}</button>)}
           </div>
         </div>
       ))}
@@ -3444,10 +3453,10 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
 
     {/* Monitor */}
-    {tab === "monitor" && <div>{categories.map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id} style={{ border: `1px solid ${li.border}`, cursor: "pointer" }} onClick={() => { setTab(cat.kmaCategory ? "kma" : "apiconfig"); setFocusCat(cat.id); }}>
+    {tab === "monitor" && <div>{categories.map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; return (<Card key={cat.id} style={{ border: `1px solid ${li.border}`, cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}10, 0 4px 20px ${li.color}15` }} onClick={() => { setTab(cat.kmaCategory ? "kma" : "apiconfig"); setFocusCat(cat.id); }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
         <div><span style={{ fontSize: 18, marginRight: 6 }}>{cat.icon}</span><span style={{ color: "#E2E8F0", fontWeight: 700, fontSize: 14 }}>{cat.name}</span></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 800, fontSize: 22, fontVariantNumeric: "tabular-nums" }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 8px", borderRadius: 20, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 14, fontWeight: 700 }}>{li.label}</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: li.color, fontWeight: 700, fontSize: 22, fontVariantNumeric: "tabular-nums", textShadow: `0 0 12px ${li.color}40` }}>{cat.currentValue.toLocaleString()}{cat.unit}</span><span style={{ padding: "3px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.label}</span></div>
       </div>
       <div style={{ marginTop: 4, color: "#94A3B8", fontSize: 14 }}>{cat.kmaCategory ? `🌤️기상청 ${cat.kmaCategory}` : cat.apiConfig?.enabled ? "🔌커스텀API" : "✏️수동"} | 클릭하여 설정 ›</div>
       <HistoryChart cat={cat} />
