@@ -887,37 +887,37 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         const cumVal = crowdLS.cumulative || 0;
         const gateData = (settings.gates || []).map(g => { const s = (crowdLS.zones || []).find(sz => sz.id === g.id); return { ...g, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
         return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: "20px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 24px ${li.color}15, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: "16px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 24px ${li.color}15, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
             <span style={{ color: "#E2E8F0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
             <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
             <div>
-              <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 6, fontWeight: 500 }}>실황 체류</div>
+              <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4, fontWeight: 500 }}>실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <span style={{ fontSize: 44, fontWeight: 600, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1.5, textShadow: `0 0 20px ${li.color}40` }}>{cat.currentValue.toLocaleString()}</span>
-                <span style={{ fontSize: 14, color: "#94A3B8", fontWeight: 500 }}>{cat.unit}</span>
+                <span style={{ fontSize: 32, fontWeight: 700, color: li.color, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", lineHeight: 1, letterSpacing: -1, textShadow: `0 0 16px ${li.color}40` }}>{cat.currentValue.toLocaleString()}</span>
+                <span style={{ fontSize: 13, color: "#94A3B8", fontWeight: 500 }}>{cat.unit}</span>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 6, fontWeight: 500 }}>누적 방문</div>
+              <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4, fontWeight: 500 }}>누적 방문</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, justifyContent: "flex-end" }}>
-                <span style={{ fontSize: 26, fontWeight: 500, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", color: "#8892b0", lineHeight: 1, letterSpacing: -0.5 }}>{cumVal.toLocaleString()}</span>
+                <span style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'", color: "#CBD5E1", lineHeight: 1, letterSpacing: -0.5 }}>{cumVal.toLocaleString()}</span>
                 <span style={{ fontSize: 12, color: "#94A3B8" }}>명</span>
               </div>
             </div>
           </div>
           {/* 출입구별 현황 */}
-          {gateData.filter(g => g.name).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8 }}>
+          {gateData.filter(g => g.name).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 6 }}>
             {gateData.filter(g => g.name).map(g => (
-              <div key={g.id} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4, fontWeight: 500 }}>🚪 {g.name}</div>
+              <div key={g.id} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 3, fontWeight: 500 }}>🚪 {g.name}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ color: "#66BB6A", fontSize: 18, fontWeight: 600, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>{g.count}</span>
+                  <span style={{ color: "#66BB6A", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>{g.count}</span>
                   <span style={{ color: "#94A3B8", fontSize: 12 }}>체류</span>
                   <span style={{ color: "#94A3B8", fontSize: 12, marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontFeatureSettings: "'tnum'" }}>누적 {g.cumulative}</span>
                 </div>
