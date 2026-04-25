@@ -5886,7 +5886,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const [cmsTab, setCmsTab] = useState(null);
   const [cmsCatId, setCmsCatId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const prevLevels = useRef({}); const lastSms = useRef(0);
+  const prevLevels = useRef({}); const lastSms = useRef(0); const alertCooldown = useRef({});
 
   const active = isActive(settings);
   const role = ROLES[session.role] || ROLES.viewer;
@@ -6002,6 +6002,15 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     categories.forEach(cat => {
       const lv = getLevel(cat); const prev = prevLevels.current[cat.id];
       if ((lv === "ORANGE" || lv === "RED") && prev && prev !== lv) {
+        // 중복 방지: 같은 카테고리의 같은 레벨 알림이 10분 내에 있었으면 스킵
+        const lastKey = `${cat.id}_${lv}`;
+        const lastTime = alertCooldown.current[lastKey] || 0;
+        const now = Date.now();
+        if (now - lastTime < 10 * 60 * 1000) {
+          prevLevels.current[cat.id] = lv;
+          return;
+        }
+        alertCooldown.current[lastKey] = now;
         const li = LEVELS[lv]; const time = new Date().toLocaleString("ko-KR");
         const msg = `⚠️ [${settings.festivalName} 긴급알림] ⚠️\n\n${cat.alertMessages?.[lv] || ""}\n\n${cat.name}: ${cat.currentValue.toLocaleString()}${cat.unit} (${li.label})\n\n점검:\n${(cat.actionItems || []).map(a => `• ${a}`).join("\n")}\n\n발신: ${settings.festivalName} 종합상황실\n시간: ${time}`;
         setAlerts(p => [{ category: cat.name, level: lv, message: msg, time }, ...p].slice(0, 100));
@@ -6136,7 +6145,23 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
     {/* Content */}
     <div style={{ paddingTop: "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
-      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} /> : <InactiveOverlay settings={settings} />)}
+      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
+        // 삭제 시 해당 알림의 cooldown을 현재 시각으로 갱신 (10분 내 재생성 방지)
+        const now = Date.now();
+        if (idx === "all") {
+          // 전체 삭제: 모든 카테고리 cooldown 갱신
+          categories.forEach(c => { ["ORANGE", "RED"].forEach(lv => { alertCooldown.current[`${c.id}_${lv}`] = now; }); });
+          setAlerts([]);
+        } else {
+          // 개별 삭제: 해당 카테고리 cooldown 갱신
+          const target = alerts[idx];
+          if (target) {
+            const cat = categories.find(c => c.name === target.category);
+            if (cat) alertCooldown.current[`${cat.id}_${target.level}`] = now;
+          }
+          setAlerts(p => p.filter((_, i) => i !== idx));
+        }
+      }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shuttle" && <ShuttlePage settings={settings} setSettings={setSettings} session={session} />}
