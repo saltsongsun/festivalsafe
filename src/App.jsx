@@ -244,13 +244,32 @@ const DEFAULT_SETTINGS = {
     heatmap: true,     // 2.0: 히트맵 지도
     location: true,    // 2.0: 위치 워키토키
     assets: true,      // 2.0: 장비/물품 관리
+    workdiary: true,   // 2.1: 근무일지/교대관리
+    shifts: true,      // 2.1: 근무일지 (alias)
+    search: true,      // 2.0: 통합 검색
+    smartAlert: true,  // 2.0: 스마트 알림
+    report: true,      // 2.1: 보고서 자동생성
+    reports: true,     // 2.1: 보고서 (alias)
+    qrcode: true,      // 2.0: QR코드 관리
   },
   // 2.0 신규 데이터
-  mapImage: null,           // 구역 도면 (base64 또는 URL)
-  mapZones: [],             // 지도 위 구역 위치 [{id, x%, y%, name}]
-  workerLocations: {},      // {workerId: {lat, lng, ts, status}}
-  assets: [],               // [{id, name, category, qty, total, location, assignedTo, status, history}]
+  mapImage: null,
+  mapZones: [],
+  mapAreas: [],
+  workerLocations: {},
+  assets: [],
   assetCategories: ["무전기", "의자", "테이블", "조명", "음향", "안전장비", "기타"],
+  workDiaries: [],          // [{id, workerId, workerName, date, shift, startTs, endTs, content, status}]
+  shifts: [],               // [{id, name, startTime, endTime, color}]
+  // 실시간 협업
+  presence: {},             // {userId: {name, page, ts, color}}
+  liveCursors: {},          // 실시간 커서 위치
+  notifyRules: {            // 스마트 알림 규칙
+    cooldownMin: 10,
+    autoResolve: true,
+    silentHours: { enabled: false, start: "23:00", end: "07:00" },
+    quietMode: false,
+  },
 };
 
 // KMA 카테고리 코드 매핑
@@ -604,7 +623,7 @@ function DashboardOrgChart({ settings, show, onToggle }) {
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────
-function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh, alerts, onAction, onActionReport, onDeleteAlert, onDeleteNotice, userRole, updateAvailable }) {
+function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh, alerts, onAction, onActionReport, onDeleteAlert, onDeleteNotice, userRole, updateAvailable, onSearch }) {
   const now = useNow();
   const [spinning, setSpinning] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
@@ -902,6 +921,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         {loc.name && <span style={{ color: "#94A3B8", fontSize: 12, padding: "5px 4px" }}>📍 {loc.name}</span>}
         {kma.enabled && <span style={{ color: "#66BB6A", fontSize: 12, padding: "5px 4px" }}>🌤️ LIVE</span>}
         <span style={{ flex: 1 }} />
+        {onSearch && <button onClick={onSearch} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(156,39,176,0.25)", background: "rgba(156,39,176,0.04)", color: "#AB47BC", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔍 검색</button>}
         <button onClick={handleRefresh} disabled={spinning} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.04)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           <span style={{ display: "inline-block", animation: spinning ? "spin 1s linear infinite" : "none", marginRight: 4 }}>🔄</span>{spinning ? "..." : "최신화"}
         </button>
@@ -2840,7 +2860,435 @@ function StageMgmtPage({ settings, setSettings, session }) {
   </div>);
 }
 
-// ─── 2.0: Heatmap Map Page (히트맵 지도 - 폴리곤 영역) ─────────────────────────────
+// ─── 2.1: Smart Search (통합 검색) ─────────────────────────────
+function SearchModal({ open, onClose, settings, categories, onNavigate }) {
+  const [q, setQ] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 100); }, [open]);
+  if (!open) return null;
+
+  const query = q.trim().toLowerCase();
+  const results = [];
+
+  if (query) {
+    // 환경 카테고리
+    (categories || []).forEach(c => { if ((c.name || "").toLowerCase().includes(query)) results.push({ type: "category", icon: c.icon || "📊", title: c.name, sub: `${c.currentValue || 0}${c.unit || ""}`, page: "dashboard", id: c.id }); });
+    // 구역
+    (settings.zones || []).forEach(z => { if ((z.name || "").toLowerCase().includes(query)) results.push({ type: "zone", icon: "📍", title: z.name, sub: `구역 · ${z.zoneType || "일반"}`, page: "congestion" }); });
+    // 사이트
+    (settings.sites || []).forEach(s => { if ((s.name || "").toLowerCase().includes(query)) results.push({ type: "site", icon: "🏢", title: s.name, sub: `근무지 · ${(s.workers||[]).length}명`, page: "status" }); });
+    // 근무자
+    (settings.sites || []).forEach(s => (s.workers || []).forEach(w => { if ((w.name || "").toLowerCase().includes(query)) results.push({ type: "worker", icon: "👤", title: w.name, sub: `${s.name} · ${w.role || "운영"} · ${w.phone || ""}`, page: "status" }); }));
+    // 프로그램
+    (settings.programs || []).forEach(p => { if ((p.title || "").toLowerCase().includes(query) || (p.manager || "").toLowerCase().includes(query)) results.push({ type: "program", icon: "🎭", title: p.title, sub: `${p.date || ""} ${p.time || ""} · ${p.location || ""}`, page: "program" }); });
+    // 공연
+    (settings.performances || []).forEach(p => { if ((p.artist || "").toLowerCase().includes(query)) results.push({ type: "perf", icon: "🎤", title: p.artist, sub: `공연 · ${p.genre || ""} · ${p.time || ""}`, page: "stage" }); });
+    // 자산
+    (settings.assets || []).forEach(a => { if ((a.name || "").toLowerCase().includes(query)) results.push({ type: "asset", icon: "📦", title: a.name, sub: `${a.category} · ${a.qty || 0}/${a.total || 0}`, page: "assets" }); });
+    // 메시지
+    (settings.messages || []).filter(m => (m.content || "").toLowerCase().includes(query)).slice(0, 5).forEach(m => results.push({ type: "msg", icon: "💬", title: m.content.slice(0, 50), sub: `메시지 · ${m.createdBy || ""} · ${m.createdAt || ""}`, page: "chat" }));
+  }
+
+  return (<div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 16px 16px" }}>
+    <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: 18, border: "1px solid rgba(66,165,245,0.3)", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 20 }}>🔍</span>
+        <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} placeholder="구역, 근무자, 프로그램, 자산, 메시지 검색..." style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 15 }} autoFocus />
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>✕</button>
+      </div>
+      <div style={{ maxHeight: "60vh", overflowY: "auto", padding: 12 }}>
+        {!query && <div style={{ padding: 30, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+          <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.4 }}>🔎</div>
+          <div>전체 자료에서 검색합니다.</div>
+          <div style={{ fontSize: 12, marginTop: 6, color: "#475569" }}>구역・근무자・프로그램・공연・자산・메시지</div>
+        </div>}
+        {query && results.length === 0 && <div style={{ padding: 30, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>"{q}" 검색 결과가 없습니다</div>}
+        {results.length > 0 && <div style={{ marginBottom: 8, color: "#94A3B8", fontSize: 11, fontWeight: 700, padding: "0 4px" }}>검색 결과 {results.length}개</div>}
+        {results.map((r, i) => (
+          <div key={i} onClick={() => { onNavigate(r.page); onClose(); }} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", marginBottom: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>{r.icon}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
+              <div style={{ color: "#94A3B8", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</div>
+            </div>
+            <span style={{ color: "#475569", fontSize: 14 }}>›</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>);
+}
+
+// ─── 2.1: 근무일지 / 교대관리 (Shifts) ─────────────────────────────
+function ShiftsPage({ settings, setSettings, session }) {
+  const shifts = settings.shifts || [];
+  const sites = (settings.sites || []).filter(s => s.name);
+  const allWorkers = sites.flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, siteId: s.id })));
+  const me = allWorkers.find(w => w.accountId === session?.id) || allWorkers.find(w => w.name === session?.name);
+  const canManage = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [filterDate, setFilterDate] = useState(today);
+  const [tab, setTab] = useState("today"); // today | mine | all
+  const [showForm, setShowForm] = useState(false);
+
+  // 출퇴근 체크
+  const myToday = shifts.find(s => s.workerId === me?.id && s.date === today);
+  const checkIn = () => {
+    if (!me) { alert("근무자 등록이 안 되어있습니다."); return; }
+    const newShift = { id: "sh_"+Date.now(), workerId: me.id, workerName: me.name, siteId: me.siteId, siteName: me.siteName, role: me.role, date: today, checkIn: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }), checkOut: null, log: "", events: [] };
+    setSettings(prev => ({ ...prev, shifts: [...(prev.shifts || []), newShift] }));
+  };
+  const checkOut = () => {
+    if (!myToday) return;
+    const cot = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    setSettings(prev => ({ ...prev, shifts: prev.shifts.map(s => s.id === myToday.id ? { ...s, checkOut: cot } : s) }));
+  };
+  const updateLog = (id, log) => setSettings(prev => ({ ...prev, shifts: prev.shifts.map(s => s.id === id ? { ...s, log } : s) }));
+  const addEvent = (id, event) => setSettings(prev => ({ ...prev, shifts: prev.shifts.map(s => s.id === id ? { ...s, events: [...(s.events || []), { ts: Date.now(), text: event, time: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) }] } : s) }));
+  const delShift = (id) => { if (confirm("기록을 삭제하시겠습니까?")) setSettings(prev => ({ ...prev, shifts: prev.shifts.filter(s => s.id !== id) })); };
+
+  const todayShifts = shifts.filter(s => s.date === filterDate);
+  const myShifts = shifts.filter(s => s.workerId === me?.id).sort((a,b) => b.date.localeCompare(a.date));
+  const allShifts = shifts.sort((a,b) => b.date.localeCompare(a.date) || b.checkIn?.localeCompare(a.checkIn || ""));
+
+  const list = tab === "today" ? todayShifts : tab === "mine" ? myShifts : allShifts;
+
+  return (<PageContainer maxWidth={700}>
+    <PageHeader icon="📝" title="근무일지" subtitle="교대 관리 + 일지 작성" accent="#66BB6A" />
+
+    {/* 출퇴근 카드 */}
+    {me && <Card style={{ background: myToday ? (myToday.checkOut ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(76,175,80,0.1), rgba(76,175,80,0.02))") : "rgba(255,255,255,0.04)", border: myToday && !myToday.checkOut ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 50, height: 50, borderRadius: 14, background: myToday && !myToday.checkOut ? "rgba(76,175,80,0.2)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, animation: myToday && !myToday.checkOut ? "pulse 2s infinite" : "none" }}>{myToday && !myToday.checkOut ? "🟢" : "👤"}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>{me.name}</div>
+          <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>
+            {!myToday ? "출근 전" : myToday.checkOut ? `근무 종료 (${myToday.checkIn} ~ ${myToday.checkOut})` : `${myToday.checkIn}부터 근무 중`}
+          </div>
+        </div>
+        {!myToday && <Btn variant="primary" color="#66BB6A" icon="▶" onClick={checkIn}>출근</Btn>}
+        {myToday && !myToday.checkOut && <Btn variant="primary" color="#EF5350" icon="⏹" onClick={checkOut}>퇴근</Btn>}
+      </div>
+      {myToday && !myToday.checkOut && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)" }}>
+        <Label>📋 근무 일지</Label>
+        <textarea value={myToday.log || ""} onChange={e => updateLog(myToday.id, e.target.value)} placeholder="오늘 근무 내용을 기록하세요..." style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#E2E8F0", fontSize: 13, minHeight: 80, resize: "vertical", fontFamily: "inherit" }} />
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          <input id="event-input" placeholder="이슈/특이사항" style={{ flex: 1, padding: "8px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#E2E8F0", fontSize: 12 }} onKeyDown={e => { if (e.key === "Enter" && e.target.value.trim()) { addEvent(myToday.id, e.target.value); e.target.value = ""; } }} />
+          <Btn variant="secondary" onClick={() => { const inp = document.getElementById("event-input"); if (inp.value.trim()) { addEvent(myToday.id, inp.value); inp.value = ""; } }} style={{ padding: "8px 14px", fontSize: 12 }}>+ 이벤트</Btn>
+        </div>
+        {(myToday.events || []).length > 0 && <div style={{ marginTop: 8 }}>
+          {myToday.events.slice(-5).reverse().map((ev, i) => <div key={i} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(33,150,243,0.05)", marginBottom: 4, fontSize: 12, color: "#CBD5E1" }}>
+            <span style={{ color: "#42A5F5", fontWeight: 700 }}>{ev.time}</span> · {ev.text}
+          </div>)}
+        </div>}
+      </div>}
+    </Card>}
+
+    {/* 탭 */}
+    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+      <button onClick={() => setTab("today")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: tab === "today" ? "1.5px solid rgba(102,187,106,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === "today" ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.02)", color: tab === "today" ? "#66BB6A" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📅 오늘 ({todayShifts.length})</button>
+      <button onClick={() => setTab("mine")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: tab === "mine" ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === "mine" ? "rgba(33,150,243,0.08)" : "rgba(255,255,255,0.02)", color: tab === "mine" ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>👤 내 기록 ({myShifts.length})</button>
+      {canManage && <button onClick={() => setTab("all")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: tab === "all" ? "1.5px solid rgba(255,167,38,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === "all" ? "rgba(255,152,0,0.08)" : "rgba(255,255,255,0.02)", color: tab === "all" ? "#FFA726" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📊 전체 ({allShifts.length})</button>}
+    </div>
+
+    {tab === "today" && <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13, marginBottom: 12 }} />}
+
+    {/* 일지 목록 */}
+    {list.length === 0 && <EmptyState icon="📝" title="기록이 없습니다" />}
+    {list.map(s => (<Card key={s.id}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: s.checkOut ? "rgba(255,255,255,0.04)" : "rgba(76,175,80,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{s.checkOut ? "✅" : "🟢"}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 700 }}>{s.workerName}</div>
+          <div style={{ color: "#94A3B8", fontSize: 12 }}>{s.siteName} · {s.role} · {s.date}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: s.checkOut ? "#94A3B8" : "#66BB6A", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{s.checkIn} {s.checkOut && `~ ${s.checkOut}`}</div>
+          {!s.checkOut && <div style={{ color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>● 근무중</div>}
+        </div>
+      </div>
+      {s.log && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", color: "#CBD5E1", fontSize: 12, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{s.log}</div>}
+      {(s.events || []).length > 0 && <div style={{ marginTop: 6 }}>
+        {s.events.map((ev, i) => <div key={i} style={{ padding: "4px 8px", fontSize: 11, color: "#94A3B8" }}>
+          <span style={{ color: "#42A5F5" }}>● {ev.time}</span> {ev.text}
+        </div>)}
+      </div>}
+      {canManage && <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", justifyContent: "flex-end" }}>
+        <Btn variant="danger" onClick={() => delShift(s.id)} style={{ padding: "6px 12px", fontSize: 12 }}>🗑 삭제</Btn>
+      </div>}
+    </Card>))}
+  </PageContainer>);
+}
+
+// ─── 2.1: 보고서 자동생성 (Reports) ─────────────────────────────
+function ReportsPage({ settings, setSettings, session, categories, alerts }) {
+  const [tab, setTab] = useState("daily"); // daily | range | custom
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const canExport = ["admin","manager","sysadmin"].includes(session?.role);
+
+  const generateReport = (type) => {
+    const dt = new Date();
+    const reportDate = type === "daily" ? date : dt.toLocaleDateString("ko-KR");
+
+    const lines = [];
+    lines.push(`# ${settings.festivalName || "축제"} 일일 종합 보고서`);
+    lines.push(`작성일: ${reportDate} ${dt.toLocaleTimeString("ko-KR")}`);
+    lines.push(`작성자: ${session?.name || "?"}`);
+    lines.push("");
+
+    // 인파 현황
+    const crowd = (categories || []).find(c => c.id === "crowd");
+    if (crowd) {
+      lines.push("## 1. 인파 현황");
+      lines.push(`- 현재 체류: ${(crowd.currentValue || 0).toLocaleString()}명`);
+      lines.push(`- 출입구 수: ${(settings.gates || []).length}개`);
+      try {
+        const cls = JSON.parse(localStorage.getItem("_crowd") || "{}");
+        lines.push(`- 누적 방문: ${(cls.cumulative || 0).toLocaleString()}명`);
+      } catch {}
+      lines.push("");
+    }
+
+    // 환경 데이터
+    const envCats = (categories || []).filter(c => c.id !== "crowd" && c.id !== "humidity" && c.id !== "temp");
+    if (envCats.length > 0) {
+      lines.push("## 2. 환경 모니터링");
+      envCats.forEach(c => lines.push(`- ${c.icon || ""} ${c.name}: ${c.currentValue || 0}${c.unit || ""}`));
+      lines.push("");
+    }
+
+    // 구역 혼잡도
+    const zones = settings.zones || [];
+    const cong = settings.zoneCongestion || [];
+    if (zones.length > 0) {
+      lines.push("## 3. 구역별 혼잡도");
+      zones.forEach(z => {
+        const c = cong.find(cc => cc.zoneId === z.id);
+        const lv = c ? { smooth: "🟢 원활", crowded: "🟡 혼잡", danger: "🔴 위험" }[c.level] : "⚪ 미보고";
+        lines.push(`- ${z.name}: ${lv}${c?.memo ? ` (${c.memo})` : ""}`);
+      });
+      lines.push("");
+    }
+
+    // 알림 이력
+    const todayAlerts = (alerts || []).filter(a => {
+      try { return a.time && a.time.includes(reportDate.slice(0, 10)) || a.time && new Date(a.time).toDateString() === new Date(date).toDateString(); } catch { return false; }
+    });
+    if ((alerts || []).length > 0) {
+      lines.push("## 4. 알림 발생 이력");
+      lines.push(`총 ${alerts.length}건 (당일 ${todayAlerts.length}건)`);
+      alerts.slice(0, 20).forEach(a => lines.push(`- [${a.level}] ${a.category}: ${a.time}`));
+      lines.push("");
+    }
+
+    // 근무 현황
+    const todayShifts = (settings.shifts || []).filter(s => s.date === date);
+    if (todayShifts.length > 0) {
+      lines.push("## 5. 근무 현황");
+      lines.push(`총 ${todayShifts.length}명 근무`);
+      todayShifts.forEach(s => lines.push(`- ${s.workerName} (${s.siteName}/${s.role}): ${s.checkIn}${s.checkOut ? ` ~ ${s.checkOut}` : " ~ 근무중"}`));
+      lines.push("");
+    }
+
+    // 자산 현황
+    const assets = settings.assets || [];
+    if (assets.length > 0) {
+      lines.push("## 6. 장비/자산 현황");
+      const totalQty = assets.reduce((s,a) => s+(a.total||0), 0);
+      const availQty = assets.reduce((s,a) => s+(a.qty||0), 0);
+      const broken = assets.reduce((s,a) => s+(a.units||[]).filter(u => u.status === "broken").length, 0);
+      const lost = assets.reduce((s,a) => s+(a.units||[]).filter(u => u.status === "lost").length, 0);
+      lines.push(`총 ${totalQty}개 / 가용 ${availQty}개 / 고장 ${broken}개 / 분실 ${lost}개`);
+      lines.push("");
+    }
+
+    // 공연
+    const perfsToday = (settings.performances || []).filter(p => p.date === date);
+    if (perfsToday.length > 0) {
+      lines.push("## 7. 공연 일정");
+      perfsToday.forEach(p => lines.push(`- ${p.time || "?"} ${p.artist} (${p.genre || ""}) @ ${p.location || ""}`));
+      lines.push("");
+    }
+
+    lines.push("---");
+    lines.push(`SAFEFLOW · ${settings.festivalName || "축제 안전관리시스템"}`);
+    return lines.join("\n");
+  };
+
+  const downloadFile = (content, filename, mime = "text/plain;charset=utf-8") => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportMD = () => {
+    const content = generateReport("daily");
+    downloadFile(content, `safeflow_report_${date}.md`);
+  };
+
+  const exportCSV = () => {
+    const rows = [["일시", "구역", "혼잡도", "메모", "보고자"]];
+    (settings.zoneCongestion || []).forEach(c => {
+      const z = (settings.zones || []).find(zz => zz.id === c.zoneId);
+      rows.push([c.reportedAt || "", z?.name || "", c.level || "", c.memo || "", c.reportedByName || ""]);
+    });
+    const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    downloadFile("\ufeff" + csv, `safeflow_congestion_${date}.csv`, "text/csv;charset=utf-8");
+  };
+
+  const exportShiftsCSV = () => {
+    const rows = [["날짜", "근무자", "근무지", "역할", "출근", "퇴근", "일지"]];
+    (settings.shifts || []).filter(s => tab === "daily" ? s.date === date : true).forEach(s => {
+      rows.push([s.date, s.workerName, s.siteName, s.role, s.checkIn, s.checkOut || "", s.log || ""]);
+    });
+    const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    downloadFile("\ufeff" + csv, `safeflow_shifts_${date}.csv`, "text/csv;charset=utf-8");
+  };
+
+  const printReport = () => {
+    const content = generateReport("daily").replace(/\n/g, "<br>").replace(/^# (.*)$/gm, "<h1>$1</h1>").replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^- (.*)$/gm, "• $1");
+    const win = window.open("", "_blank");
+    win.document.write(`<html><head><title>SAFEFLOW Report</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6}h1{border-bottom:2px solid #42A5F5;padding-bottom:8px}h2{color:#1976D2;margin-top:24px}</style></head><body>${content}</body></html>`);
+    win.document.close();
+    setTimeout(() => win.print(), 500);
+  };
+
+  const preview = generateReport("daily");
+
+  return (<PageContainer maxWidth={800}>
+    <PageHeader icon="📄" title="보고서" subtitle="일일 종합 보고서 자동 생성" accent="#FFA726" />
+
+    {!canExport && <EmptyState icon="🔒" title="권한 없음" description="관리자만 보고서를 생성할 수 있습니다" />}
+
+    {canExport && <>
+      <Card>
+        <Label>📅 보고서 일자</Label>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }} />
+      </Card>
+
+      <SectionTitle icon="📥" accent="#FFA726">내보내기</SectionTitle>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+        <Btn variant="primary" color="#FFA726" icon="📄" onClick={exportMD} style={{ padding: "14px", justifyContent: "center" }}>마크다운 (.md)</Btn>
+        <Btn variant="primary" color="#42A5F5" icon="🖨️" onClick={printReport} style={{ padding: "14px", justifyContent: "center" }}>인쇄/PDF</Btn>
+        <Btn variant="primary" color="#66BB6A" icon="📊" onClick={exportCSV} style={{ padding: "14px", justifyContent: "center" }}>혼잡도 CSV</Btn>
+        <Btn variant="primary" color="#AB47BC" icon="👥" onClick={exportShiftsCSV} style={{ padding: "14px", justifyContent: "center" }}>근무일지 CSV</Btn>
+      </div>
+
+      <SectionTitle icon="👁️" accent="#42A5F5">미리보기</SectionTitle>
+      <Card>
+        <pre style={{ color: "#CBD5E1", fontSize: 12, lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{preview}</pre>
+      </Card>
+    </>}
+  </PageContainer>);
+}
+
+// ─── 2.1: QR코드 관리 ─────────────────────────────
+function QRPage({ settings, setSettings, session }) {
+  const [tab, setTab] = useState("entry"); // entry | asset
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const baseUrl = window.location.origin + window.location.pathname;
+
+  // QR 코드 라이브러리 없이 SVG로 간단 QR (실제 데이터 인코딩은 외부 API 사용)
+  const qrUrl = (data) => `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}&color=000000&bgcolor=ffffff`;
+
+  const gates = settings.gates || [];
+  const assets = (settings.assets || []).filter(a => a.trackUnits);
+  const allUnits = assets.flatMap(a => (a.units || []).map(u => ({ ...u, assetId: a.id, assetName: a.name, category: a.category })));
+
+  // 스캔 시뮬레이션 (카메라 미사용 시 수동 입력)
+  const handleManualScan = () => {
+    const code = prompt("QR 코드 값을 입력하세요 (URL 또는 ID):");
+    if (!code) return;
+    if (code.includes("?gate=")) {
+      const gateId = code.split("?gate=")[1].split("&")[0];
+      const gate = gates.find(g => g.id === gateId);
+      setScanResult({ type: "gate", data: gate, raw: code });
+    } else if (code.includes("?asset=")) {
+      const assetCode = code.split("?asset=")[1].split("&")[0];
+      const [aid, uid] = assetCode.split(":");
+      const asset = assets.find(a => a.id === aid);
+      const unit = allUnits.find(u => u.id === uid);
+      setScanResult({ type: "asset", data: { asset, unit }, raw: code });
+    } else {
+      setScanResult({ type: "unknown", raw: code });
+    }
+  };
+
+  const downloadQR = (url, filename) => {
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.target = "_blank"; a.click();
+  };
+
+  return (<PageContainer maxWidth={800}>
+    <PageHeader icon="🔑" title="QR 코드 관리" subtitle="출입구·장비 QR 생성 및 스캔" accent="#9C27B0" />
+
+    {/* 스캔 영역 */}
+    <Card style={{ background: "linear-gradient(135deg, rgba(156,39,176,0.06), rgba(156,39,176,0.01))", border: "1px solid rgba(156,39,176,0.25)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 50, height: 50, borderRadius: 12, background: "rgba(156,39,176,0.15)", border: "1px solid rgba(156,39,176,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📷</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>QR 스캔</div>
+          <div style={{ color: "#94A3B8", fontSize: 12 }}>QR 코드 또는 URL을 입력하세요</div>
+        </div>
+        <Btn variant="primary" color="#AB47BC" icon="📷" onClick={handleManualScan}>스캔</Btn>
+      </div>
+      {scanResult && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "rgba(0,0,0,0.3)" }}>
+        {scanResult.type === "gate" && scanResult.data && <div>
+          <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>✅ 출입구 인식</div>
+          <div style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700 }}>📍 {scanResult.data.name}</div>
+          <div style={{ color: "#94A3B8", fontSize: 12 }}>코드: {scanResult.data.id}</div>
+        </div>}
+        {scanResult.type === "asset" && scanResult.data.unit && <div>
+          <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>✅ 장비 인식</div>
+          <div style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700 }}>📦 {scanResult.data.asset?.name} #{scanResult.data.unit.number}</div>
+          <div style={{ color: "#94A3B8", fontSize: 12 }}>{scanResult.data.unit.assignedToName ? `할당: ${scanResult.data.unit.assignedToName}` : "보관중"}</div>
+        </div>}
+        {scanResult.type === "unknown" && <div>
+          <div style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>⚠️ 알 수 없는 코드</div>
+          <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 4 }}>{scanResult.raw}</div>
+        </div>}
+      </div>}
+    </Card>
+
+    {/* 탭 */}
+    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+      <button onClick={() => setTab("entry")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: tab === "entry" ? "1.5px solid rgba(156,39,176,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === "entry" ? "rgba(156,39,176,0.08)" : "rgba(255,255,255,0.02)", color: tab === "entry" ? "#AB47BC" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🚪 출입구 ({gates.length})</button>
+      <button onClick={() => setTab("asset")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: tab === "asset" ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.06)", background: tab === "asset" ? "rgba(33,150,243,0.08)" : "rgba(255,255,255,0.02)", color: tab === "asset" ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📦 장비 ({allUnits.length})</button>
+    </div>
+
+    {tab === "entry" && (gates.length === 0 ? <EmptyState icon="🚪" title="출입구가 등록되지 않음" description="⚙️ 관리 → 출입구에서 등록하세요" /> :
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+        {gates.map(g => { const url = `${baseUrl}?gate=${g.id}`; return (<Card key={g.id} style={{ padding: 14, textAlign: "center" }}>
+          <div style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 {g.name}</div>
+          <img src={qrUrl(url)} alt={g.name} style={{ width: 140, height: 140, borderRadius: 8, background: "#fff", padding: 8 }} />
+          <div style={{ color: "#94A3B8", fontSize: 10, marginTop: 6, wordBreak: "break-all" }}>{url}</div>
+          <Btn variant="secondary" icon="📥" onClick={() => downloadQR(qrUrl(url), `qr_gate_${g.name}.png`)} style={{ marginTop: 8, fontSize: 12, padding: "6px 12px", width: "100%", justifyContent: "center" }}>다운로드</Btn>
+        </Card>); })}
+      </div>)}
+
+    {tab === "asset" && (allUnits.length === 0 ? <EmptyState icon="📦" title="개별 추적 장비 없음" description="장비 등록 시 '🔢 개별 번호 추적'을 켜야 QR이 생성됩니다" /> :
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+        {allUnits.map(u => { const url = `${baseUrl}?asset=${u.assetId}:${u.id}`; return (<Card key={u.id} style={{ padding: 12, textAlign: "center" }}>
+          <div style={{ color: "#E2E8F0", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{u.assetName}</div>
+          <div style={{ color: "#42A5F5", fontSize: 18, fontWeight: 800, marginBottom: 6 }}>#{u.number}</div>
+          <img src={qrUrl(url)} alt={u.number} style={{ width: 110, height: 110, borderRadius: 6, background: "#fff", padding: 6 }} />
+          <Btn variant="secondary" icon="📥" onClick={() => downloadQR(qrUrl(url), `qr_${u.assetName}_${u.number}.png`)} style={{ marginTop: 8, fontSize: 11, padding: "5px 10px", width: "100%", justifyContent: "center" }}>다운로드</Btn>
+        </Card>); })}
+      </div>)}
+
+    <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)", color: "#94A3B8", fontSize: 12, lineHeight: 1.6 }}>
+      <strong style={{ color: "#42A5F5" }}>💡 사용법</strong><br/>
+      • 출입구 QR을 출입구에 부착하면 시민이 스캔하여 바로 해당 페이지 이동<br/>
+      • 장비 QR을 장비에 부착하면 스캔으로 즉시 자산 정보 확인<br/>
+      • 다운로드 후 인쇄해서 부착하세요
+    </div>
+  </PageContainer>);
+}
+
+
 function HeatmapPage({ settings, setSettings, session }) {
   const [mode, setMode] = useState("view"); // view | draw | edit
   const [drawingPoints, setDrawingPoints] = useState([]);
@@ -5690,6 +6138,12 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           ]},
           { group: "👤 인력/위치", items: [
             { k: "location", icon: "📍", label: "위치 워키토키 (2.0)" },
+            { k: "shifts", icon: "📝", label: "근무일지/교대 (2.1)" },
+          ]},
+          { group: "📊 자동화/생산성", items: [
+            { k: "reports", icon: "📄", label: "보고서 자동생성 (2.1)" },
+            { k: "qrcode", icon: "🔑", label: "QR코드 관리 (2.1)" },
+            { k: "smartAlert", icon: "🔔", label: "스마트 알림 (2.1)" },
           ]},
           { group: "📡 데이터/연동", items: [
             { k: "weather", icon: "🌤️", label: "기상청 연동" },
@@ -5754,6 +6208,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "stage", icon: "🎤", label: "공연관리", feat: "stage" },
             { id: "location", icon: "📍", label: "위치", feat: "location" },
             { id: "assets", icon: "📦", label: "장비", feat: "assets" },
+            { id: "shifts", icon: "📝", label: "근무일지", feat: "shifts" },
+            { id: "reports", icon: "📄", label: "보고서", feat: "reports" },
+            { id: "qrcode", icon: "🔑", label: "QR코드", feat: "qrcode" },
             { id: "cms", icon: "⚙️", label: "관리" },
           ];
           const order = settings.navOrder || allItems.map(i => i.id);
@@ -6052,14 +6509,14 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
-  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "heatmap", "status", "program", "inbox", "location", "assets"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
-  stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat", "assets"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
-  counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program", "location"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#AB47BC", pages: ["parking", "dashboard", "chat", "status", "program", "location"], desc: "주차장 관리 + 대시보드 조회" },
-  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "location"], desc: "셔틀버스 위치 관리" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "heatmap", "status", "program", "inbox", "location", "assets", "shifts", "qrcode"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
+  stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat", "assets", "shifts"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
+  counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#AB47BC", pages: ["parking", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "주차장 관리 + 대시보드 조회" },
+  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "셔틀버스 위치 관리" },
   viewer: { label: "뷰어", color: "#42A5F5", pages: ["dashboard", "chat", "status", "program"], desc: "대시보드 조회만 가능" },
 };
 
@@ -6498,6 +6955,16 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const [page, setPageInternal] = useState(initialPage);
   const setPage = (p) => { setPageInternal(p); setPageExt(p); };
   const [showMore, setShowMore] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  // 키보드 단축키: Cmd/Ctrl + K
+  useEffect(() => {
+    const h = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setShowSearch(s => !s); }
+      if (e.key === "Escape") setShowSearch(false);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
 
   const fid = session.festivalId || "default";
   const [categories, setCategories] = usePersist(`${fid}_cat_v10`, DEFAULT_CATEGORIES);
@@ -6621,22 +7088,48 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   useEffect(() => {
     if (!active) return;
     const warnings = [];
+    // 스마트 알림 - 조용한 시간 체크
+    const aSet = settings.alertSettings || {};
+    const qh = aSet.quietHours || {};
+    const isQuiet = (() => {
+      if (!qh.enabled) return false;
+      const now = new Date();
+      const hm = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      const start = qh.start || "22:00", end = qh.end || "07:00";
+      // 자정 넘김 (22:00 ~ 07:00) 처리
+      if (start > end) return hm >= start || hm < end;
+      return hm >= start && hm < end;
+    })();
+    const cooldownMs = (aSet.cooldownMin || 10) * 60 * 1000;
+
     categories.forEach(cat => {
       const lv = getLevel(cat); const prev = prevLevels.current[cat.id];
       if ((lv === "ORANGE" || lv === "RED") && prev && prev !== lv) {
-        // 중복 방지: 같은 카테고리의 같은 레벨 알림이 10분 내에 있었으면 스킵
+        // 조용한 시간: RED만 알림 (ORANGE는 스킵)
+        if (isQuiet && lv !== "RED") {
+          prevLevels.current[cat.id] = lv;
+          return;
+        }
+        // 중복 방지
         const lastKey = `${cat.id}_${lv}`;
         const lastTime = alertCooldown.current[lastKey] || 0;
         const now = Date.now();
-        if (now - lastTime < 10 * 60 * 1000) {
+        if (now - lastTime < cooldownMs) {
           prevLevels.current[cat.id] = lv;
           return;
         }
         alertCooldown.current[lastKey] = now;
         const li = LEVELS[lv]; const time = new Date().toLocaleString("ko-KR");
         const msg = `⚠️ [${settings.festivalName} 긴급알림] ⚠️\n\n${cat.alertMessages?.[lv] || ""}\n\n${cat.name}: ${cat.currentValue.toLocaleString()}${cat.unit} (${li.label})\n\n점검:\n${(cat.actionItems || []).map(a => `• ${a}`).join("\n")}\n\n발신: ${settings.festivalName} 종합상황실\n시간: ${time}`;
-        setAlerts(p => [{ category: cat.name, level: lv, message: msg, time }, ...p].slice(0, 100));
+        setAlerts(p => [{ id: "al_"+now, category: cat.name, catId: cat.id, level: lv, message: msg, time, ts: now, snoozedUntil: 0 }, ...p].slice(0, 100));
         setActiveAlert({ category: cat.name, level: lv, message: msg, time });
+      }
+      // 🔔 스마트 알림 - 자동 해결: BLUE 복귀 시 해당 카테고리 알림 자동 dismiss
+      if (lv === "BLUE" && (prev === "ORANGE" || prev === "RED")) {
+        setAlerts(p => p.filter(a => a.category !== cat.name));
+        // cooldown도 초기화하여 다음에 다시 발생하면 즉시 알림
+        delete alertCooldown.current[`${cat.id}_ORANGE`];
+        delete alertCooldown.current[`${cat.id}_RED`];
       }
       if (lv === "ORANGE" || lv === "RED") warnings.push(cat);
       prevLevels.current[cat.id] = lv;
@@ -6680,7 +7173,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = 0; const _unused_unread = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "heatmap", "parking", "shuttle", "chat", "status", "program", "stage", "location", "assets", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","heatmap","parking","shuttle","chat","status","program","stage","location","assets","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "heatmap", "parking", "shuttle", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","heatmap","parking","shuttle","chat","status","program","stage","location","assets","shifts","reports","qrcode","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
@@ -6691,6 +7184,9 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.heatmap !== false && { id: "heatmap", icon: "🗺️", label: "히트맵" },
     ft.location !== false && { id: "location", icon: "📍", label: "위치" },
     ft.assets !== false && { id: "assets", icon: "📦", label: "장비" },
+    ft.shifts !== false && { id: "shifts", icon: "📝", label: "근무일지" },
+    ft.reports !== false && { id: "reports", icon: "📄", label: "보고서" },
+    ft.qrcode !== false && { id: "qrcode", icon: "🔑", label: "QR" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
     ft.shuttle !== false && { id: "shuttle", icon: "🚌", label: "셔틀버스" },
     ft.message !== false && { id: "chat", icon: "💬", label: "메시지" },
@@ -6716,10 +7212,14 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <button onClick={() => setShowSearch(true)} title="통합 검색 (Ctrl+K)" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(66,165,245,0.25)", background: "rgba(33,150,243,0.06)", color: "#42A5F5", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>🔍 <span style={{ fontSize: 11, opacity: 0.6, display: "none" }}>⌘K</span></button>
         {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#FFA726", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
         <button onClick={onLogout} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
       </div>
     </div>
+
+    {/* 통합 검색 모달 */}
+    <SearchModal open={showSearch} onClose={() => setShowSearch(false)} settings={settings} categories={categories} onNavigate={(p) => setPage(p)} />
 
     {/* Bottom nav */}
     {/* 더보기 메뉴 오버레이 */}
@@ -6786,7 +7286,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           }
           setAlerts(p => p.filter((_, i) => i !== idx));
         }
-      }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} /> : <InactiveOverlay settings={settings} />)}
+      }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} onSearch={() => setShowSearch(true)} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shuttle" && <ShuttlePage settings={settings} setSettings={setSettings} session={session} />}
@@ -6798,6 +7298,9 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "heatmap" && <HeatmapPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "location" && <LocationPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "assets" && <AssetsPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "shifts" && <ShiftsPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "reports" && <ReportsPage settings={settings} setSettings={setSettings} session={session} categories={categories} alerts={alerts} />}
+      {page === "qrcode" && <QRPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
