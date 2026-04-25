@@ -820,8 +820,11 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
     <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:0.9}}`}</style>
 
     {/* CueFlow 스타일 헤더 카드 */}
-    <div style={{ maxWidth: 900, margin: "0 auto 16px", padding: "16px 18px", borderRadius: 20, background: "linear-gradient(135deg, rgba(66,165,245,0.08), rgba(66,165,245,0.02))", border: "1px solid rgba(66,165,245,0.25)", boxShadow: "0 0 0 1px rgba(66,165,245,0.08), 0 4px 32px rgba(66,165,245,0.12), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+    <div style={{ maxWidth: 900, margin: "0 auto 16px", padding: "16px 18px", borderRadius: 20, background: "linear-gradient(135deg, rgba(66,165,245,0.12), rgba(66,165,245,0.02) 50%, rgba(171,71,188,0.06))", border: "1px solid rgba(66,165,245,0.35)", boxShadow: "0 0 0 1px rgba(66,165,245,0.12), 0 8px 40px rgba(66,165,245,0.18), 0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(66,165,245,0.6), transparent)", opacity: 0.8 }} />
+      <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(66,165,245,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -40, left: -40, width: 150, height: 150, borderRadius: "50%", background: "radial-gradient(circle, rgba(171,71,188,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, position: "relative" }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(66,165,245,0.22), rgba(66,165,245,0.06))", border: "1px solid rgba(66,165,245,0.3)", boxShadow: "0 0 20px rgba(66,165,245,0.15), inset 0 1px 0 rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{settings.logoEmoji || "🎪"}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ color: "#fff", fontSize: 18, fontWeight: 700, letterSpacing: -0.5, margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{settings.festivalName || "축제 안전관리"}</h1>
@@ -831,7 +834,7 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)", position: "relative" }}>
         <span style={{ padding: "5px 12px", borderRadius: 8, background: olv.bg, border: `1px solid ${olv.border}`, boxShadow: `0 0 12px ${olv.color}25`, color: olv.color, fontSize: 12, fontWeight: 700 }}>{olv.icon} {olv.label}</span>
         {settings.is24HourMode && <span style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(76,175,80,0.15)", border: "1px solid rgba(76,175,80,0.3)", boxShadow: "0 0 12px rgba(76,175,80,0.25)", color: "#66BB6A", fontSize: 12, fontWeight: 700 }}><span style={{ animation: "pulse 2s infinite", display: "inline-block" }}>●</span> 24H</span>}
         {loc.name && <span style={{ color: "#94A3B8", fontSize: 12, padding: "5px 4px" }}>📍 {loc.name}</span>}
@@ -887,15 +890,19 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
         const cumVal = crowdLS.cumulative || 0;
         const gateData = (settings.gates || []).map(g => { const s = (crowdLS.zones || []).find(sz => sz.id === g.id); return { ...g, count: s?.count || 0, cumulative: s?.cumulative || 0 }; });
         return (
-        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: "16px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 24px ${li.color}15, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
+        <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: `linear-gradient(145deg, ${li.color}10, rgba(255,255,255,0.03) 60%)`, borderRadius: 16, padding: "16px", border: `1px solid ${li.color}40`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}20, 0 8px 32px ${li.color}20, 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`, transition: "all 0.3s" }}>
+          {/* 상단 글로우 라인 */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${li.color}, transparent)`, opacity: 0.6 }} />
+          {/* 코너 글로우 */}
+          <div style={{ position: "absolute", top: -40, right: -40, width: 120, height: 120, borderRadius: "50%", background: `radial-gradient(circle, ${li.color}30 0%, transparent 70%)`, pointerEvents: "none" }} />
           {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, position: "relative" }}>
             <span style={{ fontSize: 16 }}>{cat.icon}</span>
             <span style={{ color: "#E2E8F0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>체류 인원</span>
             <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
             {cat.actionStatus && <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(255,152,0,0.15)", color: "#FFA726", fontSize: 12, fontWeight: 700 }}>🔧 조치중</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12, position: "relative" }}>
             <div>
               <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4, fontWeight: 500 }}>실황 체류</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
@@ -962,9 +969,11 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       </div>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
         {categories.filter(c => c.id !== "crowd" && !EXCLUDE_FROM_OVERALL.includes(c.id) && settings.dashboardVisible?.[c.id] !== false).map(cat => { const lv = getLevel(cat); const li = LEVELS[lv]; const fc = cat.forecast || []; const nextFc = fc[0]; return (
-          <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: "18px", border: `1px solid ${li.border}`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}15, 0 4px 20px ${li.color}12, inset 0 1px 0 rgba(255,255,255,0.05)`, transition: "all 0.3s" }}>
+          <div key={cat.id} onClick={() => setSelectedId(cat.id)} style={{ background: `linear-gradient(145deg, ${li.color}10, rgba(255,255,255,0.03) 60%)`, borderRadius: 16, padding: "18px", border: `1px solid ${li.color}40`, position: "relative", overflow: "hidden", cursor: "pointer", boxShadow: `0 0 0 1px ${li.color}20, 0 8px 28px ${li.color}18, 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`, transition: "all 0.3s" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${li.color}, transparent)`, opacity: 0.6 }} />
+            <div style={{ position: "absolute", top: -40, right: -40, width: 100, height: 100, borderRadius: "50%", background: `radial-gradient(circle, ${li.color}25 0%, transparent 70%)`, pointerEvents: "none" }} />
             {(lv === "ORANGE" || lv === "RED") && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: li.color, animation: "blink 1.5s infinite" }} />}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, position: "relative" }}>
               <span style={{ fontSize: 16 }}>{cat.icon}</span>
               <span style={{ color: "#E2E8F0", fontWeight: 600, fontSize: 14, letterSpacing: -0.2 }}>{cat.name}</span>
               <span style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 8, background: li.bg, border: `1px solid ${li.border}`, boxShadow: `0 0 10px ${li.color}25`, color: li.color, fontSize: 12, fontWeight: 700 }}>{li.icon} {li.label}</span>
