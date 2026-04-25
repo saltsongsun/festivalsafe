@@ -6074,7 +6074,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
 
     {/* Top bar - user info */}
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
         <span style={{ padding: "3px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
@@ -6088,7 +6088,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     {/* Bottom nav */}
     {/* 더보기 메뉴 오버레이 */}
     {showMore && <div onClick={() => setShowMore(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: 0, right: 0, bottom: 64, background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderTop: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px 20px 0 0", padding: "12px 16px 16px", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "fixed", left: 0, right: 0, bottom: "calc(env(safe-area-inset-bottom) + 64px)", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderTop: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px 20px 0 0", padding: "12px 16px 16px", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
         <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
         <div style={{ maxWidth: 480, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {(() => {
@@ -6111,7 +6111,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       </div>
     </div>}
 
-    <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 1000, background: "rgba(11,14,23,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "center", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", boxShadow: "0 -4px 20px rgba(0,0,0,0.3)" }}>
+    <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 1000, background: "rgba(11,14,23,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "center", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", boxShadow: "0 -4px 20px rgba(0,0,0,0.3)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       {(() => {
         const MAX = 5;
         if (navs.length <= MAX) {
@@ -6140,7 +6140,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     </nav>
 
     {/* Content */}
-    <div style={{ paddingTop: 36, paddingBottom: 70 }}>
+    <div style={{ paddingTop: "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
       {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => { if (idx === "all") setAlerts([]); else setAlerts(p => p.filter((_, i) => i !== idx)); }} onDeleteNotice={(nid) => setSettings(prev => ({ ...prev, notices: (prev.notices || []).filter(n => n.id !== nid) }))} userRole={session.role} updateAvailable={updateAvailable} /> : <InactiveOverlay settings={settings} />)}
       {page === "counter" && <CounterPage categories={categories} setCategories={setCategories} settings={settings} setSettings={setSettings} session={session} />}
       {page === "parking" && <ParkingPage settings={settings} setSettings={setSettings} session={session} />}
