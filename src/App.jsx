@@ -240,6 +240,7 @@ const DEFAULT_SETTINGS = {
     message: true,
     customApi: true,
     congestion: true,  // 인파혼잡도
+    stage: true,       // 공연관리
   },
 };
 
@@ -5130,6 +5131,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "chat", icon: "💬", label: "메시지", feat: "message" },
             { id: "status", icon: "🎪", label: "축제관리" },
             { id: "program", icon: "🎭", label: "프로그램" },
+            { id: "stage", icon: "🎤", label: "공연관리", feat: "stage" },
             { id: "cms", icon: "⚙️", label: "관리" },
           ];
           const order = settings.navOrder || allItems.map(i => i.id);
