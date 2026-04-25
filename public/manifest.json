@@ -4,7 +4,7 @@
   "description": "축제 재난안전 통합관리 플랫폼",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#0a0d1a",
   "theme_color": "#0a0d1a",
   "lang": "ko-KR",
