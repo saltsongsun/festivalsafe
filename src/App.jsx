@@ -246,6 +246,7 @@ const DEFAULT_SETTINGS = {
     assets: true,      // 2.0: 장비/물품 관리
     workdiary: true,   // 2.1: 근무일지/교대관리
     shifts: true,      // 2.1: 근무일지 (alias)
+    workers: true,     // 2.1: 근무자 통합 관리
     search: true,      // 2.0: 통합 검색
     smartAlert: true,  // 2.0: 스마트 알림
     report: true,      // 2.1: 보고서 자동생성
@@ -2918,6 +2919,251 @@ function SearchModal({ open, onClose, settings, categories, onNavigate }) {
       </div>
     </div>
   </div>);
+}
+
+// ─── 2.1: 근무자 통합 관리 (연락처/식수/무전기/근무지) ─────────────────
+function WorkersPage({ settings, setSettings, session }) {
+  const sites = settings.sites || [];
+  const assets = settings.assets || [];
+  const shifts = settings.shifts || [];
+  const today = new Date().toISOString().slice(0, 10);
+  const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+
+  const [filter, setFilter] = useState("all"); // all | siteId
+  const [search, setSearch] = useState("");
+  const [editId, setEditId] = useState(null); // {siteId, workerId}
+  const [addSiteId, setAddSiteId] = useState(null);
+  const [newW, setNewW] = useState({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" });
+
+  // 모든 근무자 평탄화 + 무전기/근무 정보 결합
+  const allWorkers = sites.flatMap(s => (s.workers || []).map(w => {
+    // 이 근무자에게 할당된 무전기 찾기
+    const radios = [];
+    assets.forEach(a => {
+      if (a.trackUnits && a.units) {
+        a.units.forEach(u => {
+          if (u.assignedTo === w.id || u.assignedToName === w.name) {
+            radios.push({ assetName: a.name, number: u.number, category: a.category });
+          }
+        });
+      }
+    });
+    // 오늘 근무 정보
+    const todayShift = shifts.find(sh => sh.workerId === w.id && sh.date === today);
+    return {
+      ...w,
+      siteId: s.id,
+      siteName: s.name,
+      radios,
+      onDuty: todayShift && !todayShift.checkOut,
+      checkInTime: todayShift?.checkIn,
+    };
+  }));
+
+  // 필터/검색
+  const filtered = allWorkers.filter(w => {
+    if (filter !== "all" && w.siteId !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (w.name || "").toLowerCase().includes(q) ||
+             (w.phone || "").includes(q) ||
+             (w.role || "").toLowerCase().includes(q) ||
+             (w.siteName || "").toLowerCase().includes(q) ||
+             w.radios.some(r => r.number.includes(q));
+    }
+    return true;
+  });
+
+  // 통계
+  const stats = {
+    total: allWorkers.length,
+    onDuty: allWorkers.filter(w => w.onDuty).length,
+    withRadio: allWorkers.filter(w => w.radios.length > 0).length,
+    totalMeals: allWorkers.reduce((s, w) => s + (parseInt(w.meals) || 0), 0),
+  };
+
+  const updateWorker = (siteId, workerId, changes) => {
+    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(w => w.id === workerId ? { ...w, ...changes } : w) } : s) }));
+  };
+  const removeWorker = (siteId, workerId) => {
+    if (!confirm("근무자를 삭제하시겠습니까?")) return;
+    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: (s.workers || []).filter(w => w.id !== workerId) } : s) }));
+  };
+  const addWorker = (siteId) => {
+    if (!newW.name) { alert("이름을 입력하세요."); return; }
+    const w = { id: "w_"+Date.now(), name: newW.name, phone: newW.phone, role: newW.role, meals: parseInt(newW.meals) || 0, mealNote: newW.mealNote };
+    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: [...(s.workers || []), w] } : s) }));
+    setNewW({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" }); setAddSiteId(null);
+  };
+
+  // 식수 종합 (사이트별)
+  const mealsBySite = sites.map(s => {
+    const ws = (s.workers || []);
+    return { name: s.name, count: ws.length, meals: ws.reduce((sum, w) => sum + (parseInt(w.meals) || 0), 0) };
+  });
+
+  // CSV 내보내기
+  const exportCSV = () => {
+    const rows = [["이름", "연락처", "역할", "근무지", "식수", "식사메모", "할당무전기", "오늘근무"]];
+    allWorkers.forEach(w => {
+      rows.push([w.name, w.phone || "", w.role || "", w.siteName, w.meals || 0, w.mealNote || "", w.radios.map(r => `${r.assetName} #${r.number}`).join("; "), w.onDuty ? `근무중 (${w.checkInTime})` : "-"]);
+    });
+    const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `safeflow_workers_${today}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (<PageContainer maxWidth={900}>
+    <PageHeader icon="👥" title="근무자 관리" subtitle={`총 ${stats.total}명 · 근무중 ${stats.onDuty}명`} accent="#42A5F5" action={canEdit && stats.total > 0 ? <Btn variant="secondary" icon="📥" onClick={exportCSV} style={{ padding: "8px 12px", fontSize: 12 }}>CSV</Btn> : null} />
+
+    {/* 통계 카드 */}
+    <Card>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, textAlign: "center" }}>
+        <div><div style={{ color: "#42A5F5", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.total}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>👤 총인원</div></div>
+        <div><div style={{ color: "#66BB6A", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.onDuty}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🟢 근무중</div></div>
+        <div><div style={{ color: "#AB47BC", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.withRadio}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>📻 무전기</div></div>
+        <div><div style={{ color: "#FFA726", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.totalMeals}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🍱 식수</div></div>
+      </div>
+    </Card>
+
+    {/* 검색 */}
+    <Card style={{ padding: 12 }}>
+      <div style={{ display: "flex", gap: 8 }}>
+        <span style={{ display: "flex", alignItems: "center", padding: "0 12px", color: "#94A3B8", fontSize: 18 }}>🔍</span>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="이름·연락처·역할·근무지·무전기번호" style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 14 }} />
+        {search && <Btn variant="ghost" onClick={() => setSearch("")} style={{ padding: "8px 12px", fontSize: 12 }}>✕</Btn>}
+      </div>
+    </Card>
+
+    {/* 근무지 필터 */}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+      <button onClick={() => setFilter("all")} style={{ padding: "8px 14px", borderRadius: 16, border: filter === "all" ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === "all" ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === "all" ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>전체 ({allWorkers.length})</button>
+      {sites.filter(s => s.name).map(s => { const cnt = allWorkers.filter(w => w.siteId === s.id).length; return (
+        <button key={s.id} onClick={() => setFilter(s.id)} style={{ padding: "8px 14px", borderRadius: 16, border: filter === s.id ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === s.id ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === s.id ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📍 {s.name} ({cnt})</button>
+      ); })}
+    </div>
+
+    {/* 식수 종합표 */}
+    {filter === "all" && mealsBySite.some(m => m.count > 0) && <Card style={{ background: "linear-gradient(135deg, rgba(255,167,38,0.06), rgba(255,167,38,0.01))", border: "1px solid rgba(255,167,38,0.2)" }}>
+      <SectionTitle icon="🍱" accent="#FFA726">근무지별 식수 현황</SectionTitle>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
+        {mealsBySite.filter(m => m.count > 0).map(m => (
+          <div key={m.name} style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 11, marginBottom: 2 }}>📍 {m.name}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ color: "#FFA726", fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{m.meals}</span>
+              <span style={{ color: "#94A3B8", fontSize: 11 }}>식 / {m.count}명</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>}
+
+    {/* 근무자 카드 목록 */}
+    {filtered.length === 0 && <EmptyState icon="👥" title={search ? "검색 결과 없음" : "등록된 근무자가 없습니다"} description={canEdit && !search ? "축제관리 또는 ⚙️관리 → 인력관리에서 등록하세요" : ""} />}
+
+    {filtered.map(w => {
+      const isEditing = editId?.workerId === w.id;
+      if (isEditing) return (<Card key={w.id} style={{ background: "rgba(33,150,243,0.05)", border: "1px solid rgba(33,150,243,0.25)" }}>
+        <h4 style={{ color: "#42A5F5", fontSize: 14, fontWeight: 700, margin: "0 0 10px" }}>✏️ {w.name} 정보 수정</h4>
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>이름</Label><Input defaultValue={w.name} onBlur={e => updateWorker(w.siteId, w.id, { name: e.target.value })} /></div>
+            <div><Label>연락처</Label><Input defaultValue={w.phone} onBlur={e => updateWorker(w.siteId, w.id, { phone: e.target.value })} placeholder="010-0000-0000" /></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div><Label>역할</Label><Input defaultValue={w.role} onBlur={e => updateWorker(w.siteId, w.id, { role: e.target.value })} placeholder="운영/안전/의료" /></div>
+            <div><Label>식수</Label><Input type="number" defaultValue={w.meals || 0} onBlur={e => updateWorker(w.siteId, w.id, { meals: parseInt(e.target.value) || 0 })} /></div>
+          </div>
+          <div><Label>식사 메모 (알레르기/선호)</Label><Input defaultValue={w.mealNote || ""} onBlur={e => updateWorker(w.siteId, w.id, { mealNote: e.target.value })} placeholder="채식/할랄 등" /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <Btn variant="primary" icon="✅" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>완료</Btn>
+          <Btn variant="danger" icon="🗑" onClick={() => { removeWorker(w.siteId, w.id); setEditId(null); }}>삭제</Btn>
+        </div>
+      </Card>);
+
+      return (<Card key={w.id} style={{ border: w.onDuty ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* 아바타 */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: w.onDuty ? "linear-gradient(135deg, rgba(76,175,80,0.25), rgba(76,175,80,0.05))" : "linear-gradient(135deg, rgba(33,150,243,0.15), rgba(33,150,243,0.03))", border: `1px solid ${w.onDuty ? "rgba(76,175,80,0.4)" : "rgba(33,150,243,0.25)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{w.onDuty ? "🟢" : "👤"}</div>
+            {w.onDuty && <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, background: "#66BB6A", border: "2px solid #0d1018", boxShadow: "0 0 8px rgba(76,175,80,0.6)", animation: "pulse 2s infinite" }} />}
+          </div>
+          {/* 메인 정보 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2, flexWrap: "wrap" }}>
+              <span style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700 }}>{w.name}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 10, fontWeight: 700 }}>{w.role || "운영"}</span>
+              {w.onDuty && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>● 근무중 {w.checkInTime}</span>}
+            </div>
+            <div style={{ color: "#94A3B8", fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <span>📍 {w.siteName}</span>
+              {w.phone && <a href={`tel:${w.phone}`} style={{ color: "#42A5F5", textDecoration: "none" }}>📞 {w.phone}</a>}
+            </div>
+          </div>
+          {/* 액션 */}
+          {canEdit && <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button onClick={() => setEditId({ siteId: w.siteId, workerId: w.id })} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>✏️</button>
+          </div>}
+        </div>
+        {/* 추가 정보 그리드 */}
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+          {/* 식수 */}
+          <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,167,38,0.05)", border: "1px solid rgba(255,167,38,0.15)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>🍱 식수</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <span style={{ color: "#FFA726", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{w.meals || 0}</span>
+              <span style={{ color: "#94A3B8", fontSize: 11 }}>식</span>
+            </div>
+            {w.mealNote && <div style={{ color: "#FFA726", fontSize: 10, marginTop: 2, opacity: 0.8 }}>📝 {w.mealNote}</div>}
+          </div>
+          {/* 무전기 */}
+          {w.radios.length > 0 ? <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(171,71,188,0.05)", border: "1px solid rgba(171,71,188,0.2)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>📻 무전기</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {w.radios.map((r, i) => (<div key={i} style={{ color: "#AB47BC", fontSize: 12, fontWeight: 600 }}>
+                <span style={{ fontSize: 14, fontWeight: 800 }}>#{r.number}</span> <span style={{ color: "#94A3B8", fontSize: 10 }}>{r.assetName}</span>
+              </div>))}
+            </div>
+          </div> : <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>📻 무전기</div>
+            <div style={{ color: "#475569", fontSize: 12 }}>미할당</div>
+          </div>}
+          {/* 근무 상태 */}
+          <div style={{ padding: "8px 10px", borderRadius: 8, background: w.onDuty ? "rgba(76,175,80,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${w.onDuty ? "rgba(76,175,80,0.15)" : "rgba(255,255,255,0.04)"}` }}>
+            <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>📅 오늘 근무</div>
+            <div style={{ color: w.onDuty ? "#66BB6A" : "#475569", fontSize: 12, fontWeight: 600 }}>{w.onDuty ? `${w.checkInTime}~ 근무중` : "출근 전"}</div>
+          </div>
+        </div>
+      </Card>);
+    })}
+
+    {/* 근무자 추가 (근무지 선택) */}
+    {canEdit && filtered.length > 0 && filter === "all" && <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px dashed rgba(33,150,243,0.3)" }}>
+      <div style={{ color: "#42A5F5", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>➕ 근무자 추가</div>
+      {!addSiteId ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {sites.filter(s => s.name).map(s => <button key={s.id} onClick={() => setAddSiteId(s.id)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {s.name}</button>)}
+      </div> : <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ color: "#94A3B8", fontSize: 12 }}>📍 {sites.find(s => s.id === addSiteId)?.name}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input placeholder="이름" value={newW.name} onChange={e => setNewW({ ...newW, name: e.target.value })} />
+          <Input placeholder="010-0000-0000" value={newW.phone} onChange={e => setNewW({ ...newW, phone: e.target.value })} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr", gap: 8 }}>
+          <Input placeholder="역할 (운영/안전)" value={newW.role} onChange={e => setNewW({ ...newW, role: e.target.value })} />
+          <Input type="number" placeholder="식수" value={newW.meals} onChange={e => setNewW({ ...newW, meals: e.target.value })} />
+          <Input placeholder="식사 메모" value={newW.mealNote} onChange={e => setNewW({ ...newW, mealNote: e.target.value })} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="primary" icon="✅" onClick={() => addWorker(addSiteId)} style={{ flex: 1, justifyContent: "center" }}>추가</Btn>
+          <Btn variant="ghost" onClick={() => { setAddSiteId(null); setNewW({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" }); }}>취소</Btn>
+        </div>
+      </div>}
+    </Card>}
+  </PageContainer>);
 }
 
 // ─── 2.1: 근무일지 / 교대관리 (Shifts) ─────────────────────────────
@@ -6138,6 +6384,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           ]},
           { group: "👤 인력/위치", items: [
             { k: "location", icon: "📍", label: "위치 워키토키 (2.0)" },
+            { k: "workers", icon: "👥", label: "근무자 관리 (2.1)" },
             { k: "shifts", icon: "📝", label: "근무일지/교대 (2.1)" },
           ]},
           { group: "📊 자동화/생산성", items: [
@@ -6209,6 +6456,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "location", icon: "📍", label: "위치", feat: "location" },
             { id: "assets", icon: "📦", label: "장비", feat: "assets" },
             { id: "shifts", icon: "📝", label: "근무일지", feat: "shifts" },
+            { id: "workers", icon: "👥", label: "근무자관리", feat: "workers" },
             { id: "reports", icon: "📄", label: "보고서", feat: "reports" },
             { id: "qrcode", icon: "🔑", label: "QR코드", feat: "qrcode" },
             { id: "cms", icon: "⚙️", label: "관리" },
@@ -6509,9 +6757,9 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
   zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "heatmap", "status", "program", "inbox", "location", "assets", "shifts", "qrcode"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
   stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat", "assets", "shifts"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
   counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "인파 계수 + 대시보드 조회" },
@@ -7173,7 +7421,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const unreadCount = 0; const _unused_unread = myMessages.filter(m => !readIds.includes(m.id)).length;
 
   const ft = settings.features || {};
-  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "heatmap", "parking", "shuttle", "chat", "status", "program", "stage", "location", "assets", "shifts", "reports", "qrcode", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","heatmap","parking","shuttle","chat","status","program","stage","location","assets","shifts","reports","qrcode","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
+  const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "heatmap", "parking", "shuttle", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","heatmap","parking","shuttle","chat","status","program","stage","location","assets","shifts","reports","qrcode","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
@@ -7185,6 +7433,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.location !== false && { id: "location", icon: "📍", label: "위치" },
     ft.assets !== false && { id: "assets", icon: "📦", label: "장비" },
     ft.shifts !== false && { id: "shifts", icon: "📝", label: "근무일지" },
+    ft.workers !== false && { id: "workers", icon: "👥", label: "근무자" },
     ft.reports !== false && { id: "reports", icon: "📄", label: "보고서" },
     ft.qrcode !== false && { id: "qrcode", icon: "🔑", label: "QR" },
     ft.parking !== false && { id: "parking", icon: "🅿️", label: "주차관리" },
@@ -7299,6 +7548,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "location" && <LocationPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "assets" && <AssetsPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shifts" && <ShiftsPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "workers" && <WorkersPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "reports" && <ReportsPage settings={settings} setSettings={setSettings} session={session} categories={categories} alerts={alerts} />}
       {page === "qrcode" && <QRPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
