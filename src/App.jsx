@@ -455,6 +455,104 @@ async function sendSolapi(s, text, contacts) {
 // ─── UI Components ───────────────────────────────────────────────
 const Card = ({ children, style, onClick }) => <div onClick={onClick} style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))", borderRadius: 16, padding: 20, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.2)", backdropFilter: "blur(10px)", ...style }}>{children}</div>;
 
+// ─── Supabase 동기화 상태/설정 카드 ─────────────────────────
+function SupabaseSyncCard() {
+  const [status, setStatus] = useState(window._sbStatus || { ok: null });
+  const [showConfig, setShowConfig] = useState(false);
+  const [url, setUrl] = useState(localStorage.getItem('_sb_url') || '');
+  const [key, setKey] = useState(localStorage.getItem('_sb_key') || '');
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    const h = () => setStatus(window._sbStatus || { ok: null });
+    window.addEventListener('sb-status', h);
+    h();
+    return () => window.removeEventListener('sb-status', h);
+  }, []);
+
+  const save = async () => {
+    if (!url || !key) { alert('URL과 Key를 모두 입력하세요'); return; }
+    if (!url.startsWith('http')) { alert('URL은 https://로 시작해야 합니다'); return; }
+    setTesting(true);
+    // 테스트 연결
+    try {
+      const mod = await import(/* @vite-ignore */ 'https://esm.sh/@supabase/supabase-js@2.39.0');
+      const sb = mod.createClient(url, key);
+      const { error } = await sb.from('app_state').select('key', { count: 'exact', head: true });
+      if (error) {
+        alert(`❌ 연결 실패\n\n${error.message}\n\n확인 사항:\n• URL/Key가 정확한가\n• app_state 테이블이 생성되어 있는가\n• RLS 정책이 SELECT 허용하는가`);
+        setTesting(false);
+        return;
+      }
+      localStorage.setItem('_sb_url', url);
+      localStorage.setItem('_sb_key', key);
+      alert('✅ 연결 성공!\n\n페이지를 새로고침합니다.');
+      location.reload();
+    } catch (e) {
+      alert(`❌ 오류: ${e.message}`);
+      setTesting(false);
+    }
+  };
+
+  const clearConfig = () => {
+    if (!confirm('Supabase 설정을 삭제하고 동기화를 끌까요?')) return;
+    localStorage.removeItem('_sb_url');
+    localStorage.removeItem('_sb_key');
+    location.reload();
+  };
+
+  const checkNow = async () => {
+    if (window._safeflow?.checkConnection) {
+      const ok = await window._safeflow.checkConnection();
+      alert(ok ? '✅ Supabase 정상 작동 중' : '❌ DB 접근 실패 - 콘솔 확인');
+    } else {
+      alert('Supabase가 로드되지 않았습니다. 새로고침 후 다시 시도하세요.');
+    }
+  };
+
+  // 상태 컬러
+  const statusInfo = status.ok === true ? { color: "#66BB6A", bg: "rgba(76,175,80,0.08)", border: "rgba(76,175,80,0.3)", icon: "✅", label: "동기화 작동중" }
+                  : status.ok === false ? { color: "#EF5350", bg: "rgba(244,67,54,0.06)", border: "rgba(244,67,54,0.25)", icon: "❌", label: status.reason === 'no_config' ? "설정 필요" : "연결 실패" }
+                  : { color: "#FFA726", bg: "rgba(255,167,38,0.06)", border: "rgba(255,167,38,0.25)", icon: "⏳", label: "확인 중" };
+
+  return (<Card style={{ background: `linear-gradient(135deg, ${statusInfo.bg}, rgba(255,255,255,0.01))`, border: `1px solid ${statusInfo.border}` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: showConfig ? 14 : 0 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: statusInfo.bg, border: `1px solid ${statusInfo.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{statusInfo.icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>🔄 기기간 동기화</div>
+        <div style={{ color: statusInfo.color, fontSize: 12, marginTop: 2, fontWeight: 600 }}>{statusInfo.label}{status.error && ` · ${status.error.slice(0, 50)}`}</div>
+      </div>
+      <button onClick={() => setShowConfig(!showConfig)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{showConfig ? "닫기" : "설정"}</button>
+    </div>
+
+    {showConfig && <div style={{ display: "grid", gap: 10, padding: "12px", borderRadius: 10, background: "rgba(0,0,0,0.2)" }}>
+      <div style={{ color: "#94A3B8", fontSize: 12, lineHeight: 1.5 }}>
+        🔐 Supabase URL/Key를 입력하면 모든 기기에서 데이터가 실시간 동기화됩니다.<br/>
+        Supabase 대시보드 → Project Settings → API에서 복사하세요.
+      </div>
+      <div>
+        <Label>Supabase URL</Label>
+        <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://xxx.supabase.co" style={{ fontFamily: "monospace", fontSize: 12 }} />
+      </div>
+      <div>
+        <Label>anon public Key</Label>
+        <Input value={key} onChange={e => setKey(e.target.value)} placeholder="eyJh..." style={{ fontFamily: "monospace", fontSize: 12 }} />
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={save} disabled={testing} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: testing ? "#444" : "linear-gradient(135deg, #66BB6A, #43A047)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: testing ? "wait" : "pointer" }}>{testing ? "⏳ 테스트 중..." : "✅ 저장 + 연결 테스트"}</button>
+        {status.ok && <button onClick={checkNow} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔍 진단</button>}
+        {(localStorage.getItem('_sb_url') || localStorage.getItem('_sb_key')) && <button onClick={clearConfig} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(244,67,54,0.25)", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑 삭제</button>}
+      </div>
+      <div style={{ padding: "10px", borderRadius: 8, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)", color: "#94A3B8", fontSize: 11, lineHeight: 1.6 }}>
+        <strong style={{ color: "#42A5F5" }}>💡 동기화가 안 될 때:</strong><br/>
+        1. Supabase → Database → Replication에서 <code style={{ color: "#FFA726" }}>app_state</code> 토글 ON<br/>
+        2. SQL Editor에서 RLS 정책: <code style={{ color: "#FFA726" }}>CREATE POLICY "Public all" ON app_state FOR ALL USING (true);</code><br/>
+        3. 콘솔(F12)에서 <code style={{ color: "#FFA726" }}>window._safeflow.checkConnection()</code>
+      </div>
+    </div>}
+  </Card>);
+}
+
 // ─── 공통 페이지 컴포넌트 (전체 일관성) ─────────────────────────────
 const PageContainer = ({ children, maxWidth = 800, accent = "#42A5F5" }) => (
   <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
@@ -6460,6 +6558,9 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
 
 
 
+      {/* 🔄 Supabase 동기화 설정 */}
+      <SupabaseSyncCard />
+
       {/* PWA 설치 */}
       <Card style={{ background: "linear-gradient(135deg, rgba(66,165,245,0.08), rgba(66,165,245,0.02))", border: "1px solid rgba(66,165,245,0.2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -7210,6 +7311,112 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
 
 export default function App() {
   const [fatalError, setFatalError] = useState(null);
+
+  // 🔄 Supabase 자동 연결 (npm install 불필요 - ESM CDN으로 동적 로드)
+  useEffect(() => {
+    if (window._supabaseInited) return;
+    window._supabaseInited = true;
+
+    (async () => {
+      try {
+        // 1. URL/Key 가져오기 (localStorage 우선, 다음 환경변수)
+        const url = localStorage.getItem('_sb_url') || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || '';
+        const key = localStorage.getItem('_sb_key') || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
+
+        if (!url || !key || !url.startsWith('http')) {
+          console.warn('[SAFEFLOW] ⚠️ Supabase 환경변수 미설정 - ⚙️관리 → Supabase 설정에서 입력하세요');
+          window._sbStatus = { ok: false, reason: 'no_config' };
+          window.dispatchEvent(new CustomEvent('sb-status'));
+          return;
+        }
+
+        console.log('[SAFEFLOW] Supabase 로딩 중...', url);
+        // 2. ESM CDN으로 Supabase 동적 로드 (npm install 불필요)
+        const mod = await import(/* @vite-ignore */ 'https://esm.sh/@supabase/supabase-js@2.39.0');
+        const supabase = mod.createClient(url, key, {
+          realtime: { params: { eventsPerSecond: 10 } }
+        });
+
+        // 3. window.storage 정의 (usePersist에서 호출)
+        window.storage = {
+          async get(k) {
+            try {
+              const { data, error } = await supabase.from('app_state').select('value').eq('key', k).maybeSingle();
+              if (error) { console.error('[storage.get]', k, error.message); return null; }
+              if (!data) return null;
+              const v = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
+              return { value: v };
+            } catch (e) { console.error('[storage.get] 예외:', e); return null; }
+          },
+          async set(k, v) {
+            try {
+              const json = typeof v === 'string' ? v : JSON.stringify(v);
+              let stored;
+              try { stored = JSON.parse(json); } catch { stored = json; }
+              const { error } = await supabase.from('app_state').upsert(
+                { key: k, value: stored, updated_at: new Date().toISOString() },
+                { onConflict: 'key' }
+              );
+              if (error) { console.error('[storage.set]', k, error.message); return null; }
+              return { value: json };
+            } catch (e) { console.error('[storage.set] 예외:', e); return null; }
+          },
+          async delete(k) {
+            try { await supabase.from('app_state').delete().eq('key', k); return { deleted: true }; }
+            catch { return null; }
+          },
+          async list(prefix) {
+            try {
+              let q = supabase.from('app_state').select('key');
+              if (prefix) q = q.like('key', `${prefix}%`);
+              const { data } = await q;
+              return { keys: (data || []).map(d => d.key) };
+            } catch { return null; }
+          },
+        };
+
+        // 4. Realtime 구독
+        supabase
+          .channel('app_state_changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, (payload) => {
+            const row = payload.new || payload.old;
+            if (!row?.key) return;
+            const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
+            window.dispatchEvent(new CustomEvent('supabase-sync', {
+              detail: { key: row.key, value: v }
+            }));
+          })
+          .subscribe((status) => {
+            console.log('[SAFEFLOW] Realtime:', status);
+            window._sbStatus = { ok: status === 'SUBSCRIBED', status };
+            window.dispatchEvent(new CustomEvent('sb-status'));
+            if (status === 'SUBSCRIBED') console.log('[SAFEFLOW] ✅ Realtime 구독 성공 - 기기간 동기화 활성');
+            if (status === 'CHANNEL_ERROR') console.error('[SAFEFLOW] ❌ Realtime 오류 - Database → Replication에서 app_state 토글 ON 필요');
+          });
+
+        // 5. 디버그 헬퍼
+        window._safeflow = {
+          async checkConnection() {
+            const { count, error } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
+            if (error) { console.error('❌ DB 접근 실패:', error.message); return false; }
+            console.log('✅ Supabase 정상 - app_state 레코드:', count); return true;
+          },
+          async listKeys() {
+            const { data } = await supabase.from('app_state').select('key, updated_at').order('updated_at', { ascending: false });
+            console.table(data); return data;
+          },
+        };
+
+        console.log('[SAFEFLOW] ✅ Supabase 연결 완료:', url);
+        window._sbStatus = { ok: true };
+        window.dispatchEvent(new CustomEvent('sb-status'));
+      } catch (e) {
+        console.error('[SAFEFLOW] ❌ Supabase 로드 실패:', e);
+        window._sbStatus = { ok: false, reason: 'load_error', error: String(e.message || e) };
+        window.dispatchEvent(new CustomEvent('sb-status'));
+      }
+    })();
+  }, []);
   
   if (fatalError) {
     return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif" }}>
