@@ -1733,7 +1733,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
 }
 
 // ─── Festival Status Page (축제관리) ─────────────────────────────
-function FestivalStatusPage({ settings, setSettings, session, accounts }) {
+function FestivalStatusPage({ settings, setSettings, session, accounts, setAccounts }) {
   const nowFSP = useNow(30000);
   const zones = settings.zones || [];
   const workSites = settings.workSites || [];
@@ -1909,7 +1909,23 @@ function FestivalStatusPage({ settings, setSettings, session, accounts }) {
           </div>
           <button onClick={() => {
             if (!newWorker.name) return;
-            const worker = { id: "w_" + Date.now(), name: newWorker.name, phone: newWorker.phone, type: "", role: newWorker.role, duty: "" };
+            const wid = "w_" + Date.now();
+            let worker = { id: wid, name: newWorker.name, phone: newWorker.phone, type: "", role: newWorker.role, duty: "" };
+            // 🔐 자동 계정 생성: 이름이 ID, 비밀번호 1234
+            if (setAccounts && accounts) {
+              const accountId = newWorker.name.trim();
+              const exists = accounts.find(a => a.id === accountId);
+              if (!exists) {
+                const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
+                const accRole = roleMap[newWorker.role] || "manager";
+                const fid = settings.festivalId || session?.festivalId || "default";
+                setAccounts(prev => [...prev, { id: accountId, password: simpleHash("1234"), name: newWorker.name, role: accRole, festivalId: fid, festivals: [fid], workerId: wid, siteId: site.id }]);
+                worker.accountId = accountId;
+                alert(`✅ 근무자 등록 완료\n\n👤 ${newWorker.name}\n🆔 로그인 ID: ${accountId}\n🔑 비밀번호: 1234`);
+              } else {
+                alert(`⚠️ 동일 ID 존재: ${accountId}\n근무자만 등록되었습니다.`);
+              }
+            }
             const ws = JSON.parse(JSON.stringify(settings.workSites || []));
             const si = ws.findIndex(s => s.id === site.id);
             if (si >= 0) { ws[si].workers = [...(ws[si].workers || []), worker]; setSettings(prev => ({ ...prev, workSites: ws })); }
@@ -2923,7 +2939,8 @@ function SearchModal({ open, onClose, settings, categories, onNavigate }) {
 
 // ─── 2.1: 근무자 통합 관리 (연락처/식수/무전기/근무지) ─────────────────
 function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) {
-  const sites = settings.sites || [];
+  const sites = settings.workSites || [];
+  const zones = settings.zones || [];
   const assets = settings.assets || [];
   const shifts = settings.shifts || [];
   const today = new Date().toISOString().slice(0, 10);
@@ -2936,7 +2953,9 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
   const [newW, setNewW] = useState({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" });
 
   // 모든 근무자 평탄화 + 무전기/근무 정보 결합
-  const allWorkers = sites.flatMap(s => (s.workers || []).map(w => {
+  const allWorkers = sites.flatMap(s => {
+    const zoneName = s.name || zones.find(z => z.id === s.zoneId)?.name || "미배치";
+    return (s.workers || []).map(w => {
     // 이 근무자에게 할당된 무전기 찾기
     const radios = [];
     assets.forEach(a => {
@@ -2953,12 +2972,13 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     return {
       ...w,
       siteId: s.id,
-      siteName: s.name,
+      siteName: zoneName,
       radios,
       onDuty: todayShift && !todayShift.checkOut,
       checkInTime: todayShift?.checkIn,
     };
-  }));
+  });
+  });
 
   // 필터/검색
   const filtered = allWorkers.filter(w => {
@@ -2983,16 +3003,16 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
   };
 
   const updateWorker = (siteId, workerId, changes) => {
-    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(w => w.id === workerId ? { ...w, ...changes } : w) } : s) }));
+    setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(w => w.id === workerId ? { ...w, ...changes } : w) } : s) }));
   };
   const removeWorker = (siteId, workerId) => {
     if (!confirm("근무자를 삭제하시겠습니까?\n(연결된 로그인 계정도 함께 삭제됩니다)")) return;
     // 근무자 삭제
     let removedWorker = null;
     setSettings(prev => {
-      const site = prev.sites.find(s => s.id === siteId);
+      const site = prev.workSites.find(s => s.id === siteId);
       removedWorker = site?.workers?.find(w => w.id === workerId);
-      return { ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: (s.workers || []).filter(w => w.id !== workerId) } : s) };
+      return { ...prev, workSites: prev.workSites.map(s => s.id === siteId ? { ...s, workers: (s.workers || []).filter(w => w.id !== workerId) } : s) };
     });
     // 연결된 계정도 삭제
     if (setAccounts && removedWorker?.accountId) {
@@ -3003,7 +3023,7 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     if (!newW.name) { alert("이름을 입력하세요."); return; }
     const wid = "w_"+Date.now();
     const w = { id: wid, name: newW.name, phone: newW.phone, role: newW.role, meals: parseInt(newW.meals) || 0, mealNote: newW.mealNote };
-    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: [...(s.workers || []), w] } : s) }));
+    setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => s.id === siteId ? { ...s, workers: [...(s.workers || []), w] } : s) }));
 
     // 🔐 자동 계정 생성: 이름이 ID, 비밀번호는 1234
     if (setAccounts && accounts) {
@@ -3017,7 +3037,7 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
         const newAcc = { id: accountId, password: simpleHash("1234"), name: newW.name, role: accRole, festivalId: fid, festivals: [fid], workerId: wid, siteId: siteId };
         setAccounts(prev => [...prev, newAcc]);
         // 근무자에 accountId 연결
-        setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(ww => ww.id === wid ? { ...ww, accountId } : ww) } : s) }));
+        setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(ww => ww.id === wid ? { ...ww, accountId } : ww) } : s) }));
         alert(`✅ 근무자 등록 완료\n\n👤 이름: ${newW.name}\n🆔 로그인 ID: ${accountId}\n🔑 비밀번호: 1234\n\n첫 로그인 후 비밀번호를 변경하도록 안내하세요.`);
       } else {
         alert(`⚠️ 이미 존재하는 ID입니다: ${accountId}\n근무자는 등록되었지만 계정은 생성되지 않았습니다.`);
@@ -3028,8 +3048,9 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
 
   // 식수 종합 (사이트별)
   const mealsBySite = sites.map(s => {
+    const zname = s.name || zones.find(z => z.id === s.zoneId)?.name || "미배치";
     const ws = (s.workers || []);
-    return { name: s.name, count: ws.length, meals: ws.reduce((sum, w) => sum + (parseInt(w.meals) || 0), 0) };
+    return { name: zname, count: ws.length, meals: ws.reduce((sum, w) => sum + (parseInt(w.meals) || 0), 0) };
   });
 
   // CSV 내보내기
@@ -3046,7 +3067,32 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
   };
 
   return (<PageContainer maxWidth={900}>
-    <PageHeader icon="👥" title="근무자 관리" subtitle={`총 ${stats.total}명 · 근무중 ${stats.onDuty}명`} accent="#42A5F5" action={canEdit && stats.total > 0 ? <Btn variant="secondary" icon="📥" onClick={exportCSV} style={{ padding: "8px 12px", fontSize: 12 }}>CSV</Btn> : null} />
+    <PageHeader icon="👥" title="근무자 관리" subtitle={`총 ${stats.total}명 · 근무중 ${stats.onDuty}명`} accent="#42A5F5" action={canEdit && stats.total > 0 ? <div style={{ display: "flex", gap: 6 }}>
+      {setAccounts && (() => {
+        const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
+        if (noAcc === 0) return null;
+        return <Btn variant="primary" color="#66BB6A" icon="🔐" onClick={() => {
+          if (!confirm(`계정이 없는 근무자 ${noAcc}명에 대해 일괄로 계정을 생성합니다.\n\n로그인 ID: 이름\n비밀번호: 1234\n\n진행할까요?`)) return;
+          const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
+          const fid = settings.festivalId || session?.festivalId || "default";
+          const newAccs = [];
+          let created = 0, skipped = 0;
+          allWorkers.forEach(w => {
+            if (w.accountId || accounts?.find(a => a.id === w.name)) { skipped++; return; }
+            const accRole = roleMap[w.role] || "manager";
+            newAccs.push({ id: w.name, password: simpleHash("1234"), name: w.name, role: accRole, festivalId: fid, festivals: [fid], workerId: w.id, siteId: w.siteId });
+            created++;
+          });
+          if (newAccs.length > 0) {
+            setAccounts(prev => [...prev, ...newAccs]);
+            // 근무자에도 accountId 연결
+            setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
+          }
+          alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
+        }} style={{ padding: "8px 12px", fontSize: 12 }}>계정생성 ({noAcc})</Btn>;
+      })()}
+      <Btn variant="secondary" icon="📥" onClick={exportCSV} style={{ padding: "8px 12px", fontSize: 12 }}>CSV</Btn>
+    </div> : null} />
 
     {/* 통계 카드 */}
     <Card>
@@ -3070,8 +3116,8 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     {/* 근무지 필터 */}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
       <button onClick={() => setFilter("all")} style={{ padding: "8px 14px", borderRadius: 16, border: filter === "all" ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === "all" ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === "all" ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>전체 ({allWorkers.length})</button>
-      {sites.filter(s => s.name).map(s => { const cnt = allWorkers.filter(w => w.siteId === s.id).length; return (
-        <button key={s.id} onClick={() => setFilter(s.id)} style={{ padding: "8px 14px", borderRadius: 16, border: filter === s.id ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === s.id ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === s.id ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📍 {s.name} ({cnt})</button>
+      {sites.map(s => { const zname = s.name || zones.find(z => z.id === s.zoneId)?.name || '미배치'; const cnt = allWorkers.filter(w => w.siteId === s.id).length; if (cnt === 0 && !s.name) return null; return (
+        <button key={s.id} onClick={() => setFilter(s.id)} style={{ padding: "8px 14px", borderRadius: 16, border: filter === s.id ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === s.id ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === s.id ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📍 {zname} ({cnt})</button>
       ); })}
     </div>
 
@@ -3181,9 +3227,9 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     {canEdit && filtered.length > 0 && filter === "all" && <Card style={{ background: "rgba(33,150,243,0.04)", border: "1px dashed rgba(33,150,243,0.3)" }}>
       <div style={{ color: "#42A5F5", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>➕ 근무자 추가</div>
       {!addSiteId ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {sites.filter(s => s.name).map(s => <button key={s.id} onClick={() => setAddSiteId(s.id)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {s.name}</button>)}
+        {sites.map(s => { const zname = s.name || zones.find(z => z.id === s.zoneId)?.name || "미배치"; if (!s.name && !s.zoneId) return null; return <button key={s.id} onClick={() => setAddSiteId(s.id)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {zname}</button>; })}
       </div> : <div style={{ display: "grid", gap: 8 }}>
-        <div style={{ color: "#94A3B8", fontSize: 12 }}>📍 {sites.find(s => s.id === addSiteId)?.name}</div>
+        <div style={{ color: "#94A3B8", fontSize: 12 }}>📍 {(() => { const s = sites.find(ss => ss.id === addSiteId); return s?.name || zones.find(z => z.id === s?.zoneId)?.name || "미배치"; })()}</div>
         <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.2)" }}>
           <div style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>🔐 자동 계정 생성</div>
           <div style={{ color: "#94A3B8", fontSize: 11 }}>로그인 ID = <strong style={{ color: "#66BB6A" }}>{newW.name || "이름"}</strong> · 비밀번호 = <strong style={{ color: "#66BB6A" }}>1234</strong></div>
@@ -5249,9 +5295,25 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           const phone = document.getElementById("sw-phone")?.value || "";
           const type = document.getElementById("sw-type")?.value || "";
           const role = document.getElementById("sw-role")?.value || "";
-          const accountId = document.getElementById("sw-account")?.value || null;
-          const worker = { id: "w_" + Date.now(), name, phone, type, role, duty: "", accountId };
+          let accountId = document.getElementById("sw-account")?.value || null;
+          const wid = "w_" + Date.now();
           const siteId = document.getElementById("sw-site")?.value || "_pool";
+
+          // 🔐 자동 계정 생성: 계정 미선택 시 이름으로 새 계정 생성
+          let createdNewAccount = false;
+          if (!accountId && setAccounts && accounts) {
+            const exists = accounts.find(a => a.id === name.trim());
+            if (!exists) {
+              const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
+              const accRole = roleMap[role] || "manager";
+              const fid = settings.festivalId || "default";
+              accountId = name.trim();
+              setAccounts(prev => [...prev, { id: accountId, password: simpleHash("1234"), name, role: accRole, festivalId: fid, festivals: [fid], workerId: wid, siteId }]);
+              createdNewAccount = true;
+            }
+          }
+
+          const worker = { id: wid, name, phone, type, role, duty: "", accountId };
           const ws = [...(settings.workSites || [])];
           let target = ws.find(s => s.id === siteId);
           if (!target) { target = ws.find(s => s.id === "_pool"); }
@@ -5262,8 +5324,8 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
           document.getElementById("sw-name").value = "";
           document.getElementById("sw-phone").value = "";
           const siteName = siteId === "_pool" ? "미배치" : target.name;
-          alert("✅ " + name + " 등록 완료 → " + siteName);
-        }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #4CAF50, #388E3C)", color: "#fff", boxShadow: "0 4px 12px rgba(76,175,80,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>👤 근무자 등록</button>
+          alert("✅ " + name + " 등록 완료 → " + siteName + (createdNewAccount ? `\n\n🔐 자동 계정 생성됨\n🆔 ID: ${accountId}\n🔑 비밀번호: 1234` : ""));
+        }} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #4CAF50, #388E3C)", color: "#fff", boxShadow: "0 4px 12px rgba(76,175,80,0.3)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>👤 근무자 등록 (계정 미선택 시 자동 생성)</button>
       </Card>
 
       {/* ② 배치 관리 (드래그) */}
@@ -7591,7 +7653,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "workers" && <WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
       {page === "reports" && <ReportsPage settings={settings} setSettings={setSettings} session={session} categories={categories} alerts={alerts} />}
       {page === "qrcode" && <QRPage settings={settings} setSettings={setSettings} session={session} />}
-      {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
+      {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
           <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 14px" }}>👤 계정 관리</h2>
