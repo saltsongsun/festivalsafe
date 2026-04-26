@@ -3983,10 +3983,29 @@ function HeatmapPage({ settings, setSettings, session }) {
   const fileRef = useRef(null);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
   const zones = settings.zones || [];
-  const mapAreas = settings.mapAreas || []; // [{id, zoneId, points: [{x,y}]}]
   const congestion = settings.zoneCongestion || [];
   const workSites = settings.workSites || [];
   const assets = settings.assets || [];
+
+  // 🗺️ 지도 이미지/영역을 별도 키로 분리 (다른 데이터와 같은 fid 패턴 사용)
+  const fid = session?.festivalId || "default";
+  const [mapImage, setMapImage] = usePersist(`${fid}_map_img_v1`, null);
+  const [mapAreas, setMapAreas] = usePersist(`${fid}_map_areas_v1`, []);
+
+  // 마이그레이션: settings.mapImage / settings.mapAreas → 별도 키 (한번만)
+  useEffect(() => {
+    if (!mapImage && settings.mapImage) {
+      console.log("[히트맵] 기존 도면 마이그레이션");
+      setMapImage(settings.mapImage);
+    }
+    if ((!mapAreas || mapAreas.length === 0) && settings.mapAreas?.length > 0) {
+      console.log("[히트맵] 기존 영역 마이그레이션:", settings.mapAreas.length + "개");
+      setMapAreas(settings.mapAreas);
+    }
+    if (settings.mapImage || settings.mapAreas?.length > 0) {
+      setTimeout(() => setSettings(prev => { const n = { ...prev }; delete n.mapImage; delete n.mapAreas; return n; }), 1000);
+    }
+  }, []);
 
   // 구역별 근무자/무전기 정보 자동 집계
   const getAreaInfo = (zoneId) => {
@@ -4006,20 +4025,6 @@ function HeatmapPage({ settings, setSettings, session }) {
     });
     return { sites: sitesInZone, workers, workerCount: workers.length, onDutyCount, radios, radioCount: radios.length };
   };
-
-  // 🗺️ 지도 이미지를 별도 키로 분리 (settings와 분리해서 저장 - 동기화 안정성)
-  const fid = session?.festivalId || settings?.festivalId || "default";
-  const [mapImage, setMapImage] = usePersist(`${fid}_map_img_v1`, null);
-
-  // 마이그레이션: settings.mapImage → 별도 키 (한번만)
-  useEffect(() => {
-    if (!mapImage && settings.mapImage) {
-      console.log("[히트맵] 기존 도면 이미지 마이그레이션 중...");
-      setMapImage(settings.mapImage);
-      // settings.mapImage는 그대로 두어도 됨 (이중 저장 회피용으로 다음 settings 업데이트 시 자연스럽게 정리)
-      setSettings(prev => { const n = { ...prev }; delete n.mapImage; return n; });
-    }
-  }, []);
 
   // 이미지 압축 - 큰 도면도 빠른 동기화 가능
   const compressImage = (file) => new Promise((resolve, reject) => {
@@ -4082,7 +4087,7 @@ function HeatmapPage({ settings, setSettings, session }) {
   const finishDrawing = () => {
     if (drawingPoints.length < 3) { alert("최소 3개 점이 필요합니다."); return; }
     const newArea = { id: "ma_" + Date.now(), zoneId: drawingZoneId, points: drawingPoints };
-    setSettings({ ...settings, mapAreas: [...mapAreas, newArea] });
+    setMapAreas(prev => [...(prev || []), newArea]);
     setDrawingPoints([]); setDrawingZoneId(""); setMode("view");
     alert("✅ 영역이 저장되었습니다.");
   };
@@ -4097,7 +4102,7 @@ function HeatmapPage({ settings, setSettings, session }) {
 
   const removeArea = (id) => {
     if (confirm("이 영역을 삭제하시겠습니까?")) {
-      setSettings({ ...settings, mapAreas: mapAreas.filter(a => a.id !== id) });
+      setMapAreas(prev => (prev || []).filter(a => a.id !== id));
       setSelectedAreaId(null);
     }
   };
@@ -4126,7 +4131,7 @@ function HeatmapPage({ settings, setSettings, session }) {
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <style>{`@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor) drop-shadow(0 0 32px currentColor)}}`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <PageHeader icon="🗺️" title="히트맵 지도" subtitle="구역별 실시간 혼잡도 시각화" accent="#42A5F5" />
+      <PageHeader icon="🗺️" title="히트맵 지도" subtitle={`도면 ${mapImage ? "✓" : "X"} · 영역 ${mapAreas?.length || 0}개`} accent="#42A5F5" action={<button onClick={() => location.reload()} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>🔄 새로고침</button>} />
 
       {!mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
