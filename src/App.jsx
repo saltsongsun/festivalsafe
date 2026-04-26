@@ -474,13 +474,15 @@ function SupabaseSyncCard() {
     if (!url || !key) { alert('URL과 Key를 모두 입력하세요'); return; }
     if (!url.startsWith('http')) { alert('URL은 https://로 시작해야 합니다'); return; }
     setTesting(true);
-    // 테스트 연결
+    // REST API로 직접 테스트 (vite 빌드 호환)
     try {
-      const mod = await import(/* @vite-ignore */ 'https://esm.sh/@supabase/supabase-js@2.39.0');
-      const sb = mod.createClient(url, key);
-      const { error } = await sb.from('app_state').select('key', { count: 'exact', head: true });
-      if (error) {
-        alert(`❌ 연결 실패\n\n${error.message}\n\n확인 사항:\n• URL/Key가 정확한가\n• app_state 테이블이 생성되어 있는가\n• RLS 정책이 SELECT 허용하는가`);
+      const cleanUrl = url.replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/app_state?select=key&limit=1`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        alert(`❌ 연결 실패 (HTTP ${res.status})\n\n${text.slice(0, 200)}\n\n확인 사항:\n• URL/Key가 정확한가\n• app_state 테이블이 생성되어 있는가\n• RLS 정책이 SELECT 허용하는가`);
         setTesting(false);
         return;
       }
@@ -489,7 +491,7 @@ function SupabaseSyncCard() {
       alert('✅ 연결 성공!\n\n페이지를 새로고침합니다.');
       location.reload();
     } catch (e) {
-      alert(`❌ 오류: ${e.message}`);
+      alert(`❌ 오류: ${e.message}\n\nURL이 정확한지, 네트워크가 연결되어 있는지 확인하세요.`);
       setTesting(false);
     }
   };
