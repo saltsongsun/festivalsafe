@@ -2922,7 +2922,7 @@ function SearchModal({ open, onClose, settings, categories, onNavigate }) {
 }
 
 // ─── 2.1: 근무자 통합 관리 (연락처/식수/무전기/근무지) ─────────────────
-function WorkersPage({ settings, setSettings, session }) {
+function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) {
   const sites = settings.sites || [];
   const assets = settings.assets || [];
   const shifts = settings.shifts || [];
@@ -2986,13 +2986,43 @@ function WorkersPage({ settings, setSettings, session }) {
     setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(w => w.id === workerId ? { ...w, ...changes } : w) } : s) }));
   };
   const removeWorker = (siteId, workerId) => {
-    if (!confirm("근무자를 삭제하시겠습니까?")) return;
-    setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: (s.workers || []).filter(w => w.id !== workerId) } : s) }));
+    if (!confirm("근무자를 삭제하시겠습니까?\n(연결된 로그인 계정도 함께 삭제됩니다)")) return;
+    // 근무자 삭제
+    let removedWorker = null;
+    setSettings(prev => {
+      const site = prev.sites.find(s => s.id === siteId);
+      removedWorker = site?.workers?.find(w => w.id === workerId);
+      return { ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: (s.workers || []).filter(w => w.id !== workerId) } : s) };
+    });
+    // 연결된 계정도 삭제
+    if (setAccounts && removedWorker?.accountId) {
+      setAccounts(prev => prev.filter(a => a.id !== removedWorker.accountId && a.workerId !== workerId));
+    }
   };
   const addWorker = (siteId) => {
     if (!newW.name) { alert("이름을 입력하세요."); return; }
-    const w = { id: "w_"+Date.now(), name: newW.name, phone: newW.phone, role: newW.role, meals: parseInt(newW.meals) || 0, mealNote: newW.mealNote };
+    const wid = "w_"+Date.now();
+    const w = { id: wid, name: newW.name, phone: newW.phone, role: newW.role, meals: parseInt(newW.meals) || 0, mealNote: newW.mealNote };
     setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: [...(s.workers || []), w] } : s) }));
+
+    // 🔐 자동 계정 생성: 이름이 ID, 비밀번호는 1234
+    if (setAccounts && accounts) {
+      const accountId = newW.name.trim();
+      const exists = accounts.find(a => a.id === accountId);
+      if (!exists) {
+        // 역할 자동 매핑
+        const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager" };
+        const accRole = roleMap[newW.role] || "manager";
+        const fid = settings.festivalId || session?.festivalId || "default";
+        const newAcc = { id: accountId, password: simpleHash("1234"), name: newW.name, role: accRole, festivalId: fid, festivals: [fid], workerId: wid, siteId: siteId };
+        setAccounts(prev => [...prev, newAcc]);
+        // 근무자에 accountId 연결
+        setSettings(prev => ({ ...prev, sites: prev.sites.map(s => s.id === siteId ? { ...s, workers: s.workers.map(ww => ww.id === wid ? { ...ww, accountId } : ww) } : s) }));
+        alert(`✅ 근무자 등록 완료\n\n👤 이름: ${newW.name}\n🆔 로그인 ID: ${accountId}\n🔑 비밀번호: 1234\n\n첫 로그인 후 비밀번호를 변경하도록 안내하세요.`);
+      } else {
+        alert(`⚠️ 이미 존재하는 ID입니다: ${accountId}\n근무자는 등록되었지만 계정은 생성되지 않았습니다.`);
+      }
+    }
     setNewW({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" }); setAddSiteId(null);
   };
 
@@ -3081,6 +3111,11 @@ function WorkersPage({ settings, setSettings, session }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn variant="primary" icon="✅" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>완료</Btn>
+          {w.accountId && setAccounts && <Btn variant="outline" color="#FFA726" icon="🔑" onClick={() => {
+            if (!confirm(`${w.name}님의 비밀번호를 1234로 초기화할까요?`)) return;
+            setAccounts(prev => prev.map(a => a.id === w.accountId ? { ...a, password: simpleHash("1234") } : a));
+            alert(`✅ 비밀번호가 1234로 초기화되었습니다.`);
+          }}>비번초기화</Btn>}
           <Btn variant="danger" icon="🗑" onClick={() => { removeWorker(w.siteId, w.id); setEditId(null); }}>삭제</Btn>
         </div>
       </Card>);
@@ -3102,6 +3137,7 @@ function WorkersPage({ settings, setSettings, session }) {
             <div style={{ color: "#94A3B8", fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
               <span>📍 {w.siteName}</span>
               {w.phone && <a href={`tel:${w.phone}`} style={{ color: "#42A5F5", textDecoration: "none" }}>📞 {w.phone}</a>}
+              {w.accountId && <span style={{ color: "#66BB6A" }}>🆔 {w.accountId}</span>}
             </div>
           </div>
           {/* 액션 */}
@@ -3148,8 +3184,12 @@ function WorkersPage({ settings, setSettings, session }) {
         {sites.filter(s => s.name).map(s => <button key={s.id} onClick={() => setAddSiteId(s.id)} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📍 {s.name}</button>)}
       </div> : <div style={{ display: "grid", gap: 8 }}>
         <div style={{ color: "#94A3B8", fontSize: 12 }}>📍 {sites.find(s => s.id === addSiteId)?.name}</div>
+        <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.2)" }}>
+          <div style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>🔐 자동 계정 생성</div>
+          <div style={{ color: "#94A3B8", fontSize: 11 }}>로그인 ID = <strong style={{ color: "#66BB6A" }}>{newW.name || "이름"}</strong> · 비밀번호 = <strong style={{ color: "#66BB6A" }}>1234</strong></div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <Input placeholder="이름" value={newW.name} onChange={e => setNewW({ ...newW, name: e.target.value })} />
+          <Input placeholder="이름 (= 로그인 ID)" value={newW.name} onChange={e => setNewW({ ...newW, name: e.target.value })} />
           <Input placeholder="010-0000-0000" value={newW.phone} onChange={e => setNewW({ ...newW, phone: e.target.value })} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr", gap: 8 }}>
@@ -7548,7 +7588,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "location" && <LocationPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "assets" && <AssetsPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "shifts" && <ShiftsPage settings={settings} setSettings={setSettings} session={session} />}
-      {page === "workers" && <WorkersPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "workers" && <WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
       {page === "reports" && <ReportsPage settings={settings} setSettings={setSettings} session={session} categories={categories} alerts={alerts} />}
       {page === "qrcode" && <QRPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
