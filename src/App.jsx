@@ -510,6 +510,37 @@ function SupabaseSyncCard() {
     }
   };
 
+  // 🔄 강제 동기화 - 모든 데이터 다시 가져오기
+  const [forceSyncing, setForceSyncing] = useState(false);
+  const [lastForceSync, setLastForceSync] = useState(null);
+  const forceSync = async () => {
+    if (!window.storage) { alert('Supabase 미연결'); return; }
+    setForceSyncing(true);
+    try {
+      // 모든 키 목록
+      const list = await window.storage.list();
+      if (!list?.keys) { alert('동기화 실패'); setForceSyncing(false); return; }
+      let count = 0;
+      for (const k of list.keys) {
+        try {
+          const r = await window.storage.get(k);
+          if (r?.value) {
+            // localStorage 업데이트 + 이벤트 발생
+            localStorage.setItem(k, r.value);
+            window.dispatchEvent(new CustomEvent('supabase-sync', { detail: { key: k, value: r.value } }));
+            count++;
+          }
+        } catch {}
+      }
+      setLastForceSync(new Date());
+      alert(`✅ ${count}개 키 동기화 완료\n페이지를 새로고침하면 즉시 반영됩니다.`);
+    } catch (e) {
+      alert('오류: ' + e.message);
+    } finally {
+      setForceSyncing(false);
+    }
+  };
+
   // 상태 컬러
   const statusInfo = status.ok === true ? { color: "#66BB6A", bg: "rgba(76,175,80,0.08)", border: "rgba(76,175,80,0.3)", icon: "✅", label: "동기화 작동중" }
                   : status.ok === false ? { color: "#EF5350", bg: "rgba(244,67,54,0.06)", border: "rgba(244,67,54,0.25)", icon: "❌", label: status.reason === 'no_config' ? "설정 필요" : "연결 실패" }
@@ -543,6 +574,8 @@ function SupabaseSyncCard() {
         {status.ok && <button onClick={checkNow} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(33,150,243,0.3)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔍 진단</button>}
         {(localStorage.getItem('_sb_url') || localStorage.getItem('_sb_key')) && <button onClick={clearConfig} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(244,67,54,0.25)", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑 삭제</button>}
       </div>
+      {status.ok && <button onClick={forceSync} disabled={forceSyncing} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,167,38,0.3)", background: forceSyncing ? "rgba(255,167,38,0.05)" : "rgba(255,167,38,0.08)", color: "#FFA726", fontSize: 13, fontWeight: 700, cursor: forceSyncing ? "wait" : "pointer" }}>{forceSyncing ? "⏳ 동기화 중..." : "🔄 지금 강제 동기화"}</button>}
+      {lastForceSync && <div style={{ color: "#94A3B8", fontSize: 11, textAlign: "center" }}>마지막 동기화: {lastForceSync.toLocaleTimeString("ko-KR")}</div>}
       <div style={{ padding: "10px", borderRadius: 8, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)", color: "#94A3B8", fontSize: 11, lineHeight: 1.6 }}>
         <strong style={{ color: "#42A5F5" }}>💡 동기화가 안 될 때:</strong><br/>
         1. Supabase → Database → Replication에서 <code style={{ color: "#FFA726" }}>app_state</code> 토글 ON<br/>
@@ -3941,12 +3974,36 @@ function HeatmapPage({ settings, setSettings, session }) {
   const [drawingZoneId, setDrawingZoneId] = useState("");
   const [selectedAreaId, setSelectedAreaId] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [areaDetailId, setAreaDetailId] = useState(null);
+  const [showLabels, setShowLabels] = useState(true);
+  const [showWorkers, setShowWorkers] = useState(true);
   const mapRef = useRef(null);
   const fileRef = useRef(null);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
   const zones = settings.zones || [];
   const mapAreas = settings.mapAreas || []; // [{id, zoneId, points: [{x,y}]}]
   const congestion = settings.zoneCongestion || [];
+  const workSites = settings.workSites || [];
+  const assets = settings.assets || [];
+
+  // 구역별 근무자/무전기 정보 자동 집계
+  const getAreaInfo = (zoneId) => {
+    const sitesInZone = workSites.filter(s => s.zoneId === zoneId);
+    const workers = sitesInZone.flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name || zones.find(z => z.id === s.zoneId)?.name || "?" })));
+    const onDutyCount = workers.filter(w => (settings.shifts || []).some(sh => sh.workerId === w.id && sh.date === new Date().toISOString().slice(0, 10) && !sh.checkOut)).length;
+    // 이 구역 근무자에게 할당된 무전기
+    const radios = [];
+    assets.forEach(a => {
+      if (a.trackUnits && a.units) {
+        a.units.forEach(u => {
+          if (u.status === "assigned" && workers.find(w => w.id === u.assignedTo || w.name === u.assignedToName)) {
+            radios.push({ assetName: a.name, number: u.number, assignedToName: u.assignedToName });
+          }
+        });
+      }
+    });
+    return { sites: sitesInZone, workers, workerCount: workers.length, onDutyCount, radios, radioCount: radios.length };
+  };
 
   // 🗺️ 지도 이미지를 별도 키로 분리 (settings와 분리해서 저장 - 동기화 안정성)
   const fid = session?.festivalId || settings?.festivalId || "default";
@@ -4152,15 +4209,22 @@ function HeatmapPage({ settings, setSettings, session }) {
             </>}
           </svg>
 
-          {/* 영역 라벨 (HTML) */}
-          {mapAreas.map(area => {
+          {/* 영역 라벨 (HTML) - 클릭 가능 + 근무자/무전기 정보 */}
+          {showLabels && mapAreas.map(area => {
             const zone = zones.find(z => z.id === area.zoneId);
             if (!zone) return null;
             const lv = getCongestionLevel(area.zoneId);
             const color = CL[lv];
             const center = getAreaCenter(area.points);
-            return (<div key={area.id} style={{ position: "absolute", left: `${center.x}%`, top: `${center.y}%`, transform: "translate(-50%, -50%)", pointerEvents: "none" }}>
-              <div style={{ padding: "4px 10px", borderRadius: 6, background: `${color}DD`, border: "1.5px solid #fff", color: "#fff", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", boxShadow: `0 0 12px ${color}99` }}>{zone.name}</div>
+            const info = getAreaInfo(area.zoneId);
+            return (<div key={area.id} onClick={(e) => { if (mode === "view") { e.stopPropagation(); setAreaDetailId(area.zoneId); } }} style={{ position: "absolute", left: `${center.x}%`, top: `${center.y}%`, transform: "translate(-50%, -50%)", pointerEvents: mode === "view" ? "auto" : "none", cursor: mode === "view" ? "pointer" : "default", zIndex: 5 }}>
+              <div style={{ padding: "5px 10px", borderRadius: 8, background: `${color}EE`, border: "1.5px solid #fff", color: "#fff", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", boxShadow: `0 0 16px ${color}AA, 0 2px 8px rgba(0,0,0,0.3)`, textAlign: "center", minWidth: 80 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2 }}>📍 {zone.name}</div>
+                {showWorkers && (info.workerCount > 0 || info.radioCount > 0) && <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.95, display: "flex", justifyContent: "center", gap: 6 }}>
+                  {info.workerCount > 0 && <span>👥 {info.workerCount}{info.onDutyCount > 0 ? `(${info.onDutyCount})` : ""}</span>}
+                  {info.radioCount > 0 && <span>📻 {info.radioCount}</span>}
+                </div>}
+              </div>
             </div>);
           })}
 
@@ -4180,9 +4244,9 @@ function HeatmapPage({ settings, setSettings, session }) {
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{unplacedZones.map(z => <span key={z.id} style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "#94A3B8", fontSize: 11 }}>{z.name}</span>)}</div>
         </div>}
 
-        {/* 통계 */}
+        {/* 통계 + 표시 토글 */}
         <Card style={{ marginTop: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center", marginBottom: 12 }}>
             {["smooth", "crowded", "danger"].map(lv => {
               const count = mapAreas.filter(a => getCongestionLevel(a.zoneId) === lv).length;
               const labels = { smooth: "원활", crowded: "혼잡", danger: "위험" };
@@ -4192,7 +4256,86 @@ function HeatmapPage({ settings, setSettings, session }) {
               </div>;
             })}
           </div>
+          <div style={{ paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setShowLabels(!showLabels)} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: showLabels ? "1.5px solid rgba(33,150,243,0.5)" : "1px solid rgba(255,255,255,0.1)", background: showLabels ? "rgba(33,150,243,0.08)" : "rgba(255,255,255,0.02)", color: showLabels ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showLabels ? "👁️ 라벨 ON" : "👁️ 라벨 OFF"}</button>
+            <button onClick={() => setShowWorkers(!showWorkers)} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: showWorkers ? "1.5px solid rgba(76,175,80,0.5)" : "1px solid rgba(255,255,255,0.1)", background: showWorkers ? "rgba(76,175,80,0.08)" : "rgba(255,255,255,0.02)", color: showWorkers ? "#66BB6A" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showWorkers ? "👥 인력정보 ON" : "👥 인력정보 OFF"}</button>
+          </div>
         </Card>
+
+        {/* 영역 클릭 → 상세 모달 */}
+        {areaDetailId && (() => {
+          const zone = zones.find(z => z.id === areaDetailId);
+          if (!zone) return null;
+          const info = getAreaInfo(areaDetailId);
+          const lv = getCongestionLevel(areaDetailId);
+          const color = CL[lv];
+          return (<div onClick={() => setAreaDetailId(null)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, maxHeight: "85vh", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: "20px 20px 0 0", padding: "16px 16px 20px", overflow: "auto", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 50, height: 50, borderRadius: 12, background: `${color}25`, border: `1px solid ${color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📍</div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ color: "#E2E8F0", fontSize: 17, fontWeight: 700, margin: 0 }}>{zone.name}</h3>
+                  <div style={{ color, fontSize: 12, fontWeight: 700, marginTop: 2 }}>● {lv === "smooth" ? "원활" : lv === "crowded" ? "혼잡" : "위험"}</div>
+                </div>
+                <button onClick={() => setAreaDetailId(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>✕</button>
+              </div>
+
+              {/* 통계 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
+                <div style={{ padding: "8px 6px", borderRadius: 8, background: "rgba(33,150,243,0.05)", border: "1px solid rgba(33,150,243,0.15)", textAlign: "center" }}>
+                  <div style={{ color: "#42A5F5", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{info.sites.length}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 10 }}>📍 근무지</div>
+                </div>
+                <div style={{ padding: "8px 6px", borderRadius: 8, background: "rgba(33,150,243,0.05)", border: "1px solid rgba(33,150,243,0.15)", textAlign: "center" }}>
+                  <div style={{ color: "#42A5F5", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{info.workerCount}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 10 }}>👥 인력</div>
+                </div>
+                <div style={{ padding: "8px 6px", borderRadius: 8, background: "rgba(76,175,80,0.05)", border: "1px solid rgba(76,175,80,0.15)", textAlign: "center" }}>
+                  <div style={{ color: "#66BB6A", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{info.onDutyCount}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 10 }}>🟢 근무중</div>
+                </div>
+                <div style={{ padding: "8px 6px", borderRadius: 8, background: "rgba(171,71,188,0.05)", border: "1px solid rgba(171,71,188,0.15)", textAlign: "center" }}>
+                  <div style={{ color: "#AB47BC", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{info.radioCount}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 10 }}>📻 무전기</div>
+                </div>
+              </div>
+
+              {/* 근무지 목록 */}
+              {info.sites.length > 0 && <div style={{ marginBottom: 14 }}>
+                <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>📍 근무지</div>
+                {info.sites.map(s => (<div key={s.id} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", marginBottom: 4 }}>
+                  <div style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 600 }}>{s.name || zone.name}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>👥 {(s.workers || []).length}명 · 상태 {s.status === "active" ? "🟢 가동" : s.status === "warning" ? "🟡 주의" : "⚪ 대기"}</div>
+                </div>))}
+              </div>}
+
+              {/* 근무자 명단 */}
+              {info.workers.length > 0 ? <div>
+                <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>👥 근무자 명단 ({info.workers.length}명)</div>
+                {info.workers.map(w => {
+                  const isOnDuty = (settings.shifts || []).some(sh => sh.workerId === w.id && sh.date === new Date().toISOString().slice(0, 10) && !sh.checkOut);
+                  // 무전기 찾기
+                  const myRadios = [];
+                  assets.forEach(a => { if (a.trackUnits && a.units) a.units.forEach(u => { if (u.assignedTo === w.id || u.assignedToName === w.name) myRadios.push(`${a.name} #${u.number}`); }); });
+                  return (<div key={w.id} style={{ padding: "10px 12px", borderRadius: 10, background: isOnDuty ? "rgba(76,175,80,0.05)" : "rgba(255,255,255,0.03)", border: `1px solid ${isOnDuty ? "rgba(76,175,80,0.2)" : "rgba(255,255,255,0.04)"}`, marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14 }}>{isOnDuty ? "🟢" : "👤"}</span>
+                      <span style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 700 }}>{w.name}</span>
+                      <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 10, fontWeight: 600 }}>{w.role || "운영"}</span>
+                      {isOnDuty && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(76,175,80,0.15)", color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>● 근무중</span>}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 11, color: "#94A3B8" }}>
+                      {w.phone && <a href={`tel:${w.phone}`} style={{ color: "#42A5F5", textDecoration: "none" }}>📞 {w.phone}</a>}
+                      <span>📍 {w.siteName}</span>
+                      {myRadios.length > 0 && <span style={{ color: "#AB47BC" }}>📻 {myRadios.join(", ")}</span>}
+                    </div>
+                  </div>);
+                })}
+              </div> : <EmptyState icon="👥" title="배치된 근무자가 없습니다" description="⚙️ 인력관리에서 이 구역에 근무자를 배치하세요" />}
+            </div>
+          </div>);
+        })()}
       </>}
     </div>
   </div>);
