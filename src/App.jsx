@@ -2946,6 +2946,40 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
   const today = new Date().toISOString().slice(0, 10);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
 
+  // 토스트
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  // 무전기 할당 모달
+  const [radioModalWorker, setRadioModalWorker] = useState(null);
+
+  // 무전기 할당/회수
+  const assignRadio = (worker, assetId, unitId) => {
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => {
+      if (a.id !== assetId) return a;
+      const newUnits = (a.units || []).map(u => u.id === unitId ? { ...u, status: "assigned", assignedTo: worker.id, assignedToName: worker.name, history: [...(u.history || []), { ts: Date.now(), action: `${worker.name}에게 할당`, by: session?.name || "?" }] } : u);
+      const newQty = newUnits.filter(u => u.status === "available").length;
+      return { ...a, units: newUnits, qty: newQty };
+    }) }));
+    const unit = assets.find(a => a.id === assetId)?.units?.find(u => u.id === unitId);
+    showToast(`📻 ${worker.name}님께 #${unit?.number} 할당 완료`);
+  };
+
+  const returnRadio = (assetId, unitId) => {
+    const asset = assets.find(a => a.id === assetId);
+    const unit = asset?.units?.find(u => u.id === unitId);
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => {
+      if (a.id !== assetId) return a;
+      const newUnits = (a.units || []).map(u => u.id === unitId ? { ...u, status: "available", assignedTo: null, assignedToName: null, history: [...(u.history || []), { ts: Date.now(), action: "반납", by: session?.name || "?" }] } : u);
+      const newQty = newUnits.filter(u => u.status === "available").length;
+      return { ...a, units: newUnits, qty: newQty };
+    }) }));
+    showToast(`📥 #${unit?.number} 반납 완료`, "info");
+  };
+
   const [filter, setFilter] = useState("all"); // all | siteId
   const [search, setSearch] = useState("");
   const [editId, setEditId] = useState(null); // {siteId, workerId}
@@ -2962,7 +2996,7 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
       if (a.trackUnits && a.units) {
         a.units.forEach(u => {
           if (u.assignedTo === w.id || u.assignedToName === w.name) {
-            radios.push({ assetName: a.name, number: u.number, category: a.category });
+            radios.push({ assetId: a.id, unitId: u.id, assetName: a.name, number: u.number, category: a.category });
           }
         });
       }
@@ -3203,16 +3237,22 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
             {w.mealNote && <div style={{ color: "#FFA726", fontSize: 10, marginTop: 2, opacity: 0.8 }}>📝 {w.mealNote}</div>}
           </div>
           {/* 무전기 */}
-          {w.radios.length > 0 ? <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(171,71,188,0.05)", border: "1px solid rgba(171,71,188,0.2)" }}>
-            <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>📻 무전기</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {w.radios.map((r, i) => (<div key={i} style={{ color: "#AB47BC", fontSize: 12, fontWeight: 600 }}>
-                <span style={{ fontSize: 14, fontWeight: 800 }}>#{r.number}</span> <span style={{ color: "#94A3B8", fontSize: 10 }}>{r.assetName}</span>
+          {w.radios.length > 0 ? <div onClick={() => canEdit && setRadioModalWorker(w)} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(171,71,188,0.05)", border: "1px solid rgba(171,71,188,0.2)", cursor: canEdit ? "pointer" : "default" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+              <span style={{ color: "#94A3B8", fontSize: 10 }}>📻 무전기</span>
+              {canEdit && <span style={{ color: "#AB47BC", fontSize: 10 }}>편집 ›</span>}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {w.radios.map((r, i) => (<div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                <span style={{ color: "#AB47BC", fontSize: 12, fontWeight: 600 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800 }}>#{r.number}</span> <span style={{ color: "#94A3B8", fontSize: 10 }}>{r.assetName}</span>
+                </span>
+                {canEdit && <button onClick={(e) => { e.stopPropagation(); if (confirm(`#${r.number} 회수할까요?`)) returnRadio(r.assetId, r.unitId); }} style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "rgba(244,67,54,0.15)", color: "#EF5350", fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>}
               </div>))}
             </div>
-          </div> : <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+          </div> : <div onClick={() => canEdit && setRadioModalWorker(w)} style={{ padding: "8px 10px", borderRadius: 8, background: canEdit ? "rgba(171,71,188,0.04)" : "rgba(255,255,255,0.02)", border: `1px dashed ${canEdit ? "rgba(171,71,188,0.3)" : "rgba(255,255,255,0.04)"}`, cursor: canEdit ? "pointer" : "default" }}>
             <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>📻 무전기</div>
-            <div style={{ color: "#475569", fontSize: 12 }}>미할당</div>
+            <div style={{ color: canEdit ? "#AB47BC" : "#475569", fontSize: 12, fontWeight: 600 }}>{canEdit ? "+ 할당하기" : "미할당"}</div>
           </div>}
           {/* 근무 상태 */}
           <div style={{ padding: "8px 10px", borderRadius: 8, background: w.onDuty ? "rgba(76,175,80,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${w.onDuty ? "rgba(76,175,80,0.15)" : "rgba(255,255,255,0.04)"}` }}>
@@ -3249,6 +3289,80 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
         </div>
       </div>}
     </Card>}
+
+    {/* 📻 무전기 할당 모달 */}
+    {radioModalWorker && (() => {
+      const w = radioModalWorker;
+      const radioAssets = assets.filter(a => a.trackUnits && a.units && a.units.length > 0);
+      const totalAvailable = radioAssets.reduce((s, a) => s + a.units.filter(u => u.status === "available").length, 0);
+      return (<div onClick={() => setRadioModalWorker(null)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, maxHeight: "85vh", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: "20px 20px 0 0", padding: "16px 16px 20px", overflow: "auto", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(171,71,188,0.25), rgba(171,71,188,0.05))", border: "1px solid rgba(171,71,188,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📻</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700, margin: 0 }}>📻 무전기 할당 - {w.name}</h3>
+              <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>📍 {w.siteName} · 사용가능 {totalAvailable}대</div>
+            </div>
+            <button onClick={() => setRadioModalWorker(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>✕</button>
+          </div>
+
+          {/* 현재 할당된 무전기 */}
+          {w.radios.length > 0 && <div style={{ padding: 12, borderRadius: 10, background: "rgba(76,175,80,0.06)", border: "1px solid rgba(76,175,80,0.2)", marginBottom: 14 }}>
+            <div style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>✅ 현재 할당 ({w.radios.length}대)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {w.radios.map((r, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 8, background: "rgba(76,175,80,0.1)", border: "1px solid rgba(76,175,80,0.3)" }}>
+                <span style={{ color: "#66BB6A", fontSize: 14, fontWeight: 800 }}>#{r.number}</span>
+                <span style={{ color: "#94A3B8", fontSize: 11 }}>{r.assetName}</span>
+                <button onClick={() => returnRadio(r.assetId, r.unitId)} style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "rgba(244,67,54,0.2)", color: "#EF5350", fontSize: 11, cursor: "pointer" }}>✕</button>
+              </div>))}
+            </div>
+          </div>}
+
+          {/* 자산별 사용가능 무전기 번호 그리드 */}
+          {radioAssets.length === 0 ? <EmptyState icon="📻" title="등록된 무전기가 없습니다" description="📦 장비 관리에서 '🔢 개별 번호 추적' ON으로 등록하세요" /> :
+            radioAssets.map(a => {
+              const availUnits = a.units.filter(u => u.status === "available");
+              const assignedUnits = a.units.filter(u => u.status === "assigned");
+              const otherUnits = a.units.filter(u => u.status === "broken" || u.status === "lost");
+              return (<div key={a.id} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, padding: "0 4px" }}>
+                  <div style={{ color: "#E2E8F0", fontSize: 14, fontWeight: 700 }}>{a.name}</div>
+                  <div style={{ color: "#94A3B8", fontSize: 11 }}>가용 {availUnits.length} / 총 {a.units.length}</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))", gap: 6 }}>
+                  {a.units.map(u => {
+                    const STATUS_COLOR = { available: "#66BB6A", assigned: "#42A5F5", broken: "#EF5350", lost: "#FFA726" };
+                    const c = STATUS_COLOR[u.status];
+                    const isAvailable = u.status === "available";
+                    const isMine = u.assignedTo === w.id || u.assignedToName === w.name;
+                    return (<button key={u.id} onClick={() => { if (isAvailable) assignRadio(w, a.id, u.id); else if (isMine) returnRadio(a.id, u.id); }} disabled={!isAvailable && !isMine} style={{ position: "relative", padding: "12px 6px", borderRadius: 10, border: `1.5px solid ${c}40`, background: isMine ? `${c}25` : `${c}08`, color: c, fontSize: 16, fontWeight: 800, cursor: (isAvailable || isMine) ? "pointer" : "not-allowed", opacity: (isAvailable || isMine) ? 1 : 0.5, transition: "all 0.15s", fontVariantNumeric: "tabular-nums" }}>
+                      #{u.number}
+                      {!isAvailable && !isMine && u.assignedToName && <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 500, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>👤 {u.assignedToName}</div>}
+                      {!isAvailable && !isMine && !u.assignedToName && <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 500, marginTop: 2 }}>{u.status === "broken" ? "고장" : u.status === "lost" ? "분실" : ""}</div>}
+                      {isMine && <div style={{ fontSize: 9, color: c, fontWeight: 700, marginTop: 2 }}>✓ 내 것</div>}
+                      {isAvailable && <div style={{ fontSize: 9, color: c, fontWeight: 600, marginTop: 2 }}>+ 할당</div>}
+                    </button>);
+                  })}
+                </div>
+              </div>);
+            })}
+
+          <div style={{ padding: 10, borderRadius: 10, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)", color: "#94A3B8", fontSize: 11, lineHeight: 1.6 }}>
+            <strong style={{ color: "#42A5F5" }}>💡 사용법</strong><br/>
+            • <span style={{ color: "#66BB6A", fontWeight: 700 }}>초록색 #번호</span>: 사용 가능 - 클릭으로 할당<br/>
+            • <span style={{ color: "#42A5F5", fontWeight: 700 }}>파란색 #번호</span>: 다른 사람 할당됨<br/>
+            • 본인 무전기는 클릭으로 반납
+          </div>
+        </div>
+      </div>);
+    })()}
+
+    {/* 토스트 알림 */}
+    {toast && <div style={{ position: "fixed", top: "calc(env(safe-area-inset-top) + 60px)", left: "50%", transform: "translateX(-50%)", zIndex: 9999, padding: "12px 20px", borderRadius: 12, background: toast.type === "success" ? "linear-gradient(135deg, rgba(76,175,80,0.95), rgba(67,160,71,0.95))" : toast.type === "info" ? "linear-gradient(135deg, rgba(33,150,243,0.95), rgba(25,118,210,0.95))" : "linear-gradient(135deg, rgba(244,67,54,0.95), rgba(211,47,47,0.95))", color: "#fff", fontSize: 14, fontWeight: 700, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", backdropFilter: "blur(10px)", animation: "slideDown 0.3s ease-out", pointerEvents: "none" }}>
+      {toast.msg}
+    </div>}
+    <style>{`@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
   </PageContainer>);
 }
 
