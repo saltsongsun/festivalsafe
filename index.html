@@ -172,23 +172,126 @@
   <div id="root"></div>
 
   <div id="error-fallback">
-    <div style="max-width:420px;text-align:center">
-      <div style="font-size:64px;margin-bottom:16px">⚠️</div>
-      <h2 style="color:#F44336;font-size:22px;font-weight:800;margin-bottom:8px">앱 로드 실패</h2>
-      <p style="color:#8892b0;font-size:14px;margin-bottom:20px">이전 데이터와 충돌이 발생했습니다.</p>
-      <button id="btn-reset" style="width:100%;padding:16px;border-radius:12px;border:none;background:#F44336;color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 데이터 초기화 후 재시작</button>
-      <p style="color:#556;font-size:12px;margin-top:12px">또는 URL에 ?reset=1 추가</p>
+    <div style="max-width:520px;width:100%">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:64px;margin-bottom:16px">⚠️</div>
+        <h2 style="color:#F44336;font-size:22px;font-weight:800;margin-bottom:8px">앱 로드 실패</h2>
+        <p style="color:#8892b0;font-size:14px">아래 옵션 중 하나를 선택하세요</p>
+      </div>
+
+      <!-- 🩺 진단 패널 -->
+      <div id="diag-panel" style="background:rgba(33,150,243,0.06);border:1px solid rgba(33,150,243,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="color:#42A5F5;font-size:13px;font-weight:700;margin-bottom:8px">🩺 진단 정보</div>
+        <div id="diag-info" style="color:#94A3B8;font-size:11px;line-height:1.6;font-family:monospace"></div>
+      </div>
+
+      <!-- Supabase 직접 설정 -->
+      <div style="background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="color:#66BB6A;font-size:13px;font-weight:700;margin-bottom:8px">🔄 Supabase 동기화 설정</div>
+        <input id="ef-url" placeholder="https://xxx.supabase.co" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace;margin-bottom:6px;box-sizing:border-box" />
+        <input id="ef-key" placeholder="anon public key (eyJh...)" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace;margin-bottom:6px;box-sizing:border-box" />
+        <div style="display:flex;gap:6px">
+          <button id="btn-save-sb" style="flex:1;padding:10px;border-radius:8px;border:none;background:#66BB6A;color:#fff;font-size:13px;font-weight:700;cursor:pointer">✅ 저장 후 재시작</button>
+          <button id="btn-clear-sb" style="padding:10px 14px;border-radius:8px;border:1px solid rgba(244,67,54,0.3);background:transparent;color:#EF5350;font-size:12px;cursor:pointer">🗑 삭제</button>
+        </div>
+      </div>
+
+      <button id="btn-reset" style="width:100%;padding:14px;border-radius:12px;border:none;background:#F44336;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 모든 데이터 초기화 후 재시작</button>
+      <button id="btn-retry" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#94A3B8;font-size:13px;cursor:pointer">🔃 그냥 새로고침 (캐시 무시)</button>
+      <p style="color:#556;font-size:11px;margin-top:14px;text-align:center">💡 안 되면 F12 → Console 메시지 확인</p>
     </div>
   </div>
 
   <script>
+    // 진단 정보 채우기
+    function fillDiag() {
+      var diag = document.getElementById('diag-info');
+      if (!diag) return;
+      var info = [];
+      info.push('🌐 URL: ' + location.href);
+      info.push('📦 Build: ' + new Date().toISOString().slice(0, 10));
+      info.push('💾 Supabase URL: ' + (localStorage.getItem('_sb_url') ? '✅ 저장됨' : '❌ 없음'));
+      info.push('🔑 Supabase Key: ' + (localStorage.getItem('_sb_key') ? '✅ 저장됨' : '❌ 없음'));
+      info.push('🔌 window.storage: ' + (window.storage ? '✅ 정의됨' : '❌ 없음'));
+      info.push('📡 Supabase 상태: ' + (window._sbStatus ? JSON.stringify(window._sbStatus) : '미확인'));
+      info.push('🛠️ Service Worker: ' + ('serviceWorker' in navigator ? '지원' : '미지원'));
+      diag.innerHTML = info.join('<br>');
+      // 저장된 값 채우기
+      var urlInp = document.getElementById('ef-url');
+      var keyInp = document.getElementById('ef-key');
+      if (urlInp && localStorage.getItem('_sb_url')) urlInp.value = localStorage.getItem('_sb_url');
+      if (keyInp && localStorage.getItem('_sb_key')) keyInp.value = localStorage.getItem('_sb_key');
+    }
+    setTimeout(fillDiag, 100);
+    setInterval(fillDiag, 2000);
+
     document.getElementById('btn-reset').addEventListener('click', function(){
-      try{localStorage.clear();sessionStorage.clear();}catch(e){}
-      location.replace(location.pathname);
+      if (!confirm('⚠️ 모든 로컬 데이터가 삭제됩니다 (Supabase 데이터는 유지).\n\n진행하시겠습니까?')) return;
+      try {
+        // Supabase 설정은 보존
+        var url = localStorage.getItem('_sb_url');
+        var key = localStorage.getItem('_sb_key');
+        localStorage.clear(); sessionStorage.clear();
+        if (url) localStorage.setItem('_sb_url', url);
+        if (key) localStorage.setItem('_sb_key', key);
+      } catch(e){}
+      // PWA 캐시 삭제
+      if ('caches' in window) {
+        caches.keys().then(function(names){
+          names.forEach(function(n){ caches.delete(n); });
+          location.replace(location.pathname);
+        });
+      } else {
+        location.replace(location.pathname);
+      }
+    });
+
+    document.getElementById('btn-retry').addEventListener('click', function(){
+      // SW 캐시 무시 새로고침
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          regs.forEach(function(r){ r.unregister(); });
+          location.reload(true);
+        });
+      } else {
+        location.reload(true);
+      }
+    });
+
+    document.getElementById('btn-save-sb').addEventListener('click', function(){
+      var url = document.getElementById('ef-url').value.trim();
+      var key = document.getElementById('ef-key').value.trim();
+      if (!url || !key) { alert('URL과 Key를 모두 입력하세요'); return; }
+      if (!url.startsWith('http')) { alert('URL은 https://로 시작해야 합니다'); return; }
+      // REST API로 테스트
+      var cleanUrl = url.replace(/\/$/, '');
+      fetch(cleanUrl + '/rest/v1/app_state?select=key&limit=1', {
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+      }).then(function(res){
+        if (!res.ok) {
+          return res.text().then(function(t){
+            alert('❌ 연결 실패 (HTTP ' + res.status + ')\n\n' + t.slice(0, 300) + '\n\n확인 사항:\n• URL/Key가 정확한가\n• app_state 테이블이 존재하는가\n• RLS 정책이 SELECT 허용하는가');
+          });
+        }
+        localStorage.setItem('_sb_url', url);
+        localStorage.setItem('_sb_key', key);
+        alert('✅ 연결 성공!\n\n페이지를 재시작합니다.');
+        location.replace(location.pathname);
+      }).catch(function(e){
+        alert('❌ 네트워크 오류: ' + e.message);
+      });
+    });
+
+    document.getElementById('btn-clear-sb').addEventListener('click', function(){
+      if (!confirm('Supabase 설정을 삭제하시겠습니까?')) return;
+      localStorage.removeItem('_sb_url');
+      localStorage.removeItem('_sb_key');
+      alert('✅ Supabase 설정 삭제됨');
+      fillDiag();
     });
   </script>
 
-  <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show')"></script>
+  <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();"></script>
   <script>setTimeout(function(){if(!document.getElementById('root').children.length){document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();}},8000)</script>
 
   <script>
