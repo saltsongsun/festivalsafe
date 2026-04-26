@@ -3940,6 +3940,7 @@ function HeatmapPage({ settings, setSettings, session }) {
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [drawingZoneId, setDrawingZoneId] = useState("");
   const [selectedAreaId, setSelectedAreaId] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const mapRef = useRef(null);
   const fileRef = useRef(null);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
@@ -3947,11 +3948,61 @@ function HeatmapPage({ settings, setSettings, session }) {
   const mapAreas = settings.mapAreas || []; // [{id, zoneId, points: [{x,y}]}]
   const congestion = settings.zoneCongestion || [];
 
-  const handleUpload = (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  // 🗺️ 지도 이미지를 별도 키로 분리 (settings와 분리해서 저장 - 동기화 안정성)
+  const fid = session?.festivalId || settings?.festivalId || "default";
+  const [mapImage, setMapImage] = usePersist(`${fid}_map_img_v1`, null);
+
+  // 마이그레이션: settings.mapImage → 별도 키 (한번만)
+  useEffect(() => {
+    if (!mapImage && settings.mapImage) {
+      console.log("[히트맵] 기존 도면 이미지 마이그레이션 중...");
+      setMapImage(settings.mapImage);
+      // settings.mapImage는 그대로 두어도 됨 (이중 저장 회피용으로 다음 settings 업데이트 시 자연스럽게 정리)
+      setSettings(prev => { const n = { ...prev }; delete n.mapImage; return n; });
+    }
+  }, []);
+
+  // 이미지 압축 - 큰 도면도 빠른 동기화 가능
+  const compressImage = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (ev) => setSettings({ ...settings, mapImage: ev.target.result });
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX = 1600; // 최대 변 길이
+          let { width, height } = img;
+          if (width > MAX) { height = (height * MAX) / width; width = MAX; }
+          if (height > MAX) { width = (width * MAX) / height; height = MAX; }
+          const canvas = document.createElement("canvas");
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          // JPEG 75% 품질
+          resolve(canvas.toDataURL("image/jpeg", 0.75));
+        } catch (err) { reject(err); }
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const sizeKB = Math.round(compressed.length / 1024);
+      setMapImage(compressed);
+      console.log(`[히트맵] 이미지 업로드 완료: ${sizeKB}KB`);
+      if (sizeKB > 800) alert(`⚠️ 이미지 크기가 큽니다 (${sizeKB}KB).\n작은 이미지로 업로드하면 동기화가 더 빠릅니다.`);
+    } catch (err) {
+      alert("이미지 처리 실패: " + err.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getMapPos = (e) => {
@@ -4018,26 +4069,27 @@ function HeatmapPage({ settings, setSettings, session }) {
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
       <PageHeader icon="🗺️" title="히트맵 지도" subtitle="구역별 실시간 혼잡도 시각화" accent="#42A5F5" />
 
-      {!settings.mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
+      {!mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
         <h3 style={{ color: "#E2E8F0", fontSize: 16, margin: "0 0 8px" }}>축제장 도면 업로드</h3>
         <p style={{ color: "#94A3B8", fontSize: 13, marginBottom: 16 }}>도면을 올리면 구역 영역을 그릴 수 있습니다.</p>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: "none" }} />
-        <button onClick={() => fileRef.current?.click()} style={{ padding: "12px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📤 도면 업로드</button>
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ padding: "12px 24px", borderRadius: 10, border: "none", background: uploading ? "#444" : "linear-gradient(135deg, #42A5F5, #1976D2)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: uploading ? "wait" : "pointer" }}>{uploading ? "⏳ 압축 중..." : "📤 도면 업로드"}</button>
+        <p style={{ color: "#94A3B8", fontSize: 11, marginTop: 10 }}>이미지가 자동으로 1600px 이내로 압축됩니다 (JPEG 75%)</p>
       </Card>}
 
-      {!settings.mapImage && !canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
+      {!mapImage && !canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <p style={{ color: "#94A3B8", fontSize: 14 }}>관리자가 도면을 업로드하지 않았습니다.</p>
       </Card>}
 
-      {settings.mapImage && <>
+      {mapImage && <>
         {/* 컨트롤 - 모드 전환 */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button onClick={() => setMode("view")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "view" ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: mode === "view" ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: mode === "view" ? "#42A5F5" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>👁️ 보기</button>
           {canEdit && <button onClick={() => setMode("draw")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "draw" ? "1.5px solid #FFA726" : "1px solid rgba(255,255,255,0.1)", background: mode === "draw" ? "rgba(255,152,0,0.1)" : "rgba(255,255,255,0.03)", color: mode === "draw" ? "#FFA726" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>✏️ 영역 그리기</button>}
           {canEdit && <button onClick={() => setMode("edit")} style={{ flex: 1, padding: "10px", borderRadius: 10, border: mode === "edit" ? "1.5px solid #EF5350" : "1px solid rgba(255,255,255,0.1)", background: mode === "edit" ? "rgba(244,67,54,0.1)" : "rgba(255,255,255,0.03)", color: mode === "edit" ? "#EF5350" : "#94A3B8", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🗑 삭제</button>}
           {canEdit && <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: "none" }} />}
-          {canEdit && <button onClick={() => fileRef.current?.click()} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>🔄</button>}
+          {canEdit && <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 13, cursor: uploading ? "wait" : "pointer", opacity: uploading ? 0.5 : 1 }}>{uploading ? "⏳" : "🔄"}</button>}
         </div>
 
         {/* 그리기 모드 - 구역 선택 */}
@@ -4074,7 +4126,7 @@ function HeatmapPage({ settings, setSettings, session }) {
 
         {/* 지도 */}
         <div ref={mapRef} onClick={handleMapClick} style={{ position: "relative", width: "100%", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", cursor: mode === "draw" && drawingZoneId ? "crosshair" : "default", background: "#000" }}>
-          <img src={settings.mapImage} alt="map" style={{ width: "100%", display: "block", opacity: 0.7, pointerEvents: "none" }} draggable={false} />
+          <img src={mapImage} alt="map" style={{ width: "100%", display: "block", opacity: 0.7, pointerEvents: "none" }} draggable={false} />
 
           {/* SVG 오버레이 - 폴리곤 영역 */}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
