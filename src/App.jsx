@@ -7609,110 +7609,25 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
 export default function App() {
   const [fatalError, setFatalError] = useState(null);
 
-  // 🔄 Supabase 자동 연결 (npm install 불필요 - ESM CDN으로 동적 로드)
+  // 🔄 환경변수가 있으면 localStorage에 자동 저장 (한번만)
+  // index.html에서 localStorage를 읽어 Supabase 초기화함
   useEffect(() => {
-    if (window._supabaseInited) return;
-    window._supabaseInited = true;
-
-    (async () => {
-      try {
-        // 1. URL/Key 가져오기 (localStorage 우선, 다음 환경변수)
-        const url = localStorage.getItem('_sb_url') || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || '';
-        const key = localStorage.getItem('_sb_key') || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
-
-        if (!url || !key || !url.startsWith('http')) {
-          console.warn('[SAFEFLOW] ⚠️ Supabase 환경변수 미설정 - ⚙️관리 → Supabase 설정에서 입력하세요');
-          window._sbStatus = { ok: false, reason: 'no_config' };
-          window.dispatchEvent(new CustomEvent('sb-status'));
-          return;
+    try {
+      const hasUrl = localStorage.getItem('_sb_url');
+      const hasKey = localStorage.getItem('_sb_key');
+      if (!hasUrl || !hasKey) {
+        // import.meta.env에서 자동 가져오기 (Vite 빌드 시 치환됨)
+        const envUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || '';
+        const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
+        if (envUrl && envKey && envUrl.startsWith('http')) {
+          localStorage.setItem('_sb_url', envUrl);
+          localStorage.setItem('_sb_key', envKey);
+          console.log('[SAFEFLOW] 환경변수에서 Supabase 설정 자동 저장 - 새로고침 후 동기화 시작');
+          // 새로고침해서 index.html이 다시 실행되도록
+          if (!hasUrl) setTimeout(() => window.location.reload(), 500);
         }
-
-        console.log('[SAFEFLOW] Supabase 로딩 중...', url);
-        // 2. ESM CDN으로 Supabase 동적 로드 (npm install 불필요)
-        const mod = await import(/* @vite-ignore */ 'https://esm.sh/@supabase/supabase-js@2.39.0');
-        const supabase = mod.createClient(url, key, {
-          realtime: { params: { eventsPerSecond: 10 } }
-        });
-
-        // 3. window.storage 정의 (usePersist에서 호출)
-        window.storage = {
-          async get(k) {
-            try {
-              const { data, error } = await supabase.from('app_state').select('value').eq('key', k).maybeSingle();
-              if (error) { console.error('[storage.get]', k, error.message); return null; }
-              if (!data) return null;
-              const v = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
-              return { value: v };
-            } catch (e) { console.error('[storage.get] 예외:', e); return null; }
-          },
-          async set(k, v) {
-            try {
-              const json = typeof v === 'string' ? v : JSON.stringify(v);
-              let stored;
-              try { stored = JSON.parse(json); } catch { stored = json; }
-              const { error } = await supabase.from('app_state').upsert(
-                { key: k, value: stored, updated_at: new Date().toISOString() },
-                { onConflict: 'key' }
-              );
-              if (error) { console.error('[storage.set]', k, error.message); return null; }
-              return { value: json };
-            } catch (e) { console.error('[storage.set] 예외:', e); return null; }
-          },
-          async delete(k) {
-            try { await supabase.from('app_state').delete().eq('key', k); return { deleted: true }; }
-            catch { return null; }
-          },
-          async list(prefix) {
-            try {
-              let q = supabase.from('app_state').select('key');
-              if (prefix) q = q.like('key', `${prefix}%`);
-              const { data } = await q;
-              return { keys: (data || []).map(d => d.key) };
-            } catch { return null; }
-          },
-        };
-
-        // 4. Realtime 구독
-        supabase
-          .channel('app_state_changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, (payload) => {
-            const row = payload.new || payload.old;
-            if (!row?.key) return;
-            const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
-            window.dispatchEvent(new CustomEvent('supabase-sync', {
-              detail: { key: row.key, value: v }
-            }));
-          })
-          .subscribe((status) => {
-            console.log('[SAFEFLOW] Realtime:', status);
-            window._sbStatus = { ok: status === 'SUBSCRIBED', status };
-            window.dispatchEvent(new CustomEvent('sb-status'));
-            if (status === 'SUBSCRIBED') console.log('[SAFEFLOW] ✅ Realtime 구독 성공 - 기기간 동기화 활성');
-            if (status === 'CHANNEL_ERROR') console.error('[SAFEFLOW] ❌ Realtime 오류 - Database → Replication에서 app_state 토글 ON 필요');
-          });
-
-        // 5. 디버그 헬퍼
-        window._safeflow = {
-          async checkConnection() {
-            const { count, error } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
-            if (error) { console.error('❌ DB 접근 실패:', error.message); return false; }
-            console.log('✅ Supabase 정상 - app_state 레코드:', count); return true;
-          },
-          async listKeys() {
-            const { data } = await supabase.from('app_state').select('key, updated_at').order('updated_at', { ascending: false });
-            console.table(data); return data;
-          },
-        };
-
-        console.log('[SAFEFLOW] ✅ Supabase 연결 완료:', url);
-        window._sbStatus = { ok: true };
-        window.dispatchEvent(new CustomEvent('sb-status'));
-      } catch (e) {
-        console.error('[SAFEFLOW] ❌ Supabase 로드 실패:', e);
-        window._sbStatus = { ok: false, reason: 'load_error', error: String(e.message || e) };
-        window.dispatchEvent(new CustomEvent('sb-status'));
       }
-    })();
+    } catch {}
   }, []);
   
   if (fatalError) {
