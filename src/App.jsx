@@ -3053,6 +3053,40 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
 
   // 무전기 할당 모달
   const [radioModalWorker, setRadioModalWorker] = useState(null);
+  // 근무지 배치 모달
+  const [siteModalWorker, setSiteModalWorker] = useState(null);
+
+  // 근무자 근무지 이동
+  const moveWorkerSite = (workerId, fromSiteId, toSiteId) => {
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      const fi = ws.findIndex(s => s.id === fromSiteId);
+      if (fi < 0) return prev;
+      const worker = (ws[fi].workers || []).find(w => w.id === workerId);
+      if (!worker) return prev;
+
+      // 미배치 사이트 자동 생성
+      if (toSiteId === "_pool" && !ws.find(s => s.id === "_pool")) {
+        ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
+      }
+      const ti = ws.findIndex(s => s.id === toSiteId);
+      if (ti < 0) return prev;
+
+      ws[fi] = { ...ws[fi], workers: (ws[fi].workers || []).filter(w => w.id !== workerId) };
+      ws[ti] = { ...ws[ti], workers: [...(ws[ti].workers || []), worker] };
+      return { ...prev, workSites: ws };
+    });
+    // 계정의 siteId도 업데이트
+    if (setAccounts) {
+      const w = allWorkers.find(ww => ww.id === workerId);
+      if (w?.accountId) {
+        setAccounts(prev => prev.map(a => a.id === w.accountId ? { ...a, siteId: toSiteId } : a));
+      }
+    }
+    const toSite = sites.find(s => s.id === toSiteId);
+    const toName = toSiteId === "_pool" ? "미배치" : (toSite?.name || zones.find(z => z.id === toSite?.zoneId)?.name || "?");
+    showToast(`📍 ${toName}(으)로 이동 완료`);
+  };
 
   // 무전기 할당/회수
   const assignRadio = (worker, assetId, unitId) => {
@@ -3325,6 +3359,14 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
         </div>
         {/* 추가 정보 그리드 */}
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+          {/* 근무지 (클릭 → 변경) */}
+          <div onClick={() => canEdit && setSiteModalWorker(w)} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(33,150,243,0.05)", border: "1px solid rgba(33,150,243,0.2)", cursor: canEdit ? "pointer" : "default" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+              <span style={{ color: "#94A3B8", fontSize: 10 }}>📍 근무지</span>
+              {canEdit && <span style={{ color: "#42A5F5", fontSize: 10 }}>변경 ›</span>}
+            </div>
+            <div style={{ color: "#42A5F5", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.siteName}</div>
+          </div>
           {/* 식수 */}
           <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,167,38,0.05)", border: "1px solid rgba(255,167,38,0.15)" }}>
             <div style={{ color: "#94A3B8", fontSize: 10, marginBottom: 2 }}>🍱 식수</div>
@@ -3387,6 +3429,66 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
         </div>
       </div>}
     </Card>}
+
+    {/* 📍 근무지 변경 모달 */}
+    {siteModalWorker && (() => {
+      const w = siteModalWorker;
+      const validSites = sites.filter(s => s.id !== "_pool");
+      const poolSite = sites.find(s => s.id === "_pool");
+      return (<div onClick={() => setSiteModalWorker(null)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, maxHeight: "85vh", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: "20px 20px 0 0", padding: "16px 16px 20px", overflow: "auto", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 12px" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, rgba(33,150,243,0.25), rgba(33,150,243,0.05))", border: "1px solid rgba(33,150,243,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📍</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700, margin: 0 }}>📍 근무지 변경 - {w.name}</h3>
+              <div style={{ color: "#94A3B8", fontSize: 12, marginTop: 2 }}>현재: <span style={{ color: "#42A5F5", fontWeight: 700 }}>{w.siteName}</span></div>
+            </div>
+            <button onClick={() => setSiteModalWorker(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>✕</button>
+          </div>
+
+          {/* 근무지 그리드 */}
+          {validSites.length === 0 ? <EmptyState icon="📍" title="등록된 근무지가 없습니다" description="⚙️ 관리 → 인력관리에서 근무지를 추가하세요" /> :
+            <div>
+              <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 8, padding: "0 4px" }}>📍 근무지 선택 ({validSites.length}곳)</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+                {validSites.map(s => {
+                  const zname = s.name || zones.find(z => z.id === s.zoneId)?.name || "미설정";
+                  const cnt = (s.workers || []).length;
+                  const isMine = s.id === w.siteId;
+                  return (<button key={s.id} onClick={() => { if (!isMine) { moveWorkerSite(w.id, w.siteId, s.id); setSiteModalWorker(null); } }} disabled={isMine} style={{ position: "relative", padding: "14px 10px", borderRadius: 10, border: isMine ? "2px solid #66BB6A" : "1.5px solid rgba(33,150,243,0.3)", background: isMine ? "rgba(76,175,80,0.15)" : "rgba(33,150,243,0.05)", color: isMine ? "#66BB6A" : "#42A5F5", cursor: isMine ? "default" : "pointer", textAlign: "left", transition: "all 0.15s" }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📍 {zname}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "#94A3B8" }}>👥 {cnt}명</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isMine ? "#66BB6A" : "#42A5F5" }}>{isMine ? "✓ 현재" : "이동 ›"}</span>
+                    </div>
+                  </button>);
+                })}
+              </div>
+
+              {/* 미배치 옵션 */}
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ color: "#94A3B8", fontSize: 12, fontWeight: 700, marginBottom: 8, padding: "0 4px" }}>⚠️ 기타</div>
+                {(() => {
+                  const isMine = w.siteId === "_pool";
+                  const cnt = (poolSite?.workers || []).length;
+                  return (<button onClick={() => { if (!isMine) { moveWorkerSite(w.id, w.siteId, "_pool"); setSiteModalWorker(null); } }} disabled={isMine} style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: isMine ? "2px solid #FFA726" : "1.5px solid rgba(255,167,38,0.3)", background: isMine ? "rgba(255,167,38,0.12)" : "rgba(255,167,38,0.04)", color: "#FFA726", cursor: isMine ? "default" : "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>⚠️ 미배치 (대기)</span>
+                    <span style={{ fontSize: 11 }}>{cnt}명 · {isMine ? "✓ 현재" : "이동 ›"}</span>
+                  </button>);
+                })()}
+              </div>
+            </div>}
+
+          <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 10, background: "rgba(33,150,243,0.04)", border: "1px solid rgba(33,150,243,0.15)", color: "#94A3B8", fontSize: 11, lineHeight: 1.6 }}>
+            <strong style={{ color: "#42A5F5" }}>💡 안내</strong><br/>
+            • 근무지 클릭 → 즉시 이동<br/>
+            • 연결된 계정의 근무지 정보도 함께 갱신<br/>
+            • 미배치는 대기 상태(휴식·이동중)에 사용
+          </div>
+        </div>
+      </div>);
+    })()}
 
     {/* 📻 무전기 할당 모달 */}
     {radioModalWorker && (() => {
