@@ -71,100 +71,102 @@
   <!-- 🔄 SUPABASE 동기화 (ESM CDN - npm install 불필요)                  -->
   <!-- ════════════════════════════════════════════════════════════════════ -->
   <script type="module">
-    try {
-      // localStorage에서 URL/Key 읽기 (사용자가 직접 입력)
-      const url = localStorage.getItem('_sb_url') || '';
-      const key = localStorage.getItem('_sb_key') || '';
+    (async () => {
+      try {
+        // localStorage에서 URL/Key 읽기 (사용자가 직접 입력)
+        const url = localStorage.getItem('_sb_url') || '';
+        const key = localStorage.getItem('_sb_key') || '';
 
-      if (url.startsWith('http') && key.length > 20) {
-        console.log('[SAFEFLOW] Supabase 로딩 중...', url);
-        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.39.0');
-        const supabase = createClient(url, key, {
-          realtime: { params: { eventsPerSecond: 10 } }
-        });
-
-        // window.storage 인터페이스 (usePersist에서 호출)
-        window.storage = {
-          async get(k) {
-            try {
-              const { data, error } = await supabase.from('app_state').select('value').eq('key', k).maybeSingle();
-              if (error) { console.error('[storage.get]', k, error.message); return null; }
-              if (!data) return null;
-              const v = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
-              return { value: v };
-            } catch (e) { console.error('[storage.get] 예외:', e); return null; }
-          },
-          async set(k, v) {
-            try {
-              const json = typeof v === 'string' ? v : JSON.stringify(v);
-              let stored;
-              try { stored = JSON.parse(json); } catch { stored = json; }
-              const { error } = await supabase.from('app_state').upsert(
-                { key: k, value: stored, updated_at: new Date().toISOString() },
-                { onConflict: 'key' }
-              );
-              if (error) { console.error('[storage.set]', k, error.message); return null; }
-              return { value: json };
-            } catch (e) { console.error('[storage.set] 예외:', e); return null; }
-          },
-          async delete(k) {
-            try { await supabase.from('app_state').delete().eq('key', k); return { deleted: true }; }
-            catch { return null; }
-          },
-          async list(prefix) {
-            try {
-              let q = supabase.from('app_state').select('key');
-              if (prefix) q = q.like('key', prefix + '%');
-              const { data } = await q;
-              return { keys: (data || []).map(d => d.key) };
-            } catch { return null; }
-          },
-        };
-
-        // Realtime 구독
-        supabase
-          .channel('app_state_changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, (payload) => {
-            const row = payload.new || payload.old;
-            if (!row?.key) return;
-            const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
-            window.dispatchEvent(new CustomEvent('supabase-sync', { detail: { key: row.key, value: v } }));
-            console.log('[SAFEFLOW] 📡 동기화 수신:', row.key.slice(0, 60));
-          })
-          .subscribe((status) => {
-            console.log('[SAFEFLOW] Realtime:', status);
-            window._sbStatus = { ok: status === 'SUBSCRIBED', status };
-            window.dispatchEvent(new CustomEvent('sb-status'));
-            if (status === 'SUBSCRIBED') console.log('[SAFEFLOW] ✅ Realtime 구독 성공 - 기기간 동기화 활성화');
-            if (status === 'CHANNEL_ERROR') console.error('[SAFEFLOW] ❌ Realtime 오류 - Database → Replication에서 app_state 토글 ON 확인');
+        if (url.startsWith('http') && key.length > 20) {
+          console.log('[SAFEFLOW] Supabase 로딩 중...', url);
+          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.39.0');
+          const supabase = createClient(url, key, {
+            realtime: { params: { eventsPerSecond: 10 } }
           });
 
-        // 디버그 헬퍼
-        window._safeflow = {
-          async checkConnection() {
-            const { count, error } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
-            if (error) { console.error('❌ DB 접근 실패:', error.message); return false; }
-            console.log('✅ Supabase 정상 - app_state 레코드:', count); return true;
-          },
-          async listKeys() {
-            const { data } = await supabase.from('app_state').select('key, updated_at').order('updated_at', { ascending: false });
-            console.table(data); return data;
-          },
-        };
+          // window.storage 인터페이스 (usePersist에서 호출)
+          window.storage = {
+            async get(k) {
+              try {
+                const { data, error } = await supabase.from('app_state').select('value').eq('key', k).maybeSingle();
+                if (error) { console.error('[storage.get]', k, error.message); return null; }
+                if (!data) return null;
+                const v = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
+                return { value: v };
+              } catch (e) { console.error('[storage.get] 예외:', e); return null; }
+            },
+            async set(k, v) {
+              try {
+                const json = typeof v === 'string' ? v : JSON.stringify(v);
+                let stored;
+                try { stored = JSON.parse(json); } catch { stored = json; }
+                const { error } = await supabase.from('app_state').upsert(
+                  { key: k, value: stored, updated_at: new Date().toISOString() },
+                  { onConflict: 'key' }
+                );
+                if (error) { console.error('[storage.set]', k, error.message); return null; }
+                return { value: json };
+              } catch (e) { console.error('[storage.set] 예외:', e); return null; }
+            },
+            async delete(k) {
+              try { await supabase.from('app_state').delete().eq('key', k); return { deleted: true }; }
+              catch { return null; }
+            },
+            async list(prefix) {
+              try {
+                let q = supabase.from('app_state').select('key');
+                if (prefix) q = q.like('key', prefix + '%');
+                const { data } = await q;
+                return { keys: (data || []).map(d => d.key) };
+              } catch { return null; }
+            },
+          };
 
-        console.log('[SAFEFLOW] ✅ Supabase 연결 완료');
-        window._sbStatus = { ok: true };
-        window.dispatchEvent(new CustomEvent('sb-status'));
-      } else {
-        console.warn('[SAFEFLOW] ⚠️ Supabase 설정 필요 - ⚙️ 관리 → 🔄 기기간 동기화 카드에서 입력하세요');
-        window._sbStatus = { ok: false, reason: 'no_config' };
+          // Realtime 구독
+          supabase
+            .channel('app_state_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, (payload) => {
+              const row = payload.new || payload.old;
+              if (!row?.key) return;
+              const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
+              window.dispatchEvent(new CustomEvent('supabase-sync', { detail: { key: row.key, value: v } }));
+              console.log('[SAFEFLOW] 📡 동기화 수신:', row.key.slice(0, 60));
+            })
+            .subscribe((status) => {
+              console.log('[SAFEFLOW] Realtime:', status);
+              window._sbStatus = { ok: status === 'SUBSCRIBED', status };
+              window.dispatchEvent(new CustomEvent('sb-status'));
+              if (status === 'SUBSCRIBED') console.log('[SAFEFLOW] ✅ Realtime 구독 성공 - 기기간 동기화 활성화');
+              if (status === 'CHANNEL_ERROR') console.error('[SAFEFLOW] ❌ Realtime 오류 - Database → Replication에서 app_state 토글 ON 확인');
+            });
+
+          // 디버그 헬퍼
+          window._safeflow = {
+            async checkConnection() {
+              const { count, error } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
+              if (error) { console.error('❌ DB 접근 실패:', error.message); return false; }
+              console.log('✅ Supabase 정상 - app_state 레코드:', count); return true;
+            },
+            async listKeys() {
+              const { data } = await supabase.from('app_state').select('key, updated_at').order('updated_at', { ascending: false });
+              console.table(data); return data;
+            },
+          };
+
+          console.log('[SAFEFLOW] ✅ Supabase 연결 완료');
+          window._sbStatus = { ok: true };
+          window.dispatchEvent(new CustomEvent('sb-status'));
+        } else {
+          console.warn('[SAFEFLOW] ⚠️ Supabase 설정 필요 - ⚙️ 관리 → 🔄 기기간 동기화 카드에서 입력하세요');
+          window._sbStatus = { ok: false, reason: 'no_config' };
+          window.dispatchEvent(new CustomEvent('sb-status'));
+        }
+      } catch (e) {
+        console.error('[SAFEFLOW] Supabase 로드 실패:', e);
+        window._sbStatus = { ok: false, reason: 'load_error', error: String(e.message || e) };
         window.dispatchEvent(new CustomEvent('sb-status'));
       }
-    } catch (e) {
-      console.error('[SAFEFLOW] Supabase 로드 실패:', e);
-      window._sbStatus = { ok: false, reason: 'load_error', error: String(e.message || e) };
-      window.dispatchEvent(new CustomEvent('sb-status'));
-    }
+    })();
   </script>
 
   <div id="root"></div>
