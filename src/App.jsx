@@ -3987,25 +3987,152 @@ function HeatmapPage({ settings, setSettings, session }) {
   const workSites = settings.workSites || [];
   const assets = settings.assets || [];
 
-  // 🗺️ 지도 이미지/영역을 별도 키로 분리 (다른 데이터와 같은 fid 패턴 사용)
+  // 🗺️ 지도 데이터 키
   const fid = session?.festivalId || "default";
-  const [mapImage, setMapImage] = usePersist(`${fid}_map_img_v1`, null);
-  const [mapAreas, setMapAreas] = usePersist(`${fid}_map_areas_v1`, []);
+  const IMG_KEY = `${fid}_map_img_v1`;
+  const AREAS_KEY = `${fid}_map_areas_v1`;
 
-  // 마이그레이션: settings.mapImage / settings.mapAreas → 별도 키 (한번만)
-  useEffect(() => {
+  // 로컬 state (저장 전 임시 보관)
+  const [mapImage, setMapImageLocal] = useState(null);
+  const [mapAreas, setMapAreasLocal] = useState([]);
+  const [savedImage, setSavedImage] = useState(null);  // 마지막 저장된 값 (변경 감지용)
+  const [savedAreas, setSavedAreas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+
+  // 변경 여부 감지
+  const hasChanges = mapImage !== savedImage || JSON.stringify(mapAreas) !== JSON.stringify(savedAreas);
+
+  // 초기 로드 - localStorage + Supabase
+  const loadData = async () => {
+    setLoading(true);
+    // 1) localStorage에서 즉시 로드
+    try {
+      const localImg = localStorage.getItem(IMG_KEY);
+      const localAreas = localStorage.getItem(AREAS_KEY);
+      if (localImg) {
+        const img = JSON.parse(localImg);
+        setMapImageLocal(img); setSavedImage(img);
+      }
+      if (localAreas) {
+        const areas = JSON.parse(localAreas);
+        setMapAreasLocal(areas); setSavedAreas(areas);
+      }
+    } catch {}
+
+    // 2) Supabase에서 최신 로드
+    if (window.storage) {
+      try {
+        const [imgRes, areasRes] = await Promise.all([
+          window.storage.get(IMG_KEY),
+          window.storage.get(AREAS_KEY)
+        ]);
+        if (imgRes?.value) {
+          const img = JSON.parse(imgRes.value);
+          setMapImageLocal(img); setSavedImage(img);
+          localStorage.setItem(IMG_KEY, imgRes.value);
+        }
+        if (areasRes?.value) {
+          const areas = JSON.parse(areasRes.value);
+          setMapAreasLocal(areas); setSavedAreas(areas);
+          localStorage.setItem(AREAS_KEY, areasRes.value);
+        }
+        console.log("[히트맵] Supabase에서 최신 데이터 로드 완료");
+      } catch (e) {
+        console.error("[히트맵] 로드 실패:", e);
+      }
+    }
+
+    // 3) 마이그레이션 (settings에 있으면 가져오기)
     if (!mapImage && settings.mapImage) {
-      console.log("[히트맵] 기존 도면 마이그레이션");
-      setMapImage(settings.mapImage);
+      setMapImageLocal(settings.mapImage);
     }
     if ((!mapAreas || mapAreas.length === 0) && settings.mapAreas?.length > 0) {
-      console.log("[히트맵] 기존 영역 마이그레이션:", settings.mapAreas.length + "개");
-      setMapAreas(settings.mapAreas);
+      setMapAreasLocal(settings.mapAreas);
     }
-    if (settings.mapImage || settings.mapAreas?.length > 0) {
-      setTimeout(() => setSettings(prev => { const n = { ...prev }; delete n.mapImage; delete n.mapAreas; return n; }), 1000);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // 저장하지 않은 변경사항이 있을 때 페이지 떠나기 경고
+  useEffect(() => {
+    if (!hasChanges) return;
+    const h = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [hasChanges]);
+
+  // Realtime 동기화 - 다른 기기에서 저장 시 자동 수신
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.detail?.key) return;
+      if (e.detail.key === IMG_KEY) {
+        try {
+          const img = JSON.parse(e.detail.value);
+          setMapImageLocal(img); setSavedImage(img);
+          console.log("[히트맵] 📡 도면 동기화 수신");
+        } catch {}
+      } else if (e.detail.key === AREAS_KEY) {
+        try {
+          const areas = JSON.parse(e.detail.value);
+          setMapAreasLocal(areas); setSavedAreas(areas);
+          console.log("[히트맵] 📡 영역 동기화 수신:", areas.length + "개");
+        } catch {}
+      }
+    };
+    window.addEventListener("supabase-sync", handler);
+    return () => window.removeEventListener("supabase-sync", handler);
+  }, [IMG_KEY, AREAS_KEY]);
+
+  // 저장 함수 (수동)
+  const saveAll = async () => {
+    if (!hasChanges) { alert("변경사항이 없습니다."); return; }
+    setSaving(true);
+    try {
+      // localStorage 즉시 저장
+      if (mapImage) localStorage.setItem(IMG_KEY, JSON.stringify(mapImage));
+      else localStorage.removeItem(IMG_KEY);
+      localStorage.setItem(AREAS_KEY, JSON.stringify(mapAreas));
+
+      // Supabase 저장
+      if (window.storage) {
+        const tasks = [];
+        if (mapImage !== savedImage) tasks.push(window.storage.set(IMG_KEY, JSON.stringify(mapImage)));
+        if (JSON.stringify(mapAreas) !== JSON.stringify(savedAreas)) tasks.push(window.storage.set(AREAS_KEY, JSON.stringify(mapAreas)));
+        const results = await Promise.all(tasks);
+        const allOk = results.every(r => r !== null);
+        if (!allOk) {
+          alert("⚠️ 일부 저장 실패\n\nSupabase 연결 상태를 확인하세요.");
+          setSaving(false);
+          return;
+        }
+      } else {
+        alert("⚠️ Supabase 미연결\n\n로컬에만 저장됩니다.\n⚙️ 관리 → Supabase 설정을 완료하세요.");
+      }
+
+      setSavedImage(mapImage);
+      setSavedAreas(mapAreas);
+      setLastSaved(new Date().toLocaleTimeString("ko-KR"));
+      console.log("[히트맵] ✅ 저장 완료");
+    } catch (e) {
+      console.error("[히트맵] 저장 실패:", e);
+      alert("❌ 저장 실패: " + e.message);
+    } finally {
+      setSaving(false);
     }
-  }, []);
+  };
+
+  // wrapper - 호환성을 위해 setMapImage / setMapAreas 그대로 사용
+  const setMapImage = (val) => {
+    if (typeof val === "function") setMapImageLocal(prev => val(prev));
+    else setMapImageLocal(val);
+  };
+  const setMapAreas = (val) => {
+    if (typeof val === "function") setMapAreasLocal(prev => val(prev));
+    else setMapAreasLocal(val);
+  };
 
   // 구역별 근무자/무전기 정보 자동 집계
   const getAreaInfo = (zoneId) => {
@@ -4089,7 +4216,7 @@ function HeatmapPage({ settings, setSettings, session }) {
     const newArea = { id: "ma_" + Date.now(), zoneId: drawingZoneId, points: drawingPoints };
     setMapAreas(prev => [...(prev || []), newArea]);
     setDrawingPoints([]); setDrawingZoneId(""); setMode("view");
-    alert("✅ 영역이 저장되었습니다.");
+    alert("✅ 영역이 추가되었습니다.\n\n💾 우측 상단 [저장] 버튼을 눌러 다른 기기에 동기화하세요.");
   };
 
   const cancelDrawing = () => {
@@ -4131,7 +4258,10 @@ function HeatmapPage({ settings, setSettings, session }) {
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <style>{`@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor) drop-shadow(0 0 32px currentColor)}}`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <PageHeader icon="🗺️" title="히트맵 지도" subtitle={`도면 ${mapImage ? "✓" : "X"} · 영역 ${mapAreas?.length || 0}개`} accent="#42A5F5" action={<button onClick={() => location.reload()} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>🔄 새로고침</button>} />
+      <PageHeader icon="🗺️" title="히트맵 지도" subtitle={loading ? "불러오는 중..." : `도면 ${mapImage ? "✓" : "X"} · 영역 ${mapAreas?.length || 0}개${lastSaved ? ` · 저장 ${lastSaved}` : ""}`} accent="#42A5F5" action={canEdit ? <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={loadData} disabled={loading} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>🔄 동기화</button>
+        <button onClick={saveAll} disabled={saving || !hasChanges} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: hasChanges ? "linear-gradient(135deg, #66BB6A, #43A047)" : "rgba(255,255,255,0.05)", color: hasChanges ? "#fff" : "#475569", fontSize: 12, fontWeight: 700, cursor: hasChanges ? "pointer" : "not-allowed", boxShadow: hasChanges ? "0 4px 12px rgba(76,175,80,0.3)" : "none", animation: hasChanges ? "pulse 2s infinite" : "none" }}>{saving ? "⏳ 저장중..." : hasChanges ? "💾 저장 *" : "✅ 저장됨"}</button>
+      </div> : null} />
 
       {!mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
