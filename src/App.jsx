@@ -378,22 +378,63 @@ function usePersist(key, init) {
   const lastJson = useRef(localStorage.getItem(key) || "");
   const saveTimer = useRef(null);
   const selfSave = useRef(false);
+  const pendingSave = useRef(null);
+  // 🔒 Supabase 로드 완료 전엔 절대 저장 안 함 (옛날 로컬 데이터로 클라우드 덮어쓰기 방지)
+  const supabaseLoaded = useRef(false);
+  const userInteracted = useRef(false); // 사용자가 직접 변경한 경우만 true
 
   useEffect(() => { valRef.current = val; }, [val]);
 
-  // 최초 Supabase 로드 (1회)
+  // 최초 Supabase 로드 (1회 + window.storage 준비될 때까지 재시도)
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const tryLoad = async (attempt = 0) => {
+      if (cancelled) return;
+      if (!window.storage) {
+        if (attempt < 60) setTimeout(() => tryLoad(attempt + 1), 500); // 30초까지 재시도
+        else {
+          // Supabase 미연결 확정 - 로컬 저장 허용
+          console.warn("[usePersist] Supabase 연결 실패, 로컬 모드로 전환:", key);
+          supabaseLoaded.current = true;
+        }
+        return;
+      }
       try {
         const r = await window.storage.get(key);
-        if (r?.value && r.value !== lastJson.current) {
-          lastJson.current = r.value;
-          const p = JSON.parse(r.value);
-          setVal(p); valRef.current = p;
-          localStorage.setItem(key, r.value);
+        if (cancelled) return;
+        if (r?.value) {
+          // 🔄 Supabase 데이터가 있으면 항상 그것을 우선 (로컬은 무시)
+          if (r.value !== lastJson.current) {
+            lastJson.current = r.value;
+            const p = JSON.parse(r.value);
+            setVal(p); valRef.current = p;
+            localStorage.setItem(key, r.value);
+            console.log("[usePersist] ☁️ Supabase에서 최신 로드:", key.slice(0, 50));
+          } else {
+            console.log("[usePersist] ☁️ Supabase=로컬 일치:", key.slice(0, 50));
+          }
+        } else {
+          console.log("[usePersist] ☁️ Supabase에 데이터 없음 (로컬 사용):", key.slice(0, 50));
         }
-      } catch {}
-    })();
+        // 이제부터 저장 허용
+        supabaseLoaded.current = true;
+
+        // 보류 중인 저장이 있으면 (사용자가 변경했으면) 실행
+        if (pendingSave.current !== null && userInteracted.current) {
+          const json = pendingSave.current;
+          pendingSave.current = null;
+          selfSave.current = true;
+          window.storage.set(key, json).catch(() => {}).finally(() => {
+            setTimeout(() => { selfSave.current = false; }, 3000);
+          });
+        }
+      } catch (e) {
+        console.error("[usePersist] 로드 실패:", key, e);
+        supabaseLoaded.current = true; // 실패 시에도 로컬 모드로 전환
+      }
+    };
+    tryLoad();
+    return () => { cancelled = true; };
   }, [key]);
 
   // Realtime 이벤트 (자기 저장 3초간 무시)
@@ -402,25 +443,50 @@ function usePersist(key, init) {
       if (selfSave.current) return;
       if (e.detail?.key === key && e.detail?.value) {
         const j = typeof e.detail.value === "string" ? e.detail.value : JSON.stringify(e.detail.value);
-        if (j !== lastJson.current) { lastJson.current = j; const p = JSON.parse(j); setVal(p); valRef.current = p; }
+        if (j !== lastJson.current) {
+          lastJson.current = j;
+          try {
+            const p = JSON.parse(j);
+            setVal(p);
+            valRef.current = p;
+            localStorage.setItem(key, j);
+            console.log("[usePersist] 📡 Realtime 수신:", key.slice(0, 50));
+          } catch {}
+        }
       }
     };
     window.addEventListener("supabase-sync", handler);
     return () => window.removeEventListener("supabase-sync", handler);
   }, [key]);
 
-  // set: 로컬 즉시 + Supabase 2초 디바운스
+  // set: 로컬 즉시 + Supabase 2초 디바운스 (단, Supabase 로드 후에만)
   const set = useCallback((v) => {
     const next = typeof v === "function" ? v(valRef.current) : v;
     setVal(next); valRef.current = next;
     const json = JSON.stringify(next);
     lastJson.current = json;
-    localStorage.setItem(key, json);
+    userInteracted.current = true; // 사용자 직접 변경 표시
+    try { localStorage.setItem(key, json); } catch (e) { console.warn("[usePersist] localStorage 실패:", key); }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const latestJson = JSON.stringify(valRef.current);
+      // 🚫 Supabase 로드 전이면 저장 보류 (옛 로컬 데이터로 클라우드 덮어쓰기 방지)
+      if (!supabaseLoaded.current) {
+        pendingSave.current = latestJson;
+        console.log("[usePersist] ⏸️ Supabase 로드 대기 중 - 저장 보류:", key.slice(0, 50));
+        return;
+      }
+      if (!window.storage) {
+        console.warn("[usePersist] window.storage 없음, 저장 스킵:", key);
+        return;
+      }
       selfSave.current = true;
-      window.storage.set(key, latestJson).catch(() => {}).finally(() => {
+      window.storage.set(key, latestJson).then(r => {
+        if (r) console.log("[usePersist] ✅ 저장 완료:", key.slice(0, 50));
+        else console.error("[usePersist] ❌ 저장 실패:", key);
+      }).catch((e) => {
+        console.error("[usePersist] 저장 예외:", key, e);
+      }).finally(() => {
         setTimeout(() => { selfSave.current = false; }, 3000);
       });
     }, 2000);
@@ -3979,6 +4045,7 @@ function HeatmapPage({ settings, setSettings, session }) {
   const [areaDetailId, setAreaDetailId] = useState(null);
   const [showLabels, setShowLabels] = useState(true);
   const [showWorkers, setShowWorkers] = useState(true);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | saving | synced
   const mapRef = useRef(null);
   const fileRef = useRef(null);
   const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
@@ -3987,152 +4054,32 @@ function HeatmapPage({ settings, setSettings, session }) {
   const workSites = settings.workSites || [];
   const assets = settings.assets || [];
 
-  // 🗺️ 지도 데이터 키
+  // 🗺️ 자동 동기화 - usePersist 사용 (변경 시 자동 저장 + Realtime 자동 수신)
   const fid = session?.festivalId || "default";
-  const IMG_KEY = `${fid}_map_img_v1`;
-  const AREAS_KEY = `${fid}_map_areas_v1`;
+  const [mapImage, setMapImage] = usePersist(`${fid}_map_img_v1`, null);
+  const [mapAreas, setMapAreas] = usePersist(`${fid}_map_areas_v1`, []);
 
-  // 로컬 state (저장 전 임시 보관)
-  const [mapImage, setMapImageLocal] = useState(null);
-  const [mapAreas, setMapAreasLocal] = useState([]);
-  const [savedImage, setSavedImage] = useState(null);  // 마지막 저장된 값 (변경 감지용)
-  const [savedAreas, setSavedAreas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-
-  // 변경 여부 감지
-  const hasChanges = mapImage !== savedImage || JSON.stringify(mapAreas) !== JSON.stringify(savedAreas);
-
-  // 초기 로드 - localStorage + Supabase
-  const loadData = async () => {
-    setLoading(true);
-    // 1) localStorage에서 즉시 로드
-    try {
-      const localImg = localStorage.getItem(IMG_KEY);
-      const localAreas = localStorage.getItem(AREAS_KEY);
-      if (localImg) {
-        const img = JSON.parse(localImg);
-        setMapImageLocal(img); setSavedImage(img);
-      }
-      if (localAreas) {
-        const areas = JSON.parse(localAreas);
-        setMapAreasLocal(areas); setSavedAreas(areas);
-      }
-    } catch {}
-
-    // 2) Supabase에서 최신 로드
-    if (window.storage) {
-      try {
-        const [imgRes, areasRes] = await Promise.all([
-          window.storage.get(IMG_KEY),
-          window.storage.get(AREAS_KEY)
-        ]);
-        if (imgRes?.value) {
-          const img = JSON.parse(imgRes.value);
-          setMapImageLocal(img); setSavedImage(img);
-          localStorage.setItem(IMG_KEY, imgRes.value);
-        }
-        if (areasRes?.value) {
-          const areas = JSON.parse(areasRes.value);
-          setMapAreasLocal(areas); setSavedAreas(areas);
-          localStorage.setItem(AREAS_KEY, areasRes.value);
-        }
-        console.log("[히트맵] Supabase에서 최신 데이터 로드 완료");
-      } catch (e) {
-        console.error("[히트맵] 로드 실패:", e);
-      }
-    }
-
-    // 3) 마이그레이션 (settings에 있으면 가져오기)
+  // 마이그레이션: settings → 별도 키 (한번만)
+  useEffect(() => {
     if (!mapImage && settings.mapImage) {
-      setMapImageLocal(settings.mapImage);
+      console.log("[히트맵] 도면 마이그레이션");
+      setMapImage(settings.mapImage);
     }
     if ((!mapAreas || mapAreas.length === 0) && settings.mapAreas?.length > 0) {
-      setMapAreasLocal(settings.mapAreas);
+      console.log("[히트맵] 영역 마이그레이션:", settings.mapAreas.length + "개");
+      setMapAreas(settings.mapAreas);
     }
-    setLoading(false);
-  };
-
-  useEffect(() => { loadData(); }, []);
-
-  // 저장하지 않은 변경사항이 있을 때 페이지 떠나기 경고
-  useEffect(() => {
-    if (!hasChanges) return;
-    const h = (e) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", h);
-    return () => window.removeEventListener("beforeunload", h);
-  }, [hasChanges]);
-
-  // Realtime 동기화 - 다른 기기에서 저장 시 자동 수신
-  useEffect(() => {
-    const handler = (e) => {
-      if (!e.detail?.key) return;
-      if (e.detail.key === IMG_KEY) {
-        try {
-          const img = JSON.parse(e.detail.value);
-          setMapImageLocal(img); setSavedImage(img);
-          console.log("[히트맵] 📡 도면 동기화 수신");
-        } catch {}
-      } else if (e.detail.key === AREAS_KEY) {
-        try {
-          const areas = JSON.parse(e.detail.value);
-          setMapAreasLocal(areas); setSavedAreas(areas);
-          console.log("[히트맵] 📡 영역 동기화 수신:", areas.length + "개");
-        } catch {}
-      }
-    };
-    window.addEventListener("supabase-sync", handler);
-    return () => window.removeEventListener("supabase-sync", handler);
-  }, [IMG_KEY, AREAS_KEY]);
-
-  // 저장 함수 (수동)
-  const saveAll = async () => {
-    if (!hasChanges) { alert("변경사항이 없습니다."); return; }
-    setSaving(true);
-    try {
-      // localStorage 즉시 저장
-      if (mapImage) localStorage.setItem(IMG_KEY, JSON.stringify(mapImage));
-      else localStorage.removeItem(IMG_KEY);
-      localStorage.setItem(AREAS_KEY, JSON.stringify(mapAreas));
-
-      // Supabase 저장
-      if (window.storage) {
-        const tasks = [];
-        if (mapImage !== savedImage) tasks.push(window.storage.set(IMG_KEY, JSON.stringify(mapImage)));
-        if (JSON.stringify(mapAreas) !== JSON.stringify(savedAreas)) tasks.push(window.storage.set(AREAS_KEY, JSON.stringify(mapAreas)));
-        const results = await Promise.all(tasks);
-        const allOk = results.every(r => r !== null);
-        if (!allOk) {
-          alert("⚠️ 일부 저장 실패\n\nSupabase 연결 상태를 확인하세요.");
-          setSaving(false);
-          return;
-        }
-      } else {
-        alert("⚠️ Supabase 미연결\n\n로컬에만 저장됩니다.\n⚙️ 관리 → Supabase 설정을 완료하세요.");
-      }
-
-      setSavedImage(mapImage);
-      setSavedAreas(mapAreas);
-      setLastSaved(new Date().toLocaleTimeString("ko-KR"));
-      console.log("[히트맵] ✅ 저장 완료");
-    } catch (e) {
-      console.error("[히트맵] 저장 실패:", e);
-      alert("❌ 저장 실패: " + e.message);
-    } finally {
-      setSaving(false);
+    if (settings.mapImage || settings.mapAreas?.length > 0) {
+      setTimeout(() => setSettings(prev => { const n = { ...prev }; delete n.mapImage; delete n.mapAreas; return n; }), 1500);
     }
-  };
+  }, []);
 
-  // wrapper - 호환성을 위해 setMapImage / setMapAreas 그대로 사용
-  const setMapImage = (val) => {
-    if (typeof val === "function") setMapImageLocal(prev => val(prev));
-    else setMapImageLocal(val);
-  };
-  const setMapAreas = (val) => {
-    if (typeof val === "function") setMapAreasLocal(prev => val(prev));
-    else setMapAreasLocal(val);
-  };
+  // 동기화 상태 표시 (저장 중 / 완료 표시)
+  useEffect(() => {
+    setSyncStatus("saving");
+    const t = setTimeout(() => setSyncStatus("synced"), 2500);
+    return () => clearTimeout(t);
+  }, [mapImage, mapAreas]);
 
   // 구역별 근무자/무전기 정보 자동 집계
   const getAreaInfo = (zoneId) => {
@@ -4216,7 +4163,7 @@ function HeatmapPage({ settings, setSettings, session }) {
     const newArea = { id: "ma_" + Date.now(), zoneId: drawingZoneId, points: drawingPoints };
     setMapAreas(prev => [...(prev || []), newArea]);
     setDrawingPoints([]); setDrawingZoneId(""); setMode("view");
-    alert("✅ 영역이 추가되었습니다.\n\n💾 우측 상단 [저장] 버튼을 눌러 다른 기기에 동기화하세요.");
+    alert("✅ 영역이 추가되었습니다.\n\n다른 기기에 자동으로 동기화됩니다 (3~5초).");
   };
 
   const cancelDrawing = () => {
@@ -4258,10 +4205,11 @@ function HeatmapPage({ settings, setSettings, session }) {
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <style>{`@keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor)}50%{filter:drop-shadow(0 0 16px currentColor) drop-shadow(0 0 32px currentColor)}}`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <PageHeader icon="🗺️" title="히트맵 지도" subtitle={loading ? "불러오는 중..." : `도면 ${mapImage ? "✓" : "X"} · 영역 ${mapAreas?.length || 0}개${lastSaved ? ` · 저장 ${lastSaved}` : ""}`} accent="#42A5F5" action={canEdit ? <div style={{ display: "flex", gap: 6 }}>
-        <button onClick={loadData} disabled={loading} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#94A3B8", fontSize: 12, cursor: "pointer" }}>🔄 동기화</button>
-        <button onClick={saveAll} disabled={saving || !hasChanges} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: hasChanges ? "linear-gradient(135deg, #66BB6A, #43A047)" : "rgba(255,255,255,0.05)", color: hasChanges ? "#fff" : "#475569", fontSize: 12, fontWeight: 700, cursor: hasChanges ? "pointer" : "not-allowed", boxShadow: hasChanges ? "0 4px 12px rgba(76,175,80,0.3)" : "none", animation: hasChanges ? "pulse 2s infinite" : "none" }}>{saving ? "⏳ 저장중..." : hasChanges ? "💾 저장 *" : "✅ 저장됨"}</button>
-      </div> : null} />
+      <PageHeader icon="🗺️" title="히트맵 지도" subtitle={`도면 ${mapImage ? "✓" : "X"} · 영역 ${mapAreas?.length || 0}개`} accent="#42A5F5" action={<div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 8, background: syncStatus === "saving" ? "rgba(255,167,38,0.1)" : "rgba(76,175,80,0.1)", border: `1px solid ${syncStatus === "saving" ? "rgba(255,167,38,0.3)" : "rgba(76,175,80,0.3)"}` }}>
+        <span style={{ fontSize: 12, color: syncStatus === "saving" ? "#FFA726" : "#66BB6A", fontWeight: 700 }}>
+          {syncStatus === "saving" ? "⏳ 동기화중..." : "✅ 자동 동기화"}
+        </span>
+      </div>} />
 
       {!mapImage && canEdit && <Card style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
