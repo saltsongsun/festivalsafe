@@ -822,6 +822,234 @@ const CC_STYLES = `
 const CC_LEVEL_MAP = { BLUE: "blue", YELLOW: "yellow", ORANGE: "orange", RED: "red" };
 const CC_LEVEL_LABEL = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" };
 
+// ─── Mobile Design System (클로드디자인 v2 모바일) ─────────────────
+const MD_STYLES = `
+  .md-root { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #07070d; color: #f4f5fa; min-height: 100vh; padding-bottom: 80px; }
+  .md-root .mono { font-family: 'JetBrains Mono', monospace; }
+  .md-root * { -webkit-tap-highlight-color: transparent; }
+
+  .md-topbar { padding: calc(env(safe-area-inset-top) + 14px) 18px 14px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(180deg, #0e0f17 0%, rgba(14,15,23,0.85) 100%); position: sticky; top: 0; z-index: 50; backdrop-filter: blur(16px); }
+  .md-topbar .greet { display: flex; flex-direction: column; }
+  .md-topbar .greet-sub { font-size: 11px; color: #6c6e7d; }
+  .md-topbar .greet-fest { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: #f4f5fa; }
+  .md-topbar .actions { display: flex; gap: 6px; }
+  .md-topbar .icon-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; color: #b0b3c4; font-size: 16px; }
+  .md-topbar .icon-btn .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #ff5e7e; border-radius: 50%; box-shadow: 0 0 8px #ff5e7e; }
+
+  .md-banner { margin: 12px 16px; padding: 16px; border-radius: 16px; box-shadow: 0 12px 32px -16px rgba(0,0,0,0.6); }
+  .md-banner.orange { background: linear-gradient(180deg, rgba(255,154,60,0.18), rgba(255,154,60,0.04)); border: 1px solid rgba(255,154,60,0.3); }
+  .md-banner.yellow { background: linear-gradient(180deg, rgba(245,196,81,0.15), rgba(245,196,81,0.03)); border: 1px solid rgba(245,196,81,0.25); }
+  .md-banner.red { background: linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04)); border: 1px solid rgba(255,94,126,0.3); }
+  .md-banner.blue { background: linear-gradient(180deg, rgba(76,217,154,0.12), rgba(76,217,154,0.03)); border: 1px solid rgba(76,217,154,0.2); }
+
+  .md-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1; }
+  .md-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
+  .md-chip.blue { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .md-chip.yellow { background: rgba(245,196,81,0.14); color: #f5c451; }
+  .md-chip.orange { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+  .md-chip.red { background: rgba(255,94,126,0.16); color: #ff5e7e; }
+  .md-chip.green { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .md-chip .dot.pulse { animation: cc-pulse 1.6s ease-in-out infinite; }
+
+  .md-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; margin-bottom: 12px; }
+  .md-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px; margin-bottom: 12px; }
+
+  .md-metric { padding: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); cursor: pointer; transition: transform 0.15s; }
+  .md-metric:active { transform: scale(0.97); }
+  .md-metric.alert { border-color: rgba(245,196,81,0.3); background: linear-gradient(180deg, rgba(245,196,81,0.08), rgba(245,196,81,0.02)), #0e0f17; }
+  .md-metric.danger { border-color: rgba(255,154,60,0.4); background: linear-gradient(180deg, rgba(255,154,60,0.1), rgba(255,154,60,0.02)), #0e0f17; }
+  .md-metric.red-alert { border-color: rgba(255,94,126,0.4); background: linear-gradient(180deg, rgba(255,94,126,0.1), rgba(255,94,126,0.02)), #0e0f17; }
+  .md-metric-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .md-metric-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .md-metric-icon { width: 22px; height: 22px; border-radius: 6px; background: #1d1f2c; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .md-metric.alert .md-metric-icon { background: rgba(245,196,81,0.15); }
+  .md-metric.danger .md-metric-icon { background: rgba(255,154,60,0.18); }
+  .md-metric.red-alert .md-metric-icon { background: rgba(255,94,126,0.18); }
+  .md-metric-val { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-family: 'JetBrains Mono', monospace; color: #f4f5fa; }
+  .md-metric.danger .md-metric-val { color: #ff9a3c; }
+  .md-metric.red-alert .md-metric-val { color: #ff5e7e; }
+  .md-metric-unit { font-size: 11px; color: #6c6e7d; margin-left: 4px; font-weight: 400; font-family: inherit; }
+  .md-metric-trend { font-size: 10px; color: #6c6e7d; margin-top: 4px; }
+
+  .md-card { margin: 0 16px 12px; padding: 14px 16px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); }
+  .md-card-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .md-card-title { font-size: 13px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .md-card-sub { font-size: 11px; color: #6c6e7d; margin-top: 2px; }
+
+  .md-list-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .md-list-row:last-child { border-bottom: 0; }
+
+  .md-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 0 calc(env(safe-area-inset-bottom) + 8px); background: rgba(7,7,13,0.92); backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-around; z-index: 100; }
+  .md-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 12px; cursor: pointer; color: #6c6e7d; min-width: 56px; }
+  .md-nav-item.active { color: #6b8aff; }
+  .md-nav-item.active .md-nav-icon { transform: translateY(-2px); }
+  .md-nav-icon { font-size: 22px; transition: transform 0.15s; position: relative; }
+  .md-nav-label { font-size: 10px; font-weight: 600; }
+  .md-nav-badge { position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; border-radius: 8px; background: #ff5e7e; color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 0 8px rgba(255,94,126,0.5); }
+
+  .md-overall-hero { margin: 12px 16px 16px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(107,138,255,0.08), rgba(169,128,255,0.04)); border: 1px solid rgba(107,138,255,0.18); }
+  .md-overall-label { font-size: 11px; color: #6c6e7d; letter-spacing: 0.04em; }
+  .md-overall-status { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; color: #f4f5fa; }
+  .md-overall-time { font-size: 11px; color: #6c6e7d; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+`;
+
+const MD_LEVEL_COLORS = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" };
+
+const MD_Chip = ({ level, children, pulse }) => (<span className={`md-chip ${level || "blue"}`}><span className={`dot ${pulse ? "pulse" : ""}`} />{children}</span>);
+
+const MD_Metric = ({ cat, onClick }) => {
+  const lv = getLevel(cat);
+  const isAlert = lv === "YELLOW";
+  const isDanger = lv === "ORANGE";
+  const isRed = lv === "RED";
+  return (<div className={`md-metric ${isAlert ? "alert" : ""} ${isDanger ? "danger" : ""} ${isRed ? "red-alert" : ""}`} onClick={onClick}>
+    <div className="md-metric-h">
+      <span className="md-metric-name"><span className="md-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
+      <MD_Chip level={CC_LEVEL_MAP[lv]}>{CC_LEVEL_LABEL[lv]}</MD_Chip>
+    </div>
+    <div className="md-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="md-metric-unit">{cat.unit}</span></div>
+    <div className="md-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
+  </div>);
+};
+
+// ─── Mobile 클로드디자인 대시보드 ──────────────────────────────────
+function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign }) {
+  const overall = useMemo(() => {
+    const lvs = (categories || []).map(c => getLevel(c));
+    if (lvs.includes("RED")) return "RED";
+    if (lvs.includes("ORANGE")) return "ORANGE";
+    if (lvs.includes("YELLOW")) return "YELLOW";
+    return "BLUE";
+  }, [categories]);
+  const overallColor = MD_LEVEL_COLORS[overall];
+  const overallLabel = CC_LEVEL_LABEL[overall];
+
+  const sortedCats = [...(categories || [])].sort((a, b) => {
+    const ord = { RED: 0, ORANGE: 1, YELLOW: 2, BLUE: 3 };
+    return ord[getLevel(a)] - ord[getLevel(b)];
+  });
+
+  const topAlert = alerts && alerts[0];
+  const unreadAlerts = (alerts || []).filter(a => a.level === "ORANGE" || a.level === "RED").length;
+
+  return (<>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>{MD_STYLES}</style>
+    <div className="md-root">
+      {/* 상단바 */}
+      <div className="md-topbar">
+        <div className="greet">
+          <div className="greet-sub">관제센터 · {session?.name}</div>
+          <div className="greet-fest">{settings?.festivalName || "축제 미설정"}</div>
+        </div>
+        <div className="actions">
+          <button className="icon-btn" onClick={onSearch}>🔍</button>
+          <button className="icon-btn" onClick={() => onPageChange && onPageChange("chat")}>
+            🔔
+            {unreadAlerts > 0 && <span className="dot" />}
+          </button>
+          <button className="icon-btn" onClick={onSwitchToOldDesign} title="기존 디자인으로">⚙️</button>
+        </div>
+      </div>
+
+      {/* 종합 상태 히어로 */}
+      <div className="md-overall-hero">
+        <div className="md-overall-label">현재 종합 위험도</div>
+        <div className="md-overall-status">
+          지금 <span style={{ color: overallColor }}>{overallLabel}</span> 단계예요
+        </div>
+        <div className="md-overall-time">{new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+      </div>
+
+      {/* 최우선 알림 배너 */}
+      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`} onClick={() => onAlertClick && onAlertClick(topAlert)}>
+        <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
+        <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
+        <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
+        <button style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
+      </div>}
+
+      {/* 메트릭 그리드 (2열) */}
+      <div className="md-grid2">
+        {sortedCats.slice(0, 4).map(cat => (<MD_Metric key={cat.id} cat={cat} onClick={() => onCardClick && onCardClick(cat.id)} />))}
+      </div>
+      {sortedCats.length > 4 && <div className="md-grid2">
+        {sortedCats.slice(4).map(cat => (<MD_Metric key={cat.id} cat={cat} onClick={() => onCardClick && onCardClick(cat.id)} />))}
+      </div>}
+
+      {/* 활성 경보 카드 */}
+      <div className="md-card">
+        <div className="md-card-h">
+          <div>
+            <div className="md-card-title">활성 경보 {(alerts || []).length}건</div>
+            <div className="md-card-sub">실시간 갱신</div>
+          </div>
+          {(alerts || []).length > 0 && <button onClick={() => onPageChange && onPageChange("chat")} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>전체 →</button>}
+        </div>
+        {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="md-list-row" onClick={() => onAlertClick && onAlertClick(a)}>
+          <MD_Chip level={CC_LEVEL_MAP[a.level]} pulse={a.level === "ORANGE" || a.level === "RED"}>●</MD_Chip>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.category}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{a.time?.split(" ")[1] || a.time}</span>
+        </div>))}
+        {(!alerts || alerts.length === 0) && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보 없음 ✓</div>}
+      </div>
+
+      {/* 구역 혼잡도 카드 */}
+      {(settings.zones || []).length > 0 && <div className="md-card">
+        <div className="md-card-h">
+          <div className="md-card-title">구역별 혼잡도</div>
+          <div className="md-card-sub">{(settings.zones || []).length}개 구역</div>
+        </div>
+        {(settings.zones || []).slice(0, 5).map(z => {
+          const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+          const cl = c?.level || "smooth";
+          const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+          const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+          return (<div key={z.id} className="md-list-row">
+            <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+            <MD_Chip level={lv}>{lbl}</MD_Chip>
+          </div>);
+        })}
+      </div>}
+
+      {/* 빠른 액션 */}
+      <div className="md-card">
+        <div className="md-card-title" style={{ marginBottom: 10 }}>빠른 액션</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {isManager && <button onClick={() => onPageChange && onPageChange("chat")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(107,138,255,0.2)", background: "linear-gradient(180deg, rgba(107,138,255,0.1), rgba(107,138,255,0.02))", color: "#6b8aff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔔 경보 발령</button>}
+          <button onClick={() => onPageChange && onPageChange("heatmap")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗺️ 지도 상황</button>
+          <button onClick={() => onPageChange && onPageChange("congestion")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🚦 혼잡도</button>
+          <button onClick={() => onPageChange && onPageChange("counter")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>👥 인파계수</button>
+        </div>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── Mobile 새 하단 네비게이션 ─────────────────────────────────────
+function MobileNewBottomNav({ active, onChange, alertCount, onMore }) {
+  const items = [
+    { id: "dashboard", emoji: "🏠", label: "홈" },
+    { id: "counter", emoji: "📡", label: "모니터" },
+    { id: "heatmap", emoji: "🗺️", label: "지도" },
+    { id: "chat", emoji: "🔔", label: "알림", badge: alertCount > 0 ? alertCount : null },
+    { id: "_more", emoji: "⋯", label: "더보기" },
+  ];
+  return (<div className="md-bottom-nav">
+    {items.map(it => (<div key={it.id} className={`md-nav-item ${active === it.id ? "active" : ""}`} onClick={() => it.id === "_more" ? onMore && onMore() : onChange && onChange(it.id)}>
+      <div className="md-nav-icon">
+        {it.emoji}
+        {it.badge && <span className="md-nav-badge">{it.badge > 9 ? "9+" : it.badge}</span>}
+      </div>
+      <span className="md-nav-label">{it.label}</span>
+    </div>))}
+  </div>);
+}
+
 const CC_Chip = ({ level, children, pulse }) => (<span className={`cc-chip ${level || "blue"}`}><span className={`cc-dot ${pulse ? "pulse" : ""}`} />{children}</span>);
 const CC_Btn = ({ children, variant = "", size = "", onClick, style }) => (<button className={`cc-btn ${variant} ${size}`} onClick={onClick} style={style}>{children}</button>);
 const CC_Card = ({ children, title, sub, action, tinted, style }) => (<div className={`cc-card ${tinted ? "tinted" : ""}`} style={style}>{(title || action) && <div className="cc-card-h"><div>{title && <div className="cc-card-title">{title}</div>}{sub && <div className="cc-card-sub">{sub}</div>}</div>{action}</div>}{children}</div>);
@@ -8800,6 +9028,13 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   // 🖥️ PC 관제센터 모드 (1024px 이상 자동 감지 + 사용자 토글 가능)
   const [forceMobile, setForceMobile] = useState(() => localStorage.getItem("_force_mobile") === "1");
+  // 🎨 새 모바일 디자인 (클로드디자인 v2) - 기본 ON
+  const [useNewMobile, setUseNewMobile] = useState(() => localStorage.getItem("_new_mobile") !== "0");
+  const toggleNewMobile = () => {
+    const next = !useNewMobile;
+    setUseNewMobile(next);
+    localStorage.setItem("_new_mobile", next ? "1" : "0");
+  };
   const [isPC, setIsPC] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024);
   useEffect(() => {
     const onResize = () => setIsPC(window.innerWidth >= 1024);
@@ -9087,19 +9322,20 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     <style>{`@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
 
-    {/* Top bar - user info */}
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
+    {/* Top bar - user info (새 모바일 디자인 대시보드면 숨김) */}
+    {!(useNewMobile && page === "dashboard") && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
         <span style={{ padding: "3px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         {isPC && isManager && forceMobile && <button onClick={toggleMobileView} title="PC 관제센터로 전환" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.3)", background: "rgba(107,138,255,0.06)", color: "#6b8aff", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🖥️ PC관제센터</button>}
+        <button onClick={toggleNewMobile} title={useNewMobile ? "기존 디자인" : "새 디자인 v2"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(169,128,255,0.3)", background: "rgba(169,128,255,0.06)", color: "#a980ff", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>{useNewMobile ? "🎨 v2" : "🎨 v1"}</button>
         <button onClick={() => setShowSearch(true)} title="통합 검색 (Ctrl+K)" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(66,165,245,0.25)", background: "rgba(33,150,243,0.06)", color: "#42A5F5", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>🔍 <span style={{ fontSize: 11, opacity: 0.6, display: "none" }}>⌘K</span></button>
         {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#FFA726", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
         <button onClick={onLogout} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
       </div>
-    </div>
+    </div>}
 
     {/* 통합 검색 모달 */}
     <SearchModal open={showSearch} onClose={() => setShowSearch(false)} settings={settings} categories={categories} onNavigate={(p) => setPage(p)} />
@@ -9152,8 +9388,21 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     </nav>
 
     {/* Content */}
-    <div style={{ paddingTop: "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
-      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
+    <div style={{ paddingTop: useNewMobile && page === "dashboard" ? 0 : "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
+      {page === "dashboard" && useNewMobile && active && <MobileNewDashboard
+        session={session}
+        settings={settings}
+        categories={categories}
+        alerts={alerts}
+        onCardClick={onCardClick}
+        onSearch={() => setShowSearch(true)}
+        onAlertClick={(a) => setActiveAlert(a)}
+        onPageChange={setPage}
+        onLogout={onLogout}
+        isManager={isManager}
+        onSwitchToOldDesign={toggleNewMobile}
+      />}
+      {page === "dashboard" && !useNewMobile && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
         // 삭제 시 해당 알림의 cooldown을 현재 시각으로 갱신 (10분 내 재생성 방지)
         const now = Date.now();
         if (idx === "all") {
