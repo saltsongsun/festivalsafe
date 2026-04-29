@@ -318,7 +318,27 @@
   </script>
 
   <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();"></script>
-  <script>setTimeout(function(){if(!document.getElementById('root').children.length){document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();}},8000)</script>
+  <script>
+    // React 앱이 정상 마운트 됐는지 주기적 확인 (15초 후에만 fallback)
+    var _appLoadCheck = setInterval(function() {
+      var root = document.getElementById('root');
+      if (root && root.children.length > 0) {
+        // React가 마운트 성공 - fallback 절대 안 보이게
+        clearInterval(_appLoadCheck);
+        var ef = document.getElementById('error-fallback');
+        if (ef) ef.style.display = 'none';
+      }
+    }, 500);
+    // 15초 후에도 마운트 안 됐으면 그제야 fallback
+    setTimeout(function(){
+      clearInterval(_appLoadCheck);
+      if(!document.getElementById('root').children.length){
+        document.getElementById('error-fallback').classList.add('show');
+        var sp=document.getElementById('splash');
+        if(sp)sp.remove();
+      }
+    }, 15000);
+  </script>
 
   <script>
   if('serviceWorker' in navigator) {
