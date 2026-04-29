@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -879,6 +879,31 @@ const CC_Sidebar = ({ active, alerts, settings, onNav, onLogout, festivalName })
     </div>
   </div>);
 };
+
+// ─── ErrorBoundary - PC 관제센터 에러 시 모바일 모드로 fallback ─────
+class CCErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    console.error("[CCErrorBoundary] PC 관제센터 에러:", error);
+    console.error("[CCErrorBoundary] Info:", info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (<div style={{ minHeight: "100vh", background: "#0a0d1a", color: "#fff", padding: 40, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", fontFamily: "Pretendard" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🖥️⚠️</div>
+        <h2 style={{ color: "#FF5E7E", marginBottom: 12 }}>PC 관제센터 화면 오류</h2>
+        <p style={{ color: "#94A3B8", maxWidth: 500, marginBottom: 20 }}>새로 추가된 PC 관제센터 디자인에 일시적 오류가 발생했습니다.<br/>모바일 화면으로 전환하면 모든 기능을 사용하실 수 있습니다.</p>
+        <pre style={{ background: "rgba(244,67,54,0.1)", border: "1px solid rgba(244,67,54,0.3)", padding: 12, borderRadius: 8, fontSize: 11, maxWidth: 600, overflow: "auto", textAlign: "left", color: "#FF8A95", marginBottom: 20 }}>{String(this.state.error?.message || this.state.error)}</pre>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { localStorage.setItem("_force_mobile", "1"); location.reload(); }} style={{ padding: "12px 24px", borderRadius: 10, border: "none", background: "#42A5F5", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📱 모바일 화면으로 전환</button>
+          <button onClick={() => location.reload()} style={{ padding: "12px 24px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>🔄 새로고침</button>
+        </div>
+      </div>);
+    }
+    return this.props.children;
+  }
+}
 
 function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert }) {
   const [ccPage, setCcPage] = useState("dashboard");
@@ -9035,25 +9060,26 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   // 🖥️ PC 관제센터 모드 - 1024px 이상 + 관리자 + 토글 안 한 경우
   if (useControlCenter) {
-    return (<ControlCenterDashboard
-      session={session}
-      accounts={accounts}
-      settings={settings}
-      setSettings={setSettings}
-      categories={categories}
-      alerts={alerts}
-      setAlerts={setAlerts}
-      smsLog={smsLog}
-      setSmsLog={setSmsLog}
-      onLogout={onLogout}
-      onMobileSwitch={toggleMobileView}
-      setActiveAlert={setActiveAlert}
-      onNav={(id) => {
-        // 사이드바 메뉴 → 모바일 페이지 매핑 (백업용)
-        const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
-        if (map[id]) { setPage(map[id]); }
-      }}
-    />);
+    return (<CCErrorBoundary>
+      <ControlCenterDashboard
+        session={session}
+        accounts={accounts}
+        settings={settings}
+        setSettings={setSettings}
+        categories={categories}
+        alerts={alerts}
+        setAlerts={setAlerts}
+        smsLog={smsLog}
+        setSmsLog={setSmsLog}
+        onLogout={onLogout}
+        onMobileSwitch={toggleMobileView}
+        setActiveAlert={setActiveAlert}
+        onNav={(id) => {
+          const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
+          if (map[id]) { setPage(map[id]); }
+        }}
+      />
+    </CCErrorBoundary>);
   }
 
   return (<div style={{ fontFamily: "'Noto Sans KR',-apple-system,sans-serif" }}>
