@@ -105,6 +105,7 @@ const DEFAULT_SETTINGS = {
   parkingLots: [],
   notices: [],
   messages: [],
+  incidents: [],
   shuttleStops: [],
   shuttleBuses: [],
   festivalDates: ["2026-05-02","2026-05-03","2026-05-04","2026-05-05"],
@@ -879,7 +880,7 @@ const CC_Sidebar = ({ active, alerts, settings, onNav, onLogout, festivalName })
   </div>);
 };
 
-function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, onLogout, onMobileSwitch, onNav }) {
+function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const overall = useMemo(() => {
     const lvs = (categories || []).map(c => getLevel(c));
@@ -1000,46 +1001,597 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
           </>}
 
           {/* MONITOR 탭 */}
-          {ccPage === "monitor" && <CC_Card title="실시간 모니터링" sub="환경 카테고리 상세">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-              {(categories || []).map(c => (<CC_Metric key={c.id} cat={c} />))}
-            </div>
-          </CC_Card>}
-
-          {/* ALERT 탭 */}
-          {ccPage === "alert" && <CC_Card title="알림 / 경보 발령" sub="단계별 메시지 발송">
-            <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d" }}>
-              <p style={{ fontSize: 16 }}>경보 발령 기능 (개발 예정)</p>
-              <p style={{ fontSize: 13 }}>현재 자동 알림 시스템이 작동 중입니다. 활성 알림 {(alerts || []).length}건</p>
-            </div>
-          </CC_Card>}
-
-          {/* INCIDENT 탭 */}
-          {ccPage === "incident" && <CC_Card title="사건 / 신고" sub="현장 신고 접수 및 추적">
-            <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d" }}>
-              <p style={{ fontSize: 16 }}>사건/신고 시스템 (개발 예정)</p>
-            </div>
-          </CC_Card>}
-
-          {/* MAP 탭 */}
-          {ccPage === "map" && <CC_Card title="지도 상황도" sub="구역・핀・히트맵">
-            <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d" }}>
-              <p style={{ fontSize: 16 }}>모바일 화면의 🗺️ 히트맵 메뉴를 사용하세요</p>
-              <CC_Btn variant="primary" onClick={onMobileSwitch} style={{ marginTop: 12 }}>📱 모바일 보기로 전환</CC_Btn>
-            </div>
-          </CC_Card>}
-
-          {/* RESOURCE / REPORT / USER / SETTINGS - 기존 모바일 페이지로 안내 */}
-          {["resource","report","user","settings"].includes(ccPage) && <CC_Card title={{ resource: "리소스 관리", report: "리포트", user: "사용자 관리", settings: "설정" }[ccPage]}>
-            <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d" }}>
-              <p style={{ fontSize: 14 }}>이 기능은 모바일 화면에서 사용 가능합니다</p>
-              <CC_Btn variant="primary" onClick={onMobileSwitch} style={{ marginTop: 12 }}>📱 모바일 보기로 전환</CC_Btn>
-            </div>
-          </CC_Card>}
+          {ccPage === "monitor" && <CC_MonitorPage categories={categories} settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "alert" && <CC_AlertPage settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
+          {ccPage === "incident" && <CC_IncidentPage settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "map" && <CC_MapPage settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
+          {ccPage === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
+          {ccPage === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
+          {ccPage === "settings" && <CC_SettingsPage settings={settings} setSettings={setSettings} session={session} onMobileSwitch={onMobileSwitch} />}
         </div>
       </div>
     </div>
   </>);
+}
+
+// ─── PC: 02. 실시간 모니터링 ───────────────────────────────────
+function CC_MonitorPage({ categories, settings, setSettings, session }) {
+  const [selCatId, setSelCatId] = useState(categories?.[0]?.id);
+  const cat = (categories || []).find(c => c.id === selCatId) || categories?.[0];
+  if (!cat) return <CC_Card title="실시간 모니터링">데이터가 없습니다</CC_Card>;
+  const lv = getLevel(cat);
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+
+  const history = (cat.history || []).slice(-24);
+  const trendPoints = history.length > 5 ? history.map((h, i) => ({ x: i * (100 / Math.max(1, history.length - 1)), y: h.value || 0 })) : [];
+  const minV = Math.min(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const maxV = Math.max(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const range = maxV - minV || 1;
+  const pathD = trendPoints.length > 0 ? trendPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${36 - ((p.y - minV) / range) * 30}`).join(" ") : "";
+
+  return (<>
+    <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      {(categories || []).map(c => {
+        const cv = getLevel(c);
+        const cvColor = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[cv];
+        return (<button key={c.id} onClick={() => setSelCatId(c.id)} style={{ padding: "10px 16px", borderRadius: 999, border: selCatId === c.id ? `1.5px solid ${cvColor}` : "1px solid rgba(255,255,255,0.1)", background: selCatId === c.id ? `${cvColor}20` : "rgba(255,255,255,0.03)", color: selCatId === c.id ? cvColor : "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+          {c.icon || "📊"} {c.name}
+          {(cv === "ORANGE" || cv === "RED") && <span style={{ width: 6, height: 6, borderRadius: 3, background: cvColor }} />}
+        </button>);
+      })}
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>현재 수치</div>
+        <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1, fontFamily: "JetBrains Mono", color: lvColor, letterSpacing: "-0.03em" }}>{(cat.currentValue || 0).toLocaleString()}</div>
+        <div style={{ fontSize: 16, color: "#6c6e7d", marginTop: 4 }}>{cat.unit}</div>
+        <div style={{ marginTop: 16, display: "flex", gap: 6, alignItems: "center" }}>
+          <CC_Chip level={CC_LEVEL_MAP[lv]} pulse={lv !== "BLUE"}>{CC_LEVEL_LABEL[lv]}</CC_Chip>
+          <span style={{ fontSize: 12, color: "#6c6e7d" }}>업데이트: {new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+      </CC_Card>
+
+      <CC_Card title="24시간 추이" sub={`${history.length || 0}개 데이터`}>
+        <svg viewBox="0 0 100 36" preserveAspectRatio="none" style={{ width: "100%", height: 120 }}>
+          <defs>
+            <linearGradient id={`cc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+              <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          {pathD && <>
+            <path d={`${pathD} L 100 36 L 0 36 Z`} fill={`url(#cc-grad-${cat.id})`} stroke="none"/>
+            <path d={pathD} fill="none" stroke={lvColor} strokeWidth="1.5"/>
+          </>}
+          {!pathD && <text x="50" y="20" textAnchor="middle" fill="#6c6e7d" fontSize="3">데이터 부족 (수집 중)</text>}
+        </svg>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6c6e7d", marginTop: 6, fontFamily: "JetBrains Mono" }}>
+          <span>min {minV.toFixed(1)}</span>
+          <span>max {maxV.toFixed(1)}</span>
+        </div>
+      </CC_Card>
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <CC_Card title="임계값 표">
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {[{ k: "yellow", lbl: "주의 (YELLOW)", c: "#f5c451" }, { k: "orange", lbl: "경계 (ORANGE)", c: "#ff9a3c" }, { k: "red", lbl: "심각 (RED)", c: "#ff5e7e" }].map(t => (<div key={t.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#b0b3c4", fontSize: 13 }}><span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />{t.lbl}</span>
+            <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{cat.thresholds?.[t.k] || "-"} {cat.unit}</span>
+          </div>))}
+        </div>
+      </CC_Card>
+
+      <CC_Card title="대응 체크리스트" sub={`${(cat.actionItems || []).length}개`}>
+        {(cat.actionItems || []).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 체크리스트가 없습니다</div> :
+          (cat.actionItems || []).map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: i < cat.actionItems.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+            <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
+            <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+          </div>))}
+      </CC_Card>
+    </div>
+  </>);
+}
+
+// ─── PC: 03. 알림 / 경보 발령 ───────────────────────────────────
+function CC_AlertPage({ settings, setSettings, alerts, setAlerts, smsLog, setSmsLog, session }) {
+  const [step, setStep] = useState(1);
+  const [level, setLevel] = useState("YELLOW");
+  const [msg, setMsg] = useState("");
+  const [channels, setChannels] = useState({ sms: true, app: true, sound: false });
+  const [targets, setTargets] = useState("all");
+
+  const targetCount = useMemo(() => {
+    if (targets === "managers") return (settings.smsManagers || []).length;
+    if (targets === "staff") return (settings.smsStaff || []).length;
+    return (settings.smsManagers || []).length + (settings.smsStaff || []).length;
+  }, [targets, settings]);
+
+  const lvColor = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[level];
+  const lvLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[level];
+
+  const issueAlert = async () => {
+    if (!msg.trim()) { alert("메시지를 입력하세요."); return; }
+    if (!confirm(`${lvLabel} 단계 경보를 ${targetCount}명에게 발송합니다.\n\n발송 후 취소가 불가능합니다.\n진행하시겠습니까?`)) return;
+    const time = new Date().toLocaleString("ko-KR");
+    const newAlert = { category: "수동 발령", level, message: `[${settings.festivalName || "축제"} ${lvLabel}경보]\n\n${msg}\n\n발신: ${session?.name || "관리자"}\n시간: ${time}`, time };
+    if (setAlerts) setAlerts(p => [newAlert, ...p].slice(0, 100));
+    if (channels.sms) {
+      try {
+        const contacts = targets === "managers" ? settings.smsManagers : targets === "staff" ? settings.smsStaff : [...(settings.smsManagers || []), ...(settings.smsStaff || [])];
+        const r = await sendSolapi(settings, newAlert.message, contacts);
+        if (setSmsLog) setSmsLog(p => [{ time, level, message: msg, sentTo: contacts.length, success: r.ok ? r.success : 0, fail: r.ok ? r.fail : contacts.length }, ...p].slice(0, 100));
+      } catch {}
+    }
+    alert(`✅ 경보 발령 완료\n\n수신자: ${targetCount}명\n채널: ${Object.keys(channels).filter(k => channels[k]).join(", ")}`);
+    setStep(1); setMsg(""); setLevel("YELLOW");
+  };
+
+  return (<div>
+    <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      {[1, 2, 3, 4, 5].map(s => (<div key={s} onClick={() => s < step && setStep(s)} style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: step === s ? `${lvColor}20` : step > s ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${step === s ? lvColor + "60" : step > s ? "rgba(76,217,154,0.2)" : "rgba(255,255,255,0.05)"}`, color: step === s ? lvColor : step > s ? "#4cd99a" : "#6c6e7d", fontSize: 12, fontWeight: 600, cursor: s < step ? "pointer" : "default", textAlign: "center" }}>
+        {step > s ? "✓ " : ""}{s}. {["", "단계", "메시지", "채널", "대상", "발령"][s]}
+      </div>))}
+    </div>
+
+    {step === 1 && <CC_Card title="① 경보 단계 선택">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+        {["BLUE", "YELLOW", "ORANGE", "RED"].map(l => {
+          const c = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[l];
+          const lbl = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[l];
+          const desc = { BLUE: "정보 안내", YELLOW: "주의 환기", ORANGE: "긴급 대응", RED: "최고 위험" }[l];
+          return (<div key={l} onClick={() => setLevel(l)} style={{ padding: "20px 16px", borderRadius: 14, background: level === l ? `linear-gradient(180deg, ${c}25, ${c}08)` : "rgba(255,255,255,0.02)", border: `2px solid ${level === l ? c : "rgba(255,255,255,0.06)"}`, cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 18, background: c, margin: "0 auto 10px", boxShadow: `0 0 20px ${c}80` }} />
+            <div style={{ fontSize: 16, fontWeight: 700, color: level === l ? c : "#f4f5fa", marginBottom: 4 }}>{l} · {lbl}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d" }}>{desc}</div>
+          </div>);
+        })}
+      </div>
+      <div style={{ marginTop: 16, textAlign: "right" }}>
+        <CC_Btn variant="primary" onClick={() => setStep(2)}>다음 →</CC_Btn>
+      </div>
+    </CC_Card>}
+
+    {step === 2 && <CC_Card title="② 메시지 작성" sub={`${lvLabel} 단계로 발송됩니다`}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6, fontWeight: 600 }}>빠른 템플릿</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {[`${settings.festivalName || "축제"} 안전관리상황실에서 알려드립니다.`, "구역별 인원 통제를 강화해주세요.", "현재 위치를 안전한 곳으로 이동해주세요.", "상황 종료. 정상 운영 재개합니다."].map((t, i) => (<button key={i} onClick={() => setMsg(m => m + (m ? "\n" : "") + t)} style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 12, cursor: "pointer" }}>+ {t.slice(0, 18)}{t.length > 18 ? "..." : ""}</button>))}
+        </div>
+      </div>
+      <textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="알림 메시지를 입력하세요..." style={{ width: "100%", minHeight: 140, padding: 14, borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d" }}>{msg.length}자 (SMS 90자 권장)</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <CC_Btn variant="ghost" onClick={() => setStep(1)}>← 이전</CC_Btn>
+          <CC_Btn variant="primary" onClick={() => msg.trim() && setStep(3)}>다음 →</CC_Btn>
+        </div>
+      </div>
+    </CC_Card>}
+
+    {step === 3 && <CC_Card title="③ 발송 채널" sub="여러 채널 동시 발송 가능">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        {[{ k: "sms", n: "SMS 문자", icon: "📱", desc: "운영진 휴대폰" }, { k: "app", n: "앱 푸시", icon: "🔔", desc: "SAFEFLOW 앱" }, { k: "sound", n: "방송 알림음", icon: "📢", desc: "현장 스피커" }].map(c => (<div key={c.k} onClick={() => setChannels(p => ({ ...p, [c.k]: !p[c.k] }))} style={{ padding: 16, borderRadius: 12, background: channels[c.k] ? "rgba(107,138,255,0.08)" : "rgba(255,255,255,0.02)", border: channels[c.k] ? "2px solid #6b8aff" : "2px solid rgba(255,255,255,0.05)", cursor: "pointer", textAlign: "center" }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", marginBottom: 4 }}>{c.n}</div>
+          <div style={{ fontSize: 11, color: "#6c6e7d" }}>{c.desc}</div>
+          {channels[c.k] && <div style={{ marginTop: 8, color: "#6b8aff", fontSize: 11, fontWeight: 700 }}>✓ 선택됨</div>}
+        </div>))}
+      </div>
+      <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
+        <CC_Btn variant="ghost" onClick={() => setStep(2)}>← 이전</CC_Btn>
+        <CC_Btn variant="primary" onClick={() => setStep(4)}>다음 →</CC_Btn>
+      </div>
+    </CC_Card>}
+
+    {step === 4 && <CC_Card title="④ 발송 대상" sub={`총 ${targetCount}명에게 발송됩니다`}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {[{ k: "all", n: "전체", desc: "관리자 + 안전요원 모두", count: (settings.smsManagers || []).length + (settings.smsStaff || []).length }, { k: "managers", n: "관리자만", desc: "운영진/관제센터", count: (settings.smsManagers || []).length }, { k: "staff", n: "안전요원만", desc: "현장 인력", count: (settings.smsStaff || []).length }].map(t => (<div key={t.k} onClick={() => setTargets(t.k)} style={{ padding: "14px 16px", borderRadius: 10, background: targets === t.k ? "rgba(107,138,255,0.08)" : "rgba(255,255,255,0.02)", border: targets === t.k ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 20, height: 20, borderRadius: 10, border: targets === t.k ? "6px solid #6b8aff" : "2px solid rgba(255,255,255,0.2)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{t.n}</div>
+            <div style={{ fontSize: 12, color: "#6c6e7d" }}>{t.desc}</div>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "JetBrains Mono", color: targets === t.k ? "#6b8aff" : "#b0b3c4" }}>{t.count}<span style={{ fontSize: 12, marginLeft: 4, color: "#6c6e7d" }}>명</span></div>
+        </div>))}
+      </div>
+      <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
+        <CC_Btn variant="ghost" onClick={() => setStep(3)}>← 이전</CC_Btn>
+        <CC_Btn variant="primary" onClick={() => setStep(5)}>다음 →</CC_Btn>
+      </div>
+    </CC_Card>}
+
+    {step === 5 && <CC_Card title="⑤ 발령 확인" tinted style={{ border: `2px solid ${lvColor}40` }}>
+      <div style={{ background: `${lvColor}10`, padding: 16, borderRadius: 12, border: `1px solid ${lvColor}30`, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <CC_Chip level={CC_LEVEL_MAP[level]} pulse>● {level} · {lvLabel}</CC_Chip>
+          <span style={{ fontSize: 12, color: "#6c6e7d" }}>발신자: {session?.name}</span>
+        </div>
+        <div style={{ fontSize: 14, color: "#f4f5fa", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{msg}</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d" }}>채널</div>
+          <div style={{ fontSize: 14, color: "#f4f5fa", marginTop: 4 }}>{Object.keys(channels).filter(k => channels[k]).map(k => ({ sms: "📱SMS", app: "🔔앱", sound: "📢방송" }[k])).join(" · ") || "선택 안함"}</div>
+        </div>
+        <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d" }}>대상</div>
+          <div style={{ fontSize: 14, color: "#f4f5fa", marginTop: 4 }}>{targetCount}명 ({targets === "all" ? "전체" : targets === "managers" ? "관리자" : "안전요원"})</div>
+        </div>
+      </div>
+      <div style={{ padding: 12, borderRadius: 10, background: "rgba(255,94,126,0.08)", border: "1px solid rgba(255,94,126,0.2)", color: "#ff5e7e", fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+        ⚠️ 발송 후 취소 불가능합니다. 메시지 내용과 대상을 다시 한번 확인하세요.
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <CC_Btn variant="ghost" onClick={() => setStep(4)}>← 이전</CC_Btn>
+        <CC_Btn variant="danger" size="lg" onClick={issueAlert}>🚨 발령 실행</CC_Btn>
+      </div>
+    </CC_Card>}
+
+    <CC_Card title="최근 발령 이력" sub={`${(smsLog || []).length}건`} style={{ marginTop: 16 }}>
+      {(smsLog || []).slice(0, 5).map((s, i) => (<div key={i} className="cc-list-row">
+        <CC_Chip level={CC_LEVEL_MAP[s.level || "BLUE"]}>{s.level || "정보"}</CC_Chip>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.message}</div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{s.time} · 발송 {s.sentTo || 0}건 · 성공 {s.success || 0}</div>
+        </div>
+      </div>))}
+      {(!smsLog || smsLog.length === 0) && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>발령 이력이 없습니다</div>}
+    </CC_Card>
+  </div>);
+}
+
+// ─── PC: 04. 사건 / 신고 ───────────────────────────────────
+function CC_IncidentPage({ settings, setSettings, session }) {
+  const incidents = settings.incidents || [];
+  const today = new Date().toDateString();
+  const todayIncidents = incidents.filter(i => new Date(i.ts).toDateString() === today);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [newInc, setNewInc] = useState({ type: "", location: "", desc: "", priority: "low" });
+  const types = ["응급환자", "분실아동", "폭력/싸움", "시설고장", "민원/항의", "교통사고", "기타"];
+
+  const submit = () => {
+    if (!newInc.type || !newInc.location) { alert("종류와 위치를 입력하세요."); return; }
+    const inc = { id: "inc_" + Date.now(), ...newInc, ts: Date.now(), status: "open", reporter: session?.name || "?", time: new Date().toLocaleString("ko-KR") };
+    setSettings(p => ({ ...p, incidents: [inc, ...(p.incidents || [])] }));
+    setNewInc({ type: "", location: "", desc: "", priority: "low" });
+    setShowAdd(false);
+  };
+
+  const updateStatus = (id, status) => setSettings(p => ({ ...p, incidents: (p.incidents || []).map(i => i.id === id ? { ...i, status, closedTs: status === "closed" ? Date.now() : null } : i) }));
+  const remove = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(p => ({ ...p, incidents: (p.incidents || []).filter(i => i.id !== id) })); };
+
+  const filtered = filter === "all" ? incidents : filter === "today" ? todayIncidents : incidents.filter(i => i.status === filter);
+
+  return (<div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      {[{ k: "today", n: "오늘", c: todayIncidents.length, color: "#6b8aff" }, { k: "open", n: "처리중", c: incidents.filter(i => i.status === "open").length, color: "#ff9a3c" }, { k: "in_progress", n: "조치중", c: incidents.filter(i => i.status === "in_progress").length, color: "#f5c451" }, { k: "closed", n: "완료", c: incidents.filter(i => i.status === "closed").length, color: "#4cd99a" }].map(s => (<div key={s.k} onClick={() => setFilter(s.k)} style={{ padding: 16, borderRadius: 14, background: filter === s.k ? `${s.color}15` : "rgba(255,255,255,0.02)", border: `1px solid ${filter === s.k ? s.color + "40" : "rgba(255,255,255,0.06)"}`, cursor: "pointer" }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.color, marginTop: 4 }}>{s.c}</div>
+      </div>))}
+    </div>
+
+    <CC_Card title="사건 / 신고 목록" sub={`총 ${filtered.length}건`} action={<>
+      <CC_Btn size="sm" variant="ghost" onClick={() => setFilter("all")}>전체</CC_Btn>
+      <CC_Btn size="sm" variant="primary" onClick={() => setShowAdd(!showAdd)}>+ 신규 등록</CC_Btn>
+    </>}>
+      {showAdd && <div style={{ padding: 14, borderRadius: 10, background: "rgba(107,138,255,0.06)", border: "1px solid rgba(107,138,255,0.2)", marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>종류</div>
+            <select value={newInc.type} onChange={e => setNewInc({ ...newInc, type: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 13 }}>
+              <option value="">선택...</option>
+              {types.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>위치/구역</div>
+            <input value={newInc.location} onChange={e => setNewInc({ ...newInc, location: e.target.value })} placeholder="A구역 / 정문 등" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>긴급도</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[{ k: "low", n: "낮음", c: "#4cd99a" }, { k: "mid", n: "보통", c: "#f5c451" }, { k: "high", n: "긴급", c: "#ff9a3c" }, { k: "critical", n: "치명", c: "#ff5e7e" }].map(p => (<button key={p.k} onClick={() => setNewInc({ ...newInc, priority: p.k })} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: newInc.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: newInc.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: newInc.priority === p.k ? p.c : "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{p.n}</button>))}
+          </div>
+        </div>
+        <textarea value={newInc.desc} onChange={e => setNewInc({ ...newInc, desc: e.target.value })} placeholder="상세 내용 (선택)" style={{ width: "100%", minHeight: 70, marginTop: 10, padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <CC_Btn variant="primary" onClick={submit}>등록</CC_Btn>
+          <CC_Btn variant="ghost" onClick={() => setShowAdd(false)}>취소</CC_Btn>
+        </div>
+      </div>}
+
+      {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>사건이 없습니다</div> :
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>상태</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>종류</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>위치</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>긴급도</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>접수자</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>시간</th>
+                <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontWeight: 600, fontSize: 11 }}>액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(i => {
+                const sLabel = i.status === "open" ? "처리중" : i.status === "in_progress" ? "조치중" : "완료";
+                const pColor = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+                return (<tr key={i.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td style={{ padding: "12px 8px" }}><CC_Chip level={i.status === "open" ? "orange" : i.status === "in_progress" ? "yellow" : "green"}>●{sLabel}</CC_Chip></td>
+                  <td style={{ padding: "12px 8px", color: "#f4f5fa", fontWeight: 600 }}>{i.type}</td>
+                  <td style={{ padding: "12px 8px", color: "#b0b3c4" }}>📍 {i.location}</td>
+                  <td style={{ padding: "12px 8px" }}><span style={{ color: pColor, fontWeight: 600, fontSize: 12 }}>● {{ critical: "치명", high: "긴급", mid: "보통", low: "낮음" }[i.priority]}</span></td>
+                  <td style={{ padding: "12px 8px", color: "#b0b3c4" }}>{i.reporter}</td>
+                  <td style={{ padding: "12px 8px", color: "#6c6e7d", fontFamily: "JetBrains Mono", fontSize: 12 }}>{i.time?.split(" ")[1] || i.time}</td>
+                  <td style={{ padding: "12px 8px", textAlign: "right" }}>
+                    <div style={{ display: "inline-flex", gap: 4 }}>
+                      {i.status !== "closed" && <CC_Btn size="sm" variant="ghost" onClick={() => updateStatus(i.id, i.status === "open" ? "in_progress" : "closed")}>{i.status === "open" ? "조치 시작" : "완료"}</CC_Btn>}
+                      <CC_Btn size="sm" variant="ghost" onClick={() => remove(i.id)} style={{ color: "#ff5e7e" }}>🗑</CC_Btn>
+                    </div>
+                  </td>
+                </tr>);
+              })}
+            </tbody>
+          </table>
+        </div>
+      }
+    </CC_Card>
+  </div>);
+}
+
+// ─── PC: 05. 지도 상황도 ───────────────────────────────────
+function CC_MapPage({ settings, setSettings, session }) {
+  const fid = session?.festivalId || "default";
+  const [mapImage] = usePersist(`${fid}_map_img_v1`, null);
+  const [mapAreas] = usePersist(`${fid}_map_areas_v1`, []);
+  const zones = settings.zones || [];
+  const congestion = settings.zoneCongestion || [];
+  const incidents = settings.incidents || [];
+  const [layers, setLayers] = useState({ areas: true, incidents: true, workers: false });
+  const [hoveredArea, setHoveredArea] = useState(null);
+
+  const getAreaColor = (zoneId) => {
+    const c = congestion.find(cc => cc.zoneId === zoneId);
+    if (!c) return "#6b8aff";
+    return c.level === "danger" ? "#ff5e7e" : c.level === "crowded" ? "#f5c451" : "#4cd99a";
+  };
+
+  return (<div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 16 }}>
+    <CC_Card title="실시간 상황도" sub={`${zones.length}개 구역 · ${mapAreas.length}개 영역 · ${incidents.filter(i => i.status !== "closed").length}건 진행`}>
+      {!mapImage ? <div style={{ aspectRatio: "16/10", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "2px dashed rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#6c6e7d", gap: 12 }}>
+        <span style={{ fontSize: 48 }}>🗺️</span>
+        <span>도면이 등록되지 않았습니다</span>
+        <span style={{ fontSize: 12 }}>모바일 → 🗺️ 히트맵 메뉴에서 업로드하세요</span>
+      </div> :
+        <div style={{ position: "relative", width: "100%", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <img src={mapImage} alt="map" style={{ width: "100%", display: "block" }} />
+          {layers.areas && <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            {mapAreas.map(a => {
+              const z = zones.find(zz => zz.id === a.zoneId);
+              const color = getAreaColor(a.zoneId);
+              const points = (a.points || []).map(p => `${p.x},${p.y}`).join(" ");
+              return (<g key={a.id} style={{ pointerEvents: "all" }} onMouseEnter={() => setHoveredArea(a.id)} onMouseLeave={() => setHoveredArea(null)}>
+                <polygon points={points} fill={color} fillOpacity={hoveredArea === a.id ? 0.5 : 0.3} stroke={color} strokeWidth="0.3" />
+                {z && (a.points || []).length > 0 && (() => { const cx = a.points.reduce((s, p) => s + p.x, 0) / a.points.length; const cy = a.points.reduce((s, p) => s + p.y, 0) / a.points.length; return <text x={cx} y={cy} textAnchor="middle" fill="#fff" fontSize="2" fontWeight="700" style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.6)", strokeWidth: "0.5" }}>{z.name}</text>; })()}
+              </g>);
+            })}
+          </svg>}
+          {layers.incidents && incidents.filter(i => i.status !== "closed").map((i, idx) => {
+            const x = 10 + (idx % 6) * 14; const y = 15 + Math.floor(idx / 6) * 18;
+            const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+            return (<div key={i.id} title={`${i.type} - ${i.location}`} style={{ position: "absolute", left: `${x}%`, top: `${y}%`, width: 16, height: 16, borderRadius: 8, background: c, boxShadow: `0 0 12px ${c}, 0 0 0 3px rgba(0,0,0,0.4)`, animation: "cc-pulse 2s ease-in-out infinite", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>!</div>);
+          })}
+        </div>
+      }
+    </CC_Card>
+
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <CC_Card title="레이어">
+        {[{ k: "areas", n: "구역 (영역)", icon: "🗺️" }, { k: "incidents", n: "사건 핀", icon: "📍" }, { k: "workers", n: "근무자 위치", icon: "👤" }].map(l => (<div key={l.k} onClick={() => setLayers(p => ({ ...p, [l.k]: !p[l.k] }))} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}>
+          <div style={{ width: 36, height: 20, borderRadius: 10, background: layers[l.k] ? "#6b8aff" : "rgba(255,255,255,0.1)", position: "relative", transition: "all 0.2s" }}>
+            <div style={{ width: 16, height: 16, borderRadius: 8, background: "#fff", position: "absolute", top: 2, left: layers[l.k] ? 18 : 2, transition: "all 0.2s" }} />
+          </div>
+          <span style={{ fontSize: 13, color: "#f4f5fa" }}>{l.icon} {l.n}</span>
+        </div>))}
+      </CC_Card>
+
+      <CC_Card title="구역 상태" sub={`${zones.length}개`}>
+        {zones.map(z => {
+          const c = congestion.find(cc => cc.zoneId === z.id);
+          const cl = c?.level || "smooth";
+          const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+          const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+          return (<div key={z.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <span style={{ fontSize: 12, color: "#f4f5fa" }}>📍 {z.name}</span>
+            <CC_Chip level={lv}>{lbl}</CC_Chip>
+          </div>);
+        })}
+        {zones.length === 0 && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>구역 미등록</div>}
+      </CC_Card>
+
+      <CC_Card title="활성 사건" sub={`${incidents.filter(i => i.status !== "closed").length}건`}>
+        {incidents.filter(i => i.status !== "closed").slice(0, 4).map(i => {
+          const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+          return (<div key={i.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: c }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#f4f5fa" }}>{i.type}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", paddingLeft: 14 }}>{i.location}</div>
+          </div>);
+        })}
+        {incidents.filter(i => i.status !== "closed").length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>활성 사건 없음</div>}
+      </CC_Card>
+    </div>
+  </div>);
+}
+
+// ─── PC: 06. 리소스 관리 ───────────────────────────────────
+function CC_ResourcePage({ settings, setSettings, session, accounts }) {
+  const assets = settings.assets || [];
+  const workSites = settings.workSites || [];
+  const allWorkers = workSites.flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name })));
+  const totalAssets = assets.reduce((s, a) => s + (a.total || 0), 0);
+  const availAssets = assets.reduce((s, a) => s + (a.qty || 0), 0);
+  const broken = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "broken").length, 0);
+  const lost = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "lost").length, 0);
+
+  return (<div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      {[{ n: "전체 자산", v: totalAssets, c: "#6b8aff" }, { n: "사용 가능", v: availAssets, c: "#4cd99a" }, { n: "고장", v: broken, c: "#ff9a3c" }, { n: "분실", v: lost, c: "#ff5e7e" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
+      </div>))}
+    </div>
+
+    <CC_Card title="자산 목록" sub={`${assets.length}개 분류`}>
+      {assets.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 자산이 없습니다 (모바일에서 등록)</div> :
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>자산</th>
+              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>분류</th>
+              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>가용</th>
+              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>총수량</th>
+              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assets.map(a => { const ratio = a.total ? a.qty / a.total : 0; const lv = ratio < 0.3 ? "red" : ratio < 0.6 ? "yellow" : "green"; return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <td style={{ padding: "12px 8px", color: "#f4f5fa", fontWeight: 600 }}>{a.name}</td>
+              <td style={{ padding: "12px 8px", color: "#b0b3c4" }}>{a.category}</td>
+              <td style={{ padding: "12px 8px", textAlign: "right", color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{a.qty || 0}</td>
+              <td style={{ padding: "12px 8px", textAlign: "right", color: "#b0b3c4", fontFamily: "JetBrains Mono" }}>{a.total || 0}</td>
+              <td style={{ padding: "12px 8px" }}><CC_Chip level={lv}>{Math.round(ratio * 100)}%</CC_Chip></td>
+            </tr>); })}
+          </tbody>
+        </table>
+      }
+    </CC_Card>
+
+    <CC_Card title="근무자 현황" sub={`총 ${allWorkers.length}명`} style={{ marginTop: 16 }}>
+      {workSites.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 근무자가 없습니다</div> :
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+          {workSites.map(s => (<div key={s.id} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 6 }}>📍 {s.name || "미배치"}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#6b8aff" }}>{(s.workers || []).length}<span style={{ fontSize: 12, color: "#6c6e7d", marginLeft: 4 }}>명</span></div>
+          </div>))}
+        </div>
+      }
+    </CC_Card>
+  </div>);
+}
+
+// ─── PC: 07. 리포트 ───────────────────────────────────
+function CC_ReportPage({ settings, alerts, categories, session }) {
+  const today = new Date().toLocaleDateString("ko-KR");
+  const totalAlerts = (alerts || []).length;
+  const incidents = settings.incidents || [];
+  const closedIncidents = incidents.filter(i => i.status === "closed").length;
+  const dangerCats = (categories || []).filter(c => { const lv = getLevel(c); return lv === "ORANGE" || lv === "RED"; }).length;
+
+  return (<div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      {[{ n: "오늘 알림", v: totalAlerts, c: "#6b8aff" }, { n: "사건 처리", v: closedIncidents + "/" + incidents.length, c: "#4cd99a" }, { n: "위험 카테고리", v: dangerCats, c: "#ff9a3c" }, { n: "운영 시간", v: "5h 32m", c: "#a980ff" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
+      </div>))}
+    </div>
+
+    <CC_Card title="일일 종합 리포트" sub={today} action={<CC_Btn size="sm" variant="primary" onClick={() => window.print()}>📄 PDF 인쇄</CC_Btn>}>
+      <div style={{ padding: 20, background: "rgba(255,255,255,0.02)", borderRadius: 12, lineHeight: 1.7, color: "#b0b3c4", fontSize: 13 }}>
+        <h3 style={{ color: "#f4f5fa", margin: "0 0 12px" }}>① 환경 모니터링</h3>
+        <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+          {(categories || []).map(c => { const lv = getLevel(c); const lvL = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[lv]; return <li key={c.id}>{c.name}: {(c.currentValue || 0).toLocaleString()}{c.unit} <span style={{ color: { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv] }}>({lvL})</span></li>; })}
+        </ul>
+
+        <h3 style={{ color: "#f4f5fa", margin: "16px 0 12px" }}>② 알림 현황</h3>
+        <p>총 {totalAlerts}건의 알림이 발생했습니다.</p>
+        {(alerts || []).slice(0, 5).map((a, i) => <div key={i} style={{ paddingLeft: 14, fontSize: 12 }}>• [{a.level}] {a.category} - {a.time}</div>)}
+
+        <h3 style={{ color: "#f4f5fa", margin: "16px 0 12px" }}>③ 사건 현황</h3>
+        <p>접수 {incidents.length}건, 처리 완료 {closedIncidents}건</p>
+
+        <h3 style={{ color: "#f4f5fa", margin: "16px 0 12px" }}>④ 구역별 혼잡도</h3>
+        {(settings.zones || []).map(z => { const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id); const cl = c?.level || "smooth"; const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활"; return <div key={z.id} style={{ paddingLeft: 14 }}>• {z.name}: {lbl}</div>; })}
+      </div>
+    </CC_Card>
+  </div>);
+}
+
+// ─── PC: 08. 사용자 관리 ───────────────────────────────────
+function CC_UserPage({ settings, setSettings, accounts, session, onMobileSwitch }) {
+  const [search, setSearch] = useState("");
+  const filtered = (accounts || []).filter(a => !search || (a.name || "").includes(search) || (a.id || "").includes(search));
+  const roles = { sysadmin: { lbl: "시스템관리자", c: "#ff5e7e" }, admin: { lbl: "관리자", c: "#ff9a3c" }, manager: { lbl: "운영자", c: "#f5c451" }, zonemgr: { lbl: "구역관리", c: "#6b8aff" }, stagemgr: { lbl: "무대관리", c: "#a980ff" }, counter: { lbl: "계수원", c: "#4cd99a" }, parking: { lbl: "주차요원", c: "#4cd99a" }, shuttle: { lbl: "셔틀요원", c: "#4cd99a" } };
+
+  return (<div>
+    <CC_Card title="사용자 / 계정" sub={`${(accounts || []).length}명`} action={<>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 이름/ID 검색" style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 13, width: 200 }} />
+      <CC_Btn size="sm" variant="primary" onClick={onMobileSwitch}>+ 신규 계정 (모바일)</CC_Btn>
+    </>}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>이름</th>
+            <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>로그인 ID</th>
+            <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>역할</th>
+            <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>축제</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map(a => { const r = roles[a.role] || { lbl: a.role, c: "#6c6e7d" }; return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <td style={{ padding: "12px 8px", color: "#f4f5fa", fontWeight: 600 }}>{a.name}</td>
+            <td style={{ padding: "12px 8px", color: "#b0b3c4", fontFamily: "JetBrains Mono" }}>{a.id}</td>
+            <td style={{ padding: "12px 8px" }}><span style={{ padding: "3px 10px", borderRadius: 6, background: `${r.c}15`, color: r.c, fontSize: 11, fontWeight: 700 }}>{r.lbl}</span></td>
+            <td style={{ padding: "12px 8px", color: "#b0b3c4", fontSize: 12 }}>{(a.festivals || [a.festivalId]).filter(Boolean).join(", ") || "-"}</td>
+          </tr>); })}
+        </tbody>
+      </table>
+      {filtered.length === 0 && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>{search ? "검색 결과 없음" : "계정 없음"}</div>}
+    </CC_Card>
+  </div>);
+}
+
+// ─── PC: 09. 설정 ───────────────────────────────────
+function CC_SettingsPage({ settings, setSettings, session, onMobileSwitch }) {
+  const [name, setName] = useState(settings.festivalName || "");
+  const features = settings.features || {};
+
+  return (<div>
+    <CC_Card title="축제 정보">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>축제 이름</div>
+          <input value={name} onChange={e => setName(e.target.value)} onBlur={() => setSettings(p => ({ ...p, festivalName: name }))} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>운영 상태</div>
+          <div style={{ padding: "10px 12px", borderRadius: 8, background: settings.active ? "rgba(76,217,154,0.08)" : "rgba(255,154,60,0.08)", border: settings.active ? "1px solid rgba(76,217,154,0.3)" : "1px solid rgba(255,154,60,0.3)", color: settings.active ? "#4cd99a" : "#ff9a3c", fontSize: 14, fontWeight: 700 }}>{settings.active ? "● 운영 중" : "● 미운영"}</div>
+        </div>
+      </div>
+    </CC_Card>
+
+    <CC_Card title="기능 사용" sub="모바일에서 자세히 설정 가능" style={{ marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+        {Object.entries({ crowd: "👥 인파", parking: "🚗 주차", shuttle: "🚌 셔틀", weather: "🌦️ 기상", congestion: "🚦 혼잡도", stage: "🎤 공연", heatmap: "🗺️ 히트맵", workers: "👤 근무자", reports: "📊 리포트" }).map(([k, n]) => (<div key={k} style={{ padding: "10px 12px", borderRadius: 8, background: features[k] !== false ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: features[k] !== false ? "1px solid rgba(76,217,154,0.2)" : "1px solid rgba(255,255,255,0.05)", color: features[k] !== false ? "#4cd99a" : "#6c6e7d", fontSize: 13, fontWeight: 600 }}>{features[k] !== false ? "✓" : "○"} {n}</div>))}
+      </div>
+    </CC_Card>
+
+    <CC_Card title="고급 설정" sub="모바일 화면에서 변경 가능" style={{ marginTop: 16 }}>
+      <div style={{ padding: 16, color: "#6c6e7d", textAlign: "center" }}>
+        <p style={{ marginBottom: 12 }}>API 키, 대상 연락처, 인력 관리 등 상세 설정은 모바일에서 가능합니다</p>
+        <CC_Btn variant="primary" onClick={onMobileSwitch}>📱 모바일 보기로 전환</CC_Btn>
+      </div>
+    </CC_Card>
+  </div>);
 }
 
 function DashboardOrgChart({ settings, show, onToggle }) {
@@ -8490,10 +9042,14 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       setSettings={setSettings}
       categories={categories}
       alerts={alerts}
+      setAlerts={setAlerts}
+      smsLog={smsLog}
+      setSmsLog={setSmsLog}
       onLogout={onLogout}
       onMobileSwitch={toggleMobileView}
+      setActiveAlert={setActiveAlert}
       onNav={(id) => {
-        // 사이드바 메뉴 → 모바일 페이지 매핑
+        // 사이드바 메뉴 → 모바일 페이지 매핑 (백업용)
         const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
         if (map[id]) { setPage(map[id]); }
       }}
