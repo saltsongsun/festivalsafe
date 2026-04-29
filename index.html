@@ -1,349 +1,348 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="SAFEFLOW" />
-  <meta name="application-name" content="SAFEFLOW" />
-  <meta name="theme-color" content="#0a0d1a" />
-  <meta name="description" content="SAFEFLOW - 축제 재난안전 통합관리 플랫폼" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>SAFEFLOW · 축제 안전관리</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    html,body{background:#0a0d1a;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard',Roboto,sans-serif;overscroll-behavior:none}
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>재난안전관리시스템 — 와이어프레임 v2</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07070d;
+    --bg-1: #0e0f17;
+    --bg-2: #14151f;
+    --bg-3: #1d1f2c;
+    --line: rgba(255,255,255,0.08);
+    --line-2: rgba(255,255,255,0.04);
+    --line-strong: rgba(255,255,255,0.14);
+    --text: #f4f5fa;
+    --text-2: #b0b3c4;
+    --text-3: #6c6e7d;
+    --accent: #6b8aff;
+    --accent-2: #8fa6ff;
+    --accent-glow: rgba(107,138,255,0.35);
+    --blue: #6b8aff;
+    --yellow: #f5c451;
+    --orange: #ff9a3c;
+    --red: #ff5e7e;
+    --green: #4cd99a;
+    --purple: #a980ff;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --radius-lg: 22px;
+    --shadow-card: 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 32px -16px rgba(0,0,0,0.6);
+    --shadow-glow: 0 0 0 1px rgba(107,138,255,0.18), 0 0 32px -4px var(--accent-glow);
+  }
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-feature-settings: "ss01", "ss02"; min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(107,138,255,0.10), transparent 60%),
+      radial-gradient(ellipse 800px 500px at 90% 0%, rgba(169,128,255,0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  button { font-family: inherit; }
 
-    /* Splash Screen */
-    #splash{position:fixed;inset:0;z-index:99999;background:linear-gradient(180deg,#0a0d1a 0%,#0b0e17 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s ease-out,visibility 0.6s ease-out}
-    #splash.hide{opacity:0;visibility:hidden;pointer-events:none}
-    #splash::before{content:"";position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(66,165,245,0.15) 0%,transparent 70%);filter:blur(40px);animation:pulse-bg 4s ease-in-out infinite}
-    .splash-logo{position:relative;z-index:1;width:120px;height:120px;border-radius:32px;background:linear-gradient(135deg,rgba(66,165,245,0.3),rgba(66,165,245,0.05));border:1px solid rgba(66,165,245,0.4);box-shadow:0 0 40px rgba(66,165,245,0.3),inset 0 1px 0 rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;animation:logo-float 3s ease-in-out infinite;margin-bottom:32px}
-    .splash-logo svg{width:64px;height:64px}
-    .splash-title{position:relative;z-index:1;color:#fff;font-size:38px;font-weight:800;letter-spacing:6px;margin-bottom:12px;text-shadow:0 0 30px rgba(66,165,245,0.5)}
-    .splash-sub{position:relative;z-index:1;color:#94A3B8;font-size:14px;font-weight:500;letter-spacing:2px;text-transform:uppercase;margin-bottom:48px}
-    .splash-loading{position:relative;z-index:1;width:200px;height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden}
-    .splash-loading::after{content:"";display:block;width:40%;height:100%;background:linear-gradient(90deg,transparent,#42A5F5,transparent);animation:loading-slide 1.5s ease-in-out infinite}
-    @keyframes pulse-bg{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.1);opacity:0.9}}
-    @keyframes logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-    @keyframes loading-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
-    #error-fallback{display:none;min-height:100vh;background:#0a0d1a;align-items:center;justify-content:center;padding:24px}
-    #error-fallback.show{display:flex}
-  </style>
+  /* TOP BAR */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(7,7,13,0.7); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 28px; display: flex; align-items: center; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo { width: 32px; height: 32px; border-radius: 10px;
+    background: linear-gradient(135deg, #6b8aff 0%, #a980ff 50%, #ff5e7e 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    box-shadow: 0 4px 12px rgba(107,138,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2); }
+  .brand-name { font-weight: 700; font-size: 15px; letter-spacing: -0.015em; }
+  .brand-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .crumbs { color: var(--text-3); font-size: 12px; margin-left: auto; display: flex; gap: 16px; align-items: center; }
+  .crumbs span { color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: livepulse 2s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; padding: 6px 28px 0; border-bottom: 1px solid var(--line); background: rgba(7,7,13,0.6); backdrop-filter: blur(20px); position: sticky; top: 60px; z-index: 40; overflow-x: auto; }
+  .tab { background: transparent; border: 0; border-bottom: 2px solid transparent;
+    padding: 14px 18px 16px; color: var(--text-3); cursor: pointer; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 10px; white-space: nowrap; transition: color .2s, border-color .2s;
+    position: relative; }
+  .tab:hover { color: var(--text-2); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab.active::after { content: ''; position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); width: 60%; height: 8px; background: var(--accent); filter: blur(12px); opacity: 0.5; }
+  .tab .num { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); padding: 2px 6px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; letter-spacing: 0.05em; }
+  .tab.active .num { color: var(--accent); border-color: rgba(107,138,255,0.3); background: rgba(107,138,255,0.08); }
+
+  /* SCREEN HEAD */
+  .screen { padding: 32px 32px 80px; max-width: 1600px; margin: 0 auto; }
+  .screen-head { margin-bottom: 28px; }
+  .screen-title { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 8px;
+    background: linear-gradient(180deg, #ffffff, #c8ccd9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .screen-sub { color: var(--text-2); font-size: 14px; margin: 0; letter-spacing: -0.005em; }
+  .screen-note { display: flex; gap: 12px; align-items: flex-start;
+    background: linear-gradient(180deg, rgba(107,138,255,0.06), rgba(107,138,255,0.02));
+    border: 1px solid rgba(107,138,255,0.2);
+    border-radius: var(--radius); box-shadow: var(--shadow-card);
+    padding: 14px 18px; margin: 18px 0 0; font-size: 13px; color: var(--text-2); max-width: 880px; line-height: 1.55; }
+  .screen-note .lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.12em; padding-top: 2px; flex-shrink: 0; font-weight: 600; }
+
+  /* VARIATION CONTROLS */
+  .controls { display: flex; gap: 8px; margin: 24px 0 20px; align-items: center; flex-wrap: wrap; }
+  .ctrl-label { font-size: 12px; color: var(--text-3); margin-right: 4px; }
+  .seg { display: inline-flex; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px; box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset; }
+  .seg button { background: transparent; border: 0; color: var(--text-2); padding: 7px 14px; font-size: 13px; border-radius: 7px; cursor: pointer; font-weight: 500; white-space: nowrap; transition: all .2s; }
+  .seg button:hover { color: var(--text); }
+  .seg button.active { background: var(--bg-3); color: var(--text); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 12px -4px rgba(0,0,0,0.4); }
+  .pill { background: var(--bg-1); border: 1px solid var(--line); color: var(--text-2); padding: 7px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .pill .pkey { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.8; margin-right: 4px; }
+
+  /* OPTION HEADER */
+  .opt-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+  .opt-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); letter-spacing: 0.08em; }
+  .opt-title { font-size: 16px; font-weight: 600; }
+  .opt-desc { font-size: 13px; color: var(--text-3); margin-left: auto; max-width: 50%; text-align: right; }
+
+  /* OPTIONS GRID (compare) */
+  .options-grid { display: grid; grid-template-columns: 1fr; gap: 32px; }
+  @media (min-width: 1100px) { .options-grid.cols-2 { grid-template-columns: 1fr 1fr; } }
+
+  /* SCATCH */
+  .scratch { margin-top: 36px; padding: 16px 20px; background: var(--bg-1);
+    border: 1px solid var(--line); border-radius: var(--radius); }
+  .scratch h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .scratch ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
+
+  /* ─── WIREFRAME PRIMITIVES ─── */
+  .card { background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)) , var(--bg-1);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-card); position: relative; }
+  .card.soft { background: var(--bg-2); }
+  .card.tinted { background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); }
+  .card-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .card-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .card-sub { font-size: 12px; color: var(--text-3); }
+  .row { display: flex; gap: 12px; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .stack > * + * { margin-top: 10px; }
+
+  /* CHIP / BADGE */
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0; line-height: 1; white-space: nowrap; border: 1px solid transparent; }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; box-shadow: 0 0 8px currentColor; }
+  .chip.blue { background: rgba(107,138,255,0.12); color: var(--blue); border-color: rgba(107,138,255,0.2); }
+  .chip.yellow { background: rgba(245,196,81,0.12); color: var(--yellow); border-color: rgba(245,196,81,0.2); }
+  .chip.orange { background: rgba(255,154,60,0.14); color: var(--orange); border-color: rgba(255,154,60,0.25); }
+  .chip.red { background: rgba(255,94,126,0.14); color: var(--red); border-color: rgba(255,94,126,0.25); }
+  .chip.green { background: rgba(76,217,154,0.12); color: var(--green); border-color: rgba(76,217,154,0.2); }
+  .chip.gray { background: var(--bg-3); color: var(--text-2); border-color: var(--line); }
+  .chip.lg { padding: 6px 14px; font-size: 13px; }
+  .chip .dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 currentColor; } 50%{ box-shadow: 0 0 0 4px transparent; } }
+
+  /* BUTTON */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)) , var(--bg-3);
+    color: var(--text); border: 1px solid var(--line-strong); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 1px 2px rgba(0,0,0,0.3); transition: all .15s; letter-spacing: -0.005em; }
+  .btn:hover { background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)) , var(--bg-3); transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(180deg, #7c98ff, #5a7aff); border-color: rgba(255,255,255,0.18); color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 4px 16px -4px var(--accent-glow); }
+  .btn.primary:hover { background: linear-gradient(180deg, #8fa6ff, #6b8aff); }
+  .btn.danger { background: linear-gradient(180deg, #ff738e, #ff4f72); border-color: rgba(255,255,255,0.15); color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 4px 16px -4px rgba(255,94,126,0.5); }
+  .btn.warn { background: linear-gradient(180deg, #ffaf5c, #ff8a2a); border-color: rgba(255,255,255,0.15); color: white;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 4px 16px -4px rgba(255,154,60,0.5); }
+  .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+  .btn.ghost:hover { background: var(--bg-2); }
+  .btn.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+  .btn.lg { padding: 12px 18px; font-size: 14px; }
+  .btn.block { width: 100%; justify-content: center; }
+  .btn.icon { padding: 8px; aspect-ratio: 1; }
+
+  /* INPUT-LIKE */
+  .input { padding: 10px 14px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+    color: var(--text-2); font-size: 13px; }
+  .input.full { width: 100%; }
+
+  /* METRIC */
+  .metric { padding: 18px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)) , var(--bg-1);
+    border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-card); position: relative; overflow: hidden; transition: transform .2s; }
+  .metric:hover { transform: translateY(-2px); }
+  .metric::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 200px 80px at 100% 0%, rgba(255,255,255,0.04), transparent 70%); pointer-events: none; }
+  .metric-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; position: relative; }
+  .metric-name { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .metric-icon { width: 26px; height: 26px; border-radius: 8px; background: var(--bg-3); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-2); border: 1px solid var(--line); }
+  .metric-val { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; font-family: 'JetBrains Mono', monospace; position: relative; }
+  .metric-unit { font-size: 13px; color: var(--text-3); margin-left: 6px; font-weight: 400; font-family: 'Pretendard Variable', sans-serif; }
+  .metric-trend { font-size: 11px; color: var(--text-3); margin-top: 6px; position: relative; }
+  .metric.alert { border-color: rgba(245,196,81,0.3); background: linear-gradient(180deg, rgba(245,196,81,0.08), rgba(245,196,81,0.02)) , var(--bg-1); }
+  .metric.alert .metric-icon { background: rgba(245,196,81,0.12); color: var(--yellow); border-color: rgba(245,196,81,0.25); }
+  .metric.danger { border-color: rgba(255,154,60,0.4); background: linear-gradient(180deg, rgba(255,154,60,0.1), rgba(255,154,60,0.02)) , var(--bg-1); box-shadow: 0 0 0 1px rgba(255,154,60,0.1), 0 12px 32px -16px rgba(255,154,60,0.3); }
+  .metric.danger .metric-icon { background: rgba(255,154,60,0.15); color: var(--orange); border-color: rgba(255,154,60,0.3); }
+  .metric.danger .metric-val { color: var(--orange); }
+
+  /* SIDEBAR */
+  .layout { display: flex; gap: 20px; }
+  .sidebar { width: 232px; flex-shrink: 0; padding: 16px 12px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)) , var(--bg-1);
+    border: 1px solid var(--line); border-radius: var(--radius); align-self: flex-start; position: sticky; top: 130px; box-shadow: var(--shadow-card); }
+  .sb-section { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; padding: 10px 12px 6px; font-weight: 600; }
+  .sb-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; color: var(--text-2); font-size: 13px; cursor: pointer; transition: all .15s; position: relative; }
+  .sb-item:hover { background: var(--bg-2); color: var(--text); }
+  .sb-item.active { background: linear-gradient(90deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04)); color: var(--text); font-weight: 600; }
+  .sb-item.active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px var(--accent); }
+  .sb-item .ico { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
+  .sb-item.active .ico { color: var(--accent); }
+  .sb-item .badge { margin-left: auto; font-size: 10px; padding: 2px 6px; background: var(--red); color: white; border-radius: 999px; font-family: 'JetBrains Mono', monospace; box-shadow: 0 0 8px rgba(255,94,126,0.5); }
+
+  .main-col { flex: 1; min-width: 0; }
+
+  /* PHONE */
+  .phone-shell {
+    width: 360px; max-width: 100%;
+    background: linear-gradient(180deg, #1d1f2c, #14151f);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 44px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 8px #1a1c25, 0 0 0 9px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.08);
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-screen { background: var(--bg); padding: 0; min-height: 720px; }
+  .phone-status { display: flex; justify-content: space-between; padding: 12px 24px 6px; font-size: 11px; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+  .phone-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 100px; height: 22px; background: #0a0a0f; border-radius: 14px; z-index: 2; }
+
+  /* ICONS — minimal stroke icons */
+  .ico-svg { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* AVATAR */
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-3); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-2); font-weight: 600; }
+
+  /* MAP */
+  .map { background: var(--bg-2); border-radius: var(--radius); position: relative; overflow: hidden;
+    background-image:
+      radial-gradient(ellipse 600px 400px at 50% 30%, rgba(107,138,255,0.08), transparent 70%),
+      linear-gradient(0deg, rgba(107,138,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(107,138,255,0.08) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+    border: 1px solid var(--line); box-shadow: var(--shadow-card);
+  }
+  .pin { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; }
+  .pin-body { width: 28px; height: 28px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4); border: 2px solid; }
+  .pin-body span { transform: rotate(45deg); font-size: 11px; font-weight: 700; color: white; }
+  .pin .pin-body { animation: pinpulse 2s ease-out infinite; }
+  @keyframes pinpulse { 0% { box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 0 currentColor; } 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 16px transparent; } }
+  .pin.red .pin-body { background: var(--red); border-color: rgba(255,94,126,0.4); color: rgba(255,94,126,0.4); }
+  .pin.orange .pin-body { background: var(--orange); border-color: rgba(255,154,60,0.4); }
+  .pin.yellow .pin-body { background: var(--yellow); border-color: rgba(245,196,81,0.4); }
+  .pin.yellow .pin-body span { color: #1a1500; }
+  .pin.blue .pin-body { background: var(--blue); border-color: rgba(77,142,255,0.4); }
+  .pin.green .pin-body { background: var(--green); border-color: rgba(76,217,154,0.4); }
+  .pin.green .pin-body span { color: #00120a; }
+
+  /* PROGRESS */
+  .progress { height: 6px; background: var(--bg-3); border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); }
+  .progress-fill { height: 100%; border-radius: 999px; box-shadow: 0 0 12px currentColor; }
+
+  /* TABLE-LIKE LIST */
+  .list-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; }
+  .list-row:hover { background: var(--bg-2); }
+  .list-row + .list-row { border-top: 1px solid var(--line-2); border-radius: 0; }
+
+  /* GRID UTILS */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1280px) { .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .g3, .g2 { grid-template-columns: 1fr; } }
+
+  /* SPARK SVG */
+  svg.spark { width: 100%; height: 36px; display: block; }
+
+  /* CHECKBOX/RADIO faux */
+  .check { width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 5px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .check.on { background: var(--accent); border-color: var(--accent); color: white; }
+
+  /* SEGMENTED CONTROL inside cards */
+  .seg-sm { display: inline-flex; background: var(--bg-2); border-radius: 8px; padding: 2px; }
+  .seg-sm button { background: transparent; border: 0; color: var(--text-3); padding: 5px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .seg-sm button.active { background: var(--bg-3); color: var(--text); }
+
+  /* TWEAKS adjustments */
+  .compact .card { padding: 14px; }
+  .compact .metric { padding: 12px; }
+  .compact .metric-val { font-size: 24px; }
+  .spacious .card { padding: 24px; }
+
+  /* When the desktop view is shown inside the dual-stage column,
+     condense generously-spaced sections so the layout still reads cleanly. */
+  .dual-desktop .layout { gap: 16px; }
+  .dual-desktop .sidebar { width: 200px; padding: 12px 10px; position: static; }
+  .dual-desktop .sb-item { padding: 8px 10px; font-size: 12.5px; }
+  .dual-desktop .screen-title { font-size: 24px; }
+  .dual-desktop .metric { padding: 14px; }
+  .dual-desktop .metric-val { font-size: 24px; }
+  .dual-desktop .card { padding: 16px; }
+  .dual-desktop .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dual-desktop .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dual-desktop .list-row { padding: 10px 8px; gap: 10px; }
+  .dual-desktop .card-h { margin-bottom: 12px; }
+  .dual-desktop input.input { padding: 8px 12px; font-size: 12px; }
+
+  /* DUAL VIEW — desktop + mobile side by side */
+  .dual-stage { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; align-items: flex-start; padding: 24px; background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent); border: 1px solid var(--line-2); border-radius: var(--radius-lg); }
+  .dual-desktop { min-width: 0; padding: 18px; background: rgba(7,7,13,0.4); border: 1px solid var(--line-2); border-radius: var(--radius); }
+  .dual-mobile { position: sticky; top: 130px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .stage-tag { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; margin-bottom: 14px; }
+  .stage-tag .sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  @media (max-width: 1280px) { .dual-stage { grid-template-columns: 1fr; } .dual-mobile { position: static; align-items: flex-start; } }
+
+  /* Tighten cards & list rhythm globally for readability */
+  .card-h { margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; }
+  .card-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; line-height: 1.4; }
+  .list-row { padding: 12px 12px; gap: 12px; }
+  .list-row + .list-row { border-top: 1px solid var(--line-2); }
+
+  /* Subtle scroll bar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--line-strong); }
+</style>
 </head>
 <body>
-  <!-- Splash Screen -->
-  <div id="splash">
-    <div class="splash-logo">
-      <svg viewBox="0 0 64 64" fill="none">
-        <path d="M32 4L8 14V30C8 44 18 56 32 60C46 56 56 44 56 30V14L32 4Z" stroke="#42A5F5" stroke-width="2.5" fill="rgba(66,165,245,0.1)"/>
-        <path d="M22 32L29 39L42 24" stroke="#42A5F5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-logo">
+      <svg class="ico-svg" viewBox="0 0 24 24" style="width:16px;height:16px;color:white"><path d="M12 2 L4 6 v6 c0 5 4 8 8 10 c4-2 8-5 8-10 V6 z"/></svg>
     </div>
-    <div class="splash-title">SAFEFLOW</div>
-    <div class="splash-sub">축제 안전관리 플랫폼</div>
-    <div class="splash-loading"></div>
-  </div>
-
-  <script>
-    // ?reset=1 → 즉시 데이터 초기화
-    if(location.search.includes('reset=1')){
-      try{localStorage.clear();sessionStorage.clear();}catch(e){}
-      location.replace(location.pathname);
-    }
-    // 스플래시 자동 제거
-    window.addEventListener('load', function(){
-      setTimeout(function(){
-        var splash = document.getElementById('splash');
-        if(splash) {
-          splash.classList.add('hide');
-          setTimeout(function(){ splash.remove(); }, 700);
-        }
-      }, 1200);
-    });
-  </script>
-
-  <!-- ════════════════════════════════════════════════════════════════════ -->
-  <!-- 🔄 SUPABASE 동기화 (ESM CDN - npm install 불필요)                  -->
-  <!-- ════════════════════════════════════════════════════════════════════ -->
-  <script type="module">
-    (async () => {
-      try {
-        // localStorage에서 URL/Key 읽기 (사용자가 직접 입력)
-        const url = localStorage.getItem('_sb_url') || '';
-        const key = localStorage.getItem('_sb_key') || '';
-
-        if (url.startsWith('http') && key.length > 20) {
-          console.log('[SAFEFLOW] Supabase 로딩 중...', url);
-          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.39.0');
-          const supabase = createClient(url, key, {
-            realtime: { params: { eventsPerSecond: 10 } }
-          });
-
-          // window.storage 인터페이스 (usePersist에서 호출)
-          window.storage = {
-            async get(k) {
-              try {
-                const { data, error } = await supabase.from('app_state').select('value').eq('key', k).maybeSingle();
-                if (error) { console.error('[storage.get]', k, error.message); return null; }
-                if (!data) return null;
-                const v = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
-                return { value: v };
-              } catch (e) { console.error('[storage.get] 예외:', e); return null; }
-            },
-            async set(k, v) {
-              try {
-                const json = typeof v === 'string' ? v : JSON.stringify(v);
-                let stored;
-                try { stored = JSON.parse(json); } catch { stored = json; }
-                const { error } = await supabase.from('app_state').upsert(
-                  { key: k, value: stored, updated_at: new Date().toISOString() },
-                  { onConflict: 'key' }
-                );
-                if (error) { console.error('[storage.set]', k, error.message); return null; }
-                return { value: json };
-              } catch (e) { console.error('[storage.set] 예외:', e); return null; }
-            },
-            async delete(k) {
-              try { await supabase.from('app_state').delete().eq('key', k); return { deleted: true }; }
-              catch { return null; }
-            },
-            async list(prefix) {
-              try {
-                let q = supabase.from('app_state').select('key');
-                if (prefix) q = q.like('key', prefix + '%');
-                const { data } = await q;
-                return { keys: (data || []).map(d => d.key) };
-              } catch { return null; }
-            },
-          };
-
-          // Realtime 구독
-          supabase
-            .channel('app_state_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, (payload) => {
-              const row = payload.new || payload.old;
-              if (!row?.key) return;
-              const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
-              window.dispatchEvent(new CustomEvent('supabase-sync', { detail: { key: row.key, value: v } }));
-              console.log('[SAFEFLOW] 📡 동기화 수신:', row.key.slice(0, 60));
-            })
-            .subscribe((status) => {
-              console.log('[SAFEFLOW] Realtime:', status);
-              window._sbStatus = { ok: status === 'SUBSCRIBED', status };
-              window.dispatchEvent(new CustomEvent('sb-status'));
-              if (status === 'SUBSCRIBED') console.log('[SAFEFLOW] ✅ Realtime 구독 성공 - 기기간 동기화 활성화');
-              if (status === 'CHANNEL_ERROR') console.error('[SAFEFLOW] ❌ Realtime 오류 - Database → Replication에서 app_state 토글 ON 확인');
-            });
-
-          // 디버그 헬퍼
-          window._safeflow = {
-            async checkConnection() {
-              const { count, error } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
-              if (error) { console.error('❌ DB 접근 실패:', error.message); return false; }
-              console.log('✅ Supabase 정상 - app_state 레코드:', count); return true;
-            },
-            async listKeys() {
-              const { data } = await supabase.from('app_state').select('key, updated_at').order('updated_at', { ascending: false });
-              console.table(data); return data;
-            },
-          };
-
-          console.log('[SAFEFLOW] ✅ Supabase 연결 완료');
-          window._sbStatus = { ok: true };
-          window.dispatchEvent(new CustomEvent('sb-status'));
-        } else {
-          console.warn('[SAFEFLOW] ⚠️ Supabase 설정 필요 - ⚙️ 관리 → 🔄 기기간 동기화 카드에서 입력하세요');
-          window._sbStatus = { ok: false, reason: 'no_config' };
-          window.dispatchEvent(new CustomEvent('sb-status'));
-        }
-      } catch (e) {
-        console.error('[SAFEFLOW] Supabase 로드 실패:', e);
-        window._sbStatus = { ok: false, reason: 'load_error', error: String(e.message || e) };
-        window.dispatchEvent(new CustomEvent('sb-status'));
-      }
-    })();
-  </script>
-
-  <div id="root"></div>
-
-  <div id="error-fallback">
-    <div style="max-width:520px;width:100%">
-      <div style="text-align:center;margin-bottom:20px">
-        <div style="font-size:64px;margin-bottom:16px">⚠️</div>
-        <h2 style="color:#F44336;font-size:22px;font-weight:800;margin-bottom:8px">앱 로드 실패</h2>
-        <p style="color:#8892b0;font-size:14px">아래 옵션 중 하나를 선택하세요</p>
-      </div>
-
-      <!-- 🩺 진단 패널 -->
-      <div id="diag-panel" style="background:rgba(33,150,243,0.06);border:1px solid rgba(33,150,243,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-        <div style="color:#42A5F5;font-size:13px;font-weight:700;margin-bottom:8px">🩺 진단 정보</div>
-        <div id="diag-info" style="color:#94A3B8;font-size:11px;line-height:1.6;font-family:monospace"></div>
-      </div>
-
-      <!-- Supabase 직접 설정 -->
-      <div style="background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-        <div style="color:#66BB6A;font-size:13px;font-weight:700;margin-bottom:8px">🔄 Supabase 동기화 설정</div>
-        <input id="ef-url" placeholder="https://xxx.supabase.co" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace;margin-bottom:6px;box-sizing:border-box" />
-        <input id="ef-key" placeholder="anon public key (eyJh...)" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;font-family:monospace;margin-bottom:6px;box-sizing:border-box" />
-        <div style="display:flex;gap:6px">
-          <button id="btn-save-sb" style="flex:1;padding:10px;border-radius:8px;border:none;background:#66BB6A;color:#fff;font-size:13px;font-weight:700;cursor:pointer">✅ 저장 후 재시작</button>
-          <button id="btn-clear-sb" style="padding:10px 14px;border-radius:8px;border:1px solid rgba(244,67,54,0.3);background:transparent;color:#EF5350;font-size:12px;cursor:pointer">🗑 삭제</button>
-        </div>
-      </div>
-
-      <button id="btn-reset" style="width:100%;padding:14px;border-radius:12px;border:none;background:#F44336;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 모든 데이터 초기화 후 재시작</button>
-      <button id="btn-retry" style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#94A3B8;font-size:13px;cursor:pointer">🔃 그냥 새로고침 (캐시 무시)</button>
-      <p style="color:#556;font-size:11px;margin-top:14px;text-align:center">💡 안 되면 F12 → Console 메시지 확인</p>
+    <div>
+      <div class="brand-name">재난안전관리시스템</div>
+      <div class="brand-sub">축제 재난안전 실시간 모니터링</div>
     </div>
   </div>
+  <div class="crumbs">
+    <span class="mono">v0.2 · WIREFRAME</span>
+    <span>관제센터 운영자</span>
+    <span class="mono">2026.04.29 14:32</span>
+  </div>
+</div>
 
-  <script>
-    // 진단 정보 채우기
-    function fillDiag() {
-      var diag = document.getElementById('diag-info');
-      if (!diag) return;
-      var info = [];
-      info.push('🌐 URL: ' + location.href);
-      info.push('📦 Build: ' + new Date().toISOString().slice(0, 10));
-      info.push('💾 Supabase URL: ' + (localStorage.getItem('_sb_url') ? '✅ 저장됨' : '❌ 없음'));
-      info.push('🔑 Supabase Key: ' + (localStorage.getItem('_sb_key') ? '✅ 저장됨' : '❌ 없음'));
-      info.push('🔌 window.storage: ' + (window.storage ? '✅ 정의됨' : '❌ 없음'));
-      info.push('📡 Supabase 상태: ' + (window._sbStatus ? JSON.stringify(window._sbStatus) : '미확인'));
-      info.push('🛠️ Service Worker: ' + ('serviceWorker' in navigator ? '지원' : '미지원'));
-      diag.innerHTML = info.join('<br>');
-      // 저장된 값 채우기
-      var urlInp = document.getElementById('ef-url');
-      var keyInp = document.getElementById('ef-key');
-      if (urlInp && localStorage.getItem('_sb_url')) urlInp.value = localStorage.getItem('_sb_url');
-      if (keyInp && localStorage.getItem('_sb_key')) keyInp.value = localStorage.getItem('_sb_key');
-    }
-    setTimeout(fillDiag, 100);
-    setInterval(fillDiag, 2000);
+<div id="root"></div>
 
-    document.getElementById('btn-reset').addEventListener('click', function(){
-      if (!confirm('⚠️ 모든 로컬 데이터가 삭제됩니다 (Supabase 데이터는 유지).\n\n진행하시겠습니까?')) return;
-      try {
-        // Supabase 설정은 보존
-        var url = localStorage.getItem('_sb_url');
-        var key = localStorage.getItem('_sb_key');
-        localStorage.clear(); sessionStorage.clear();
-        if (url) localStorage.setItem('_sb_url', url);
-        if (key) localStorage.setItem('_sb_key', key);
-      } catch(e){}
-      // PWA 캐시 삭제
-      if ('caches' in window) {
-        caches.keys().then(function(names){
-          names.forEach(function(n){ caches.delete(n); });
-          location.replace(location.pathname);
-        });
-      } else {
-        location.replace(location.pathname);
-      }
-    });
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
 
-    document.getElementById('btn-retry').addEventListener('click', function(){
-      // SW 캐시 무시 새로고침
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs){
-          regs.forEach(function(r){ r.unregister(); });
-          location.reload(true);
-        });
-      } else {
-        location.reload(true);
-      }
-    });
-
-    document.getElementById('btn-save-sb').addEventListener('click', function(){
-      var url = document.getElementById('ef-url').value.trim();
-      var key = document.getElementById('ef-key').value.trim();
-      if (!url || !key) { alert('URL과 Key를 모두 입력하세요'); return; }
-      if (!url.startsWith('http')) { alert('URL은 https://로 시작해야 합니다'); return; }
-      // REST API로 테스트
-      var cleanUrl = url.replace(/\/$/, '');
-      fetch(cleanUrl + '/rest/v1/app_state?select=key&limit=1', {
-        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
-      }).then(function(res){
-        if (!res.ok) {
-          return res.text().then(function(t){
-            alert('❌ 연결 실패 (HTTP ' + res.status + ')\n\n' + t.slice(0, 300) + '\n\n확인 사항:\n• URL/Key가 정확한가\n• app_state 테이블이 존재하는가\n• RLS 정책이 SELECT 허용하는가');
-          });
-        }
-        localStorage.setItem('_sb_url', url);
-        localStorage.setItem('_sb_key', key);
-        alert('✅ 연결 성공!\n\n페이지를 재시작합니다.');
-        location.replace(location.pathname);
-      }).catch(function(e){
-        alert('❌ 네트워크 오류: ' + e.message);
-      });
-    });
-
-    document.getElementById('btn-clear-sb').addEventListener('click', function(){
-      if (!confirm('Supabase 설정을 삭제하시겠습니까?')) return;
-      localStorage.removeItem('_sb_url');
-      localStorage.removeItem('_sb_key');
-      alert('✅ Supabase 설정 삭제됨');
-      fillDiag();
-    });
-  </script>
-
-  <script type="module" src="/src/main.jsx" onerror="document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();"></script>
-  <script>setTimeout(function(){if(!document.getElementById('root').children.length){document.getElementById('error-fallback').classList.add('show');var sp=document.getElementById('splash');if(sp)sp.remove();}},8000)</script>
-
-  <script>
-  if('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(function(reg) {
-      setInterval(function() { reg.update(); }, 60000);
-      reg.addEventListener('updatefound', function() {
-        var nw = reg.installing;
-        if (nw) nw.addEventListener('statechange', function() {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-            window.dispatchEvent(new CustomEvent('sw-update-available'));
-          }
-        });
-      });
-    }).catch(function(){});
-    navigator.serviceWorker.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'SW_UPDATED') {
-        window.dispatchEvent(new CustomEvent('sw-update-available'));
-      }
-    });
-    navigator.serviceWorker.addEventListener('controllerchange', function() {
-      if (window._swUpdating) window.location.reload();
-    });
-    window.applySwUpdate = function() {
-      window._swUpdating = true;
-      navigator.serviceWorker.getRegistration().then(function(reg) {
-        if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');
-        else window.location.reload();
-      });
-    };
-  }
-
-  // PWA 설치
-  let deferredPrompt;
-  window.addEventListener('beforeinstallprompt', function(e){
-    e.preventDefault();
-    deferredPrompt = e;
-    window._pwaInstallable = true;
-    window.dispatchEvent(new CustomEvent('pwa-installable'));
-  });
-  window.installPWA = function(){
-    if(!deferredPrompt){ alert('이미 설치되어 있거나 이 브라우저에서는 설치를 지원하지 않습니다.\n\niOS Safari: 공유 → 홈 화면에 추가\nAndroid Chrome: 메뉴 → 앱 설치'); return; }
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(){
-      deferredPrompt = null;
-      window._pwaInstallable = false;
-    });
-  };
-  window.addEventListener('appinstalled', function(){
-    window._pwaInstallable = false;
-    deferredPrompt = null;
-  });
-  </script>
 </body>
 </html>
