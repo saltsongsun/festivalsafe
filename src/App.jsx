@@ -823,6 +823,95 @@ const CC_LEVEL_MAP = { BLUE: "blue", YELLOW: "yellow", ORANGE: "orange", RED: "r
 const CC_LEVEL_LABEL = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" };
 
 // ─── Mobile Design System (클로드디자인 v2 모바일) ─────────────────
+const MD_GLOBAL_V2 = `
+  /* ═══════════════════════════════════════════════════════════ */
+  /* v2 활성: 모든 페이지에 클로드디자인 톤 입히기                */
+  /* ═══════════════════════════════════════════════════════════ */
+  body.md-v2-active { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif !important; }
+  body.md-v2-active * { font-family: inherit; }
+  body.md-v2-active .mono, body.md-v2-active [style*="JetBrains Mono"] { font-family: 'JetBrains Mono', monospace !important; }
+
+  /* 메인 배경: 더 깊은 검정으로 */
+  body.md-v2-active div[style*="linear-gradient(180deg, #0a0d1a"] { 
+    background: linear-gradient(180deg, #07070d 0%, #0e0f17 100%) !important; 
+  }
+  body.md-v2-active { background: #07070d; }
+  
+  /* 상단바 v2 톤 */
+  body.md-v2-active div[style*="rgba(10,10,26,0.95)"] { 
+    background: rgba(7,7,13,0.85) !important; 
+    backdrop-filter: blur(20px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  }
+  
+  /* 카드 v2 그라데이션 */
+  body.md-v2-active div[style*="linear-gradient(145deg, rgba(255,255,255,0.04)"],
+  body.md-v2-active div[style*="background: \\"rgba(255,255,255,0.02)\\""],
+  body.md-v2-active div[style*="background: rgba(255,255,255,0.02)"], 
+  body.md-v2-active div[style*="background: rgba(255,255,255,0.03)"] { 
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17 !important;
+  }
+  
+  /* 보더 톤 통일 */
+  body.md-v2-active [style*="rgba(255,255,255,0.04)"]:not([style*="background"]),
+  body.md-v2-active [style*="rgba(255,255,255,0.05)"]:not([style*="background"]),
+  body.md-v2-active [style*="rgba(255,255,255,0.06)"]:not([style*="background"]) { 
+    border-color: rgba(255,255,255,0.08) !important; 
+  }
+  
+  /* 색상 팔레트 매핑: SAFEFLOW → 클로드디자인 v2 */
+  /* 파랑 #42A5F5 → #6b8aff (accent) */
+  body.md-v2-active [style*="color: \\"#42A5F5\\""] { color: #8fa6ff !important; }
+  body.md-v2-active [style*="color:#42A5F5"] { color: #8fa6ff !important; }
+  body.md-v2-active [style*="background: \\"#42A5F5\\""] { background: linear-gradient(180deg, #7c98ff, #5a7aff) !important; }
+  
+  /* 타이틀 letter-spacing 더 빡빡하게 */
+  body.md-v2-active h1, body.md-v2-active h2, body.md-v2-active h3 { 
+    letter-spacing: -0.02em !important; 
+  }
+  
+  /* 인풋/셀렉트/텍스트에어리어 v2 톤 */
+  body.md-v2-active input:not([type="checkbox"]):not([type="radio"]), 
+  body.md-v2-active select, 
+  body.md-v2-active textarea { 
+    font-family: inherit !important;
+    border-radius: 10px !important;
+    background: #0e0f17 !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+  body.md-v2-active input:focus, body.md-v2-active select:focus, body.md-v2-active textarea:focus {
+    border-color: rgba(107,138,255,0.4) !important;
+    outline: none !important;
+  }
+  
+  /* 버튼 글로벌 톤 */
+  body.md-v2-active button[style*="background: \\"rgba(33,150,243"],
+  body.md-v2-active button[style*="background:rgba(33,150,243"] { 
+    background: linear-gradient(180deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05)) !important; 
+    color: #8fa6ff !important; 
+    border-color: rgba(107,138,255,0.25) !important;
+  }
+  
+  /* 둥글기 통일 */
+  body.md-v2-active div[style*="borderRadius: 12"] { border-radius: 14px !important; }
+  body.md-v2-active div[style*="borderRadius: 16"] { border-radius: 16px !important; }
+  
+  /* PageHeader 액센트 라인 */
+  body.md-v2-active div[style*="borderLeft"][style*="solid"] { border-left-width: 3px !important; }
+  
+  /* 하단 네비게이션 v2 톤 */
+  body.md-v2-active nav[style*="position"][style*="fixed"][style*="bottom"] {
+    background: rgba(7,7,13,0.92) !important;
+    backdrop-filter: blur(20px) !important;
+    border-top-color: rgba(255,255,255,0.06) !important;
+  }
+  
+  /* 그림자 더 깊게 */
+  body.md-v2-active div[style*="boxShadow: \\"0 4px 24px rgba(0,0,0,0.2)\\""] {
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 32px -16px rgba(0,0,0,0.6) !important;
+  }
+`;
+
 const MD_STYLES = `
   .md-root { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #07070d; color: #f4f5fa; min-height: 100vh; padding-bottom: 80px; }
   .md-root .mono { font-family: 'JetBrains Mono', monospace; }
@@ -9035,6 +9124,12 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     setUseNewMobile(next);
     localStorage.setItem("_new_mobile", next ? "1" : "0");
   };
+  // body 클래스로 글로벌 v2 톤 적용
+  useEffect(() => {
+    if (useNewMobile) document.body.classList.add("md-v2-active");
+    else document.body.classList.remove("md-v2-active");
+    return () => document.body.classList.remove("md-v2-active");
+  }, [useNewMobile]);
   const [isPC, setIsPC] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024);
   useEffect(() => {
     const onResize = () => setIsPC(window.innerWidth >= 1024);
@@ -9320,6 +9415,11 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   return (<div style={{ fontFamily: "'Noto Sans KR',-apple-system,sans-serif" }}>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
     <style>{`@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
+    {useNewMobile && <>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+      <style>{MD_GLOBAL_V2}</style>
+    </>}
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
 
     {/* Top bar - user info (새 모바일 디자인 대시보드면 숨김) */}
