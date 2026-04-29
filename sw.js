@@ -13,6 +13,11 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // POST 요청, chrome-extension 등은 캐시 안 함
+  if (e.request.method !== 'GET') return;
+  if (!e.request.url.startsWith('http')) return;
+  if (e.request.url.includes('supabase.co')) return; // Supabase 요청은 항상 네트워크
+
   // Always network first for navigation and JS/CSS
   if (e.request.mode === 'navigate' || e.request.destination === 'script' || e.request.destination === 'style') {
     e.respondWith(
@@ -23,9 +28,11 @@ self.addEventListener('fetch', e => {
   // Other assets: network first with cache fallback
   e.respondWith(
     fetch(e.request).then(res => {
-      if (res.ok) {
+      if (res.ok && e.request.method === 'GET' && e.request.url.startsWith('http')) {
         const clone = res.clone();
-        caches.open(CACHE_VERSION).then(cache => cache.put(e.request, clone));
+        caches.open(CACHE_VERSION).then(cache => {
+          try { cache.put(e.request, clone); } catch (err) { /* 캐시 실패 무시 */ }
+        });
       }
       return res;
     }).catch(() => caches.match(e.request))
