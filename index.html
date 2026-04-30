@@ -273,6 +273,127 @@
               console.log('총 ' + workers.length + '명');
               return workers;
             },
+            // 🔒 근무자 백업 (수동 호출)
+            async backupWorkers() {
+              const sessRes = await window.storage.get('fest_session_v2');
+              let fid = 'default';
+              if (sessRes) { try { fid = JSON.parse(sessRes.value).festivalId || 'default'; } catch {} }
+              const r = await window.storage.get(fid + '_set_v10');
+              if (!r) { console.error('❌ 설정 데이터 없음'); return; }
+              const settings = JSON.parse(r.value);
+              const ws = settings.workSites || [];
+              const total = ws.reduce((sum, s) => sum + (s.workers || []).length, 0);
+              const ts = new Date().toISOString();
+              const backupKey = fid + '_workers_backup_' + Date.now();
+              await window.storage.set(backupKey, JSON.stringify({ ts, workSites: ws, total }));
+              // 로컬에도 별도 저장
+              try {
+                const list = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+                list.unshift({ key: backupKey, ts, total });
+                if (list.length > 10) list.length = 10; // 최근 10개만
+                localStorage.setItem('_worker_backups', JSON.stringify(list));
+              } catch {}
+              console.log('✅ 근무자 백업 완료:', total, '명');
+              console.log('백업 키:', backupKey);
+              return { ts, total, key: backupKey };
+            },
+            async listBackups() {
+              try {
+                const list = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+                console.log('📦 백업 목록 (' + list.length + '개):');
+                console.table(list.map((b, i) => ({ '#': i, time: new Date(b.ts).toLocaleString('ko-KR'), workers: b.total, key: b.key })));
+                return list;
+              } catch { return []; }
+            },
+            async restoreBackup(idx) {
+              const list = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+              const target = list[idx || 0];
+              if (!target) { console.error('❌ 백업이 없습니다'); return; }
+              const r = await window.storage.get(target.key);
+              if (!r) { console.error('❌ 백업 데이터를 찾을 수 없음:', target.key); return; }
+              const backup = JSON.parse(r.value);
+              const sessRes = await window.storage.get('fest_session_v2');
+              let fid = 'default';
+              if (sessRes) { try { fid = JSON.parse(sessRes.value).festivalId || 'default'; } catch {} }
+              const setRes = await window.storage.get(fid + '_set_v10');
+              if (!setRes) { console.error('❌ 설정 데이터 없음'); return; }
+              const settings = JSON.parse(setRes.value);
+              if (!confirm('백업 시간: ' + new Date(backup.ts).toLocaleString('ko-KR') + '\n근무자 ' + backup.total + '명을 복구하시겠습니까?\n\n현재 데이터는 덮어써집니다.')) return;
+              settings.workSites = backup.workSites;
+              await window.storage.set(fid + '_set_v10', JSON.stringify(settings));
+              console.log('✅ 복구 완료. 3초 후 새로고침...');
+              setTimeout(() => location.reload(), 3000);
+            },
+            // 🔍 진단: 근무자 데이터가 왜 사라졌는지 조사
+            async diagnose() {
+              console.log('🔍 SAFEFLOW 진단 시작...');
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              
+              // 1) Supabase 연결
+              if (!window.storage) { console.error('❌ Supabase 미연결'); return; }
+              const { count, error: cErr } = await supabase.from('app_state').select('*', { count: 'exact', head: true });
+              if (cErr) console.error('❌ DB 에러:', cErr.message);
+              else console.log('✅ Supabase 정상, 레코드:', count);
+              
+              // 2) 세션
+              const sessRes = await window.storage.get('fest_session_v2');
+              if (!sessRes) { console.error('❌ 세션 없음 - 로그인 필요'); return; }
+              const session = JSON.parse(sessRes.value);
+              console.log('👤 세션:', session.name, '/', session.role);
+              const fid = session.festivalId || 'default';
+              console.log('🎪 축제 ID:', fid);
+              
+              // 3) accounts
+              const accRes = await window.storage.get('fest_accounts_v2');
+              if (accRes) {
+                const accounts = JSON.parse(accRes.value);
+                const myFest = accounts.filter(a => a.festivalId === fid || (a.festivals || []).includes(fid));
+                console.log('📋 사용자관리 계정:', accounts.length, '(이 축제:', myFest.length, ')');
+              }
+              
+              // 4) settings
+              const setRes = await window.storage.get(fid + '_set_v10');
+              if (!setRes) { console.error('❌ 설정 데이터 없음 - 새 축제'); return; }
+              const settings = JSON.parse(setRes.value);
+              const sites = settings.workSites || [];
+              const totalWorkers = sites.reduce((s, x) => s + (x.workers || []).length, 0);
+              console.log('🏠 근무지:', sites.length, '개');
+              console.log('👷 근무자:', totalWorkers, '명');
+              if (totalWorkers === 0) {
+                console.warn('⚠️ 근무자가 0명입니다!');
+                console.log('💡 해결: window._safeflow.recoverWorkers()');
+              }
+              
+              // 5) 로컬 vs 클라우드
+              const localSet = localStorage.getItem(fid + '_set_v10');
+              if (localSet) {
+                const localSettings = JSON.parse(localSet);
+                const localTotal = (localSettings.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+                if (localTotal !== totalWorkers) {
+                  console.warn('⚠️ 로컬과 클라우드 불일치! 로컬:', localTotal, '명 / 클라우드:', totalWorkers, '명');
+                } else {
+                  console.log('✅ 로컬↔클라우드 일치:', totalWorkers, '명');
+                }
+              }
+              
+              // 6) 백업 목록
+              try {
+                const backups = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+                console.log('📦 백업:', backups.length, '개');
+                if (backups.length > 0) {
+                  console.log('💡 백업 복구: window._safeflow.restoreBackup(0)');
+                }
+              } catch {}
+              
+              console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              console.log('진단 완료. 명령어:');
+              console.log('  window._safeflow.listWorkers()');
+              console.log('  window._safeflow.listAccounts()');
+              console.log('  window._safeflow.recoverWorkers()');
+              console.log('  window._safeflow.backupWorkers()');
+              console.log('  window._safeflow.listBackups()');
+              console.log('  window._safeflow.restoreBackup(0)');
+            },
           };
 
           console.log('[SAFEFLOW] ✅ Supabase 연결 완료');
