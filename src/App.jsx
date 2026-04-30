@@ -2901,13 +2901,20 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       </div>
     </CC_Card>
 
-    {/* 메인: 인력목록 + 사이드 통계 (3 컬럼) */}
-    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-      {/* 인력 목록 */}
-      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명`}>
-        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+    {/* 메인: 좌측 인력 풀 + 우측 근무지 그리드 (드래그앤드롭) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 16 }}>
+      {/* 좌측: 인력 목록 (드래그 소스) */}
+      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명 · 드래그하여 근무지에 배치`}>
+        <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
-          filtered.map(w => (<div key={w.id} style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 10, alignItems: "center" }}>
+          filtered.map(w => (<div key={w.id}
+            draggable
+            onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
+            onDragEnd={e => { e.currentTarget.style.opacity = "1"; }}
+            style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto auto 1fr auto auto", gap: 10, alignItems: "center", cursor: "grab", transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(107,138,255,0.06)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}>
+            <span style={{ fontSize: 13, color: "#6c6e7d", cursor: "grab" }} title="드래그하여 이동">⠿</span>
             <span style={{ width: 8, height: 8, borderRadius: 4, background: w.onDuty ? "#4cd99a" : "#556" }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2923,12 +2930,122 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
         </div>
       </CC_Card>
 
-      {/* 역할별 분포 */}
-      <CC_Card title="📊 역할별 분포" sub={`${Object.keys(byRole).length}개 역할`}>
+      {/* 우측: 근무지 그리드 (드롭 영역) */}
+      <CC_Card title="🏠 근무지별 배치" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지 · 여기에 드롭`}>
+        <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
+          {/* 미배치 풀 - 상단에 강조 */}
+          {(() => {
+            const pool = (settings.workSites || []).find(s => s.id === "_pool");
+            const poolCount = (pool?.workers || []).length;
+            return (<div
+              onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(255,154,60,0.18)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.5)"; }}
+              onDragLeave={e => { e.currentTarget.style.background = "rgba(255,154,60,0.06)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.2)"; }}
+              onDrop={e => { 
+                e.preventDefault(); 
+                e.currentTarget.style.background = "rgba(255,154,60,0.06)"; 
+                e.currentTarget.style.borderColor = "rgba(255,154,60,0.2)";
+                const wid = e.dataTransfer.getData("workerId"); 
+                const from = e.dataTransfer.getData("fromSite"); 
+                if (!wid || from === "_pool") return;
+                setSettings(prev => {
+                  const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+                  const fi = ws.findIndex(s => s.id === from);
+                  let pi = ws.findIndex(s => s.id === "_pool");
+                  if (pi < 0) { ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] }); pi = ws.length - 1; }
+                  if (fi >= 0) {
+                    const w = (ws[fi].workers || []).find(ww => ww.id === wid);
+                    if (w) {
+                      ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) };
+                      ws[pi] = { ...ws[pi], workers: [...(ws[pi].workers || []), w] };
+                    }
+                  }
+                  return { ...prev, workSites: ws };
+                });
+              }}
+              style={{ padding: 12, marginBottom: 10, borderRadius: 10, background: "rgba(255,154,60,0.06)", border: "1.5px dashed rgba(255,154,60,0.2)", transition: "all 0.15s" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: poolCount > 0 ? 8 : 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>⚠️ 미배치 풀</span>
+                <span className="mono" style={{ fontSize: 12, color: "#ff9a3c", fontWeight: 700 }}>{poolCount}명</span>
+              </div>
+              {poolCount > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {(pool.workers || []).slice(0, 12).map(w => (<span key={w.id}
+                  draggable
+                  onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
+                  style={{ padding: "3px 8px", borderRadius: 999, background: "rgba(255,154,60,0.12)", border: "1px solid rgba(255,154,60,0.25)", color: "#ff9a3c", fontSize: 11, fontWeight: 600, cursor: "grab" }}>{w.name}</span>))}
+                {poolCount > 12 && <span style={{ padding: "3px 8px", color: "#6c6e7d", fontSize: 11 }}>+{poolCount - 12}</span>}
+              </div>}
+              {poolCount === 0 && <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "4px 0" }}>여기로 드래그하면 배치 해제됩니다</div>}
+            </div>);
+          })()}
+
+          {/* 근무지 그리드 (2열) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => {
+              const ws = s.workers || [];
+              const onD = ws.filter(w => w.onDuty).length;
+              const meals = ws.reduce((sum, w) => sum + (w.meals || 0), 0);
+              const zone = (settings.zones || []).find(z => z.id === s.zoneId);
+              return (<div key={s.id}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(76,217,154,0.1)"; e.currentTarget.style.borderColor = "rgba(76,217,154,0.5)"; }}
+                onDragLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
+                onDrop={e => { 
+                  e.preventDefault(); 
+                  e.currentTarget.style.background = "rgba(255,255,255,0.02)"; 
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+                  const wid = e.dataTransfer.getData("workerId"); 
+                  const from = e.dataTransfer.getData("fromSite"); 
+                  if (!wid || from === s.id) return;
+                  setSettings(prev => {
+                    const wss = JSON.parse(JSON.stringify(prev.workSites || []));
+                    const fi = wss.findIndex(x => x.id === from);
+                    const ti = wss.findIndex(x => x.id === s.id);
+                    if (fi >= 0 && ti >= 0) {
+                      const w = (wss[fi].workers || []).find(ww => ww.id === wid);
+                      if (w) {
+                        wss[fi] = { ...wss[fi], workers: wss[fi].workers.filter(ww => ww.id !== wid) };
+                        wss[ti] = { ...wss[ti], workers: [...(wss[ti].workers || []), w] };
+                      }
+                    }
+                    return { ...prev, workSites: wss };
+                  });
+                }}
+                style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1.5px dashed rgba(255,255,255,0.06)", minHeight: 100, transition: "all 0.15s" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
+                  <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700, flexShrink: 0 }}>{onD}/{ws.length}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#6c6e7d", marginBottom: 6 }}>
+                  {zone && <span>📍 {zone.name}</span>}
+                  {meals > 0 && <span>🍱 {meals}식</span>}
+                </div>
+                {ws.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "12px 0", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: 6 }}>여기에 드래그</div>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {ws.map(w => (<span key={w.id}
+                      draggable
+                      onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
+                      title={`${w.name} ${w.role || ""} ${w.phone || ""} (드래그하여 이동)`}
+                      style={{ padding: "3px 8px", borderRadius: 999, background: w.onDuty ? "rgba(76,217,154,0.12)" : "rgba(107,138,255,0.1)", border: `1px solid ${w.onDuty ? "rgba(76,217,154,0.3)" : "rgba(107,138,255,0.2)"}`, color: w.onDuty ? "#4cd99a" : "#8fa6ff", fontSize: 11, fontWeight: 600, cursor: "grab", whiteSpace: "nowrap" }}>
+                      {w.onDuty && "● "}{w.name}
+                      {w.role && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 10 }}>({w.role})</span>}
+                    </span>))}
+                  </div>
+                )}
+              </div>);
+            })}
+          </div>
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 보조: 역할별 분포 */}
+    <CC_Card title="📊 역할별 분포" sub={`${Object.keys(byRole).length}개 역할`} style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         {Object.keys(byRole).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>역할 미지정</div> :
         Object.entries(byRole).sort((a,b)=>b[1].length-a[1].length).map(([role, ws]) => {
           const ratio = allWorkers.length > 0 ? Math.round((ws.length / allWorkers.length) * 100) : 0;
-          return (<div key={role} style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          return (<div key={role}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontSize: 13, color: "#f4f5fa" }}>{role}</span>
               <span className="mono" style={{ fontSize: 12, color: "#a980ff" }}>{ws.length}명 ({ratio}%)</span>
@@ -2938,48 +3055,15 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
             </div>
           </div>);
         })}
-      </CC_Card>
-
-      {/* 근무지별 인력 */}
-      <CC_Card title="🏠 근무지별 인력" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지`}>
-        <div style={{ maxHeight: 580, overflowY: "auto" }}>
-          {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => {
-            const ws = s.workers || [];
-            const onD = ws.filter(w => w.onDuty).length;
-            const meals = ws.reduce((sum, w) => sum + (w.meals || 0), 0);
-            const zone = (settings.zones || []).find(z => z.id === s.zoneId);
-            return (<div key={s.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }} onClick={() => setFilter(`site:${s.id}`)}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
-                <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700 }}>{onD}/{ws.length}</span>
-              </div>
-              <div style={{ display: "flex", gap: 10, fontSize: 10, color: "#6c6e7d" }}>
-                {zone && <span>📍 {zone.name}</span>}
-                <span>🍱 {meals}</span>
-              </div>
-            </div>);
-          })}
-          {/* 미배치 풀 */}
-          {(() => {
-            const pool = (settings.workSites || []).find(s => s.id === "_pool");
-            if (!pool || (pool.workers || []).length === 0) return null;
-            return (<div style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,154,60,0.06)", border: "1px solid rgba(255,154,60,0.2)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#ff9a3c" }}>⚠️ 미배치</span>
-                <span className="mono" style={{ fontSize: 12, color: "#ff9a3c", fontWeight: 700 }}>{(pool.workers || []).length}명</span>
-              </div>
-            </div>);
-          })()}
-        </div>
-      </CC_Card>
-    </div>
+      </div>
+    </CC_Card>
 
     {/* 안내 */}
     <CC_Card>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18 }}>💡</span>
-          <span style={{ fontSize: 13, color: "#94A3B8" }}>상세 편집(드래그·이동·계정 발급 등)은 모바일에서 더 편리하게 사용 가능</span>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>인력을 근무지로 드래그하여 즉시 배치할 수 있습니다. 상세 정보 편집(이름·연락처·계정)은 모바일에서 사용 가능</span>
         </div>
         <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 설정으로 →</CC_Btn>
       </div>
