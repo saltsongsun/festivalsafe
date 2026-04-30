@@ -8721,13 +8721,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   </div>
                 ) : (
                   <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
-                    style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                    {w.type && <span style={{ color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
-                    {w.role && <span style={{ color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                    {w.accountId && <span style={{ color: "#42A5F5", fontSize: 12 }}>🔑</span>}
-                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>✏️</button>
-                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
+                    style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{w.name}</span>
+                    {w.type && <span style={{ color: "#E1BEE7", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.type}</span>}
+                    {w.role && <span style={{ color: "#009688", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.role}</span>}
+                    {w.accountId && <span style={{ color: "#42A5F5", fontSize: 12, flexShrink: 0 }}>🔑</span>}
+                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4, flexShrink: 0 }}>✏️</button>
+                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✕</button>
                   </div>
                 );
               })}
@@ -8785,14 +8785,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                     </div>
                   ) : (
                     <div key={w.id} draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}
-                      style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid rgba(255,255,255,0.04)" }}>
-                      <span style={{ fontSize: 14, color: "#94A3B8" }}>⠿</span>
-                      <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>{w.name}</span>
-                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
-                      {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12 }}>🔑{w.accountId}</span>}
-                      {w.phone && <span style={{ color: "#94A3B8", fontSize: 12 }}>{w.phone}</span>}
-                      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                      style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid rgba(255,255,255,0.04)", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 14, color: "#94A3B8", flexShrink: 0 }}>⠿</span>
+                      <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{w.name}</span>
+                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.type}</span>}
+                      {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.role}</span>}
+                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>🔑{w.accountId}</span>}
+                      {w.phone && <span style={{ color: "#94A3B8", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.phone}</span>}
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexShrink: 0 }}>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
                         <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
