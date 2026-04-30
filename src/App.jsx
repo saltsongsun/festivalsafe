@@ -2542,34 +2542,66 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
                     if (setActiveAlert) setActiveAlert(cat);
                   } else if (setActiveAlert) setActiveAlert(topAlert);
                 }}>대응 시작 →</CC_Btn>
+                <CC_Btn variant="ghost" onClick={() => setAlerts(p => p.filter((_, i) => i !== 0))}>🗑 삭제</CC_Btn>
               </div>
             </CC_Card>}
 
-            {/* 카테고리 메트릭 */}
-            <div className="cc-g4" style={{ marginBottom: 16 }}>
-              {sortedCats.slice(0, 4).map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
+            {/* KPI 요약 - 6열로 한눈에 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}>
+              {(() => {
+                const allWorkers = (settings.workSites || []).flatMap(s => s.workers || []);
+                const onDuty = allWorkers.filter(w => w.onDuty).length;
+                const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+                const allRadios = (settings.assets || []).flatMap(a => a.units || []).filter(u => u.assignedTo);
+                const openIncidents = (settings.incidents || []).filter(i => i.status !== "closed").length;
+                const totalPrograms = (settings.programs || []).length;
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                const activePrograms = (settings.programs || []).filter(p => {
+                  if (p.date !== "always" && p.date !== todayStr) return false;
+                  const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                  const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+                  return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+                }).length;
+                const crowd = categories.find(c => c.id === "crowd");
+                
+                const kpis = [
+                  { label: "총 근무자", value: allWorkers.length, sub: `근무중 ${onDuty}`, color: "#6b8aff", icon: "👥" },
+                  { label: "활성 경보", value: (alerts || []).length, sub: `${(alerts || []).filter(a => a.level === "RED").length} 심각`, color: (alerts || []).length > 0 ? "#ff5e7e" : "#4cd99a", icon: "🔔" },
+                  { label: "진행중 사건", value: openIncidents, sub: "처리 대기", color: openIncidents > 0 ? "#ff9a3c" : "#4cd99a", icon: "📁" },
+                  { label: "진행 프로그램", value: activePrograms, sub: `총 ${totalPrograms}건`, color: "#a980ff", icon: "🎭" },
+                  { label: "현재 인파", value: (crowd?.currentValue || 0).toLocaleString(), sub: crowd?.unit || "명", color: "#4cd99a", icon: "🏃" },
+                  { label: "무전기 사용", value: allRadios.length, sub: "분배중", color: "#f5c451", icon: "📻" },
+                ];
+                return kpis.map(k => (<div key={k.label} style={{ padding: "14px 16px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 16 }}>{k.icon}</span>
+                    <span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</span>
+                    <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>
+                  </div>
+                </div>));
+              })()}
             </div>
-            {sortedCats.length > 4 && <div className="cc-g4" style={{ marginBottom: 16 }}>
-              {sortedCats.slice(4, 7).map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
-              <CC_Card style={{ background: "#14151f" }}>
-                <div className="cc-card-sub">활성 경보</div>
-                <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "JetBrains Mono", marginTop: 4, marginBottom: 6, color: "#f4f5fa" }}>{(alerts || []).length} <span style={{ fontSize: 13, color: "#6c6e7d", fontFamily: "inherit" }}>건</span></div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {["RED","ORANGE","YELLOW"].map(lv => { const cnt = (alerts || []).filter(a => a.level === lv).length; if (!cnt) return null; return <CC_Chip key={lv} level={CC_LEVEL_MAP[lv]}>●{cnt}</CC_Chip>; })}
-                </div>
-              </CC_Card>
-            </div>}
 
-            {/* 활성 경보 + 주요 구역 */}
-            <div className="cc-grid-2col" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-              <CC_Card title="활성 경보" sub="실시간 갱신" action={<CC_Btn size="sm" variant="ghost">전체 보기</CC_Btn>}>
+            {/* 카테고리 메트릭 - 6열로 더 컴팩트 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {sortedCats.map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
+            </div>
+
+            {/* 메인 그리드: 활성경보 + 사건 + 구역 + 프로그램 + 자산 (5열) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.5fr 1fr", gap: 16, marginBottom: 16 }}>
+              {/* 활성 경보 */}
+              <CC_Card title="활성 경보" sub={`${(alerts || []).length}건 · 실시간`} action={(alerts || []).length > 0 ? <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("alert")}>전체 →</CC_Btn> : null}>
                 {(alerts || []).slice(0, 5).map((a, i) => (<div key={i} className="cc-list-row">
                   <CC_Chip level={CC_LEVEL_MAP[a.level]} pulse={a.level === "ORANGE" || a.level === "RED"}>●</CC_Chip>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#f4f5fa" }}>{a.category}</div>
-                    <div style={{ fontSize: 12, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.category}</div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
                   </div>
-                  <span className="mono" style={{ fontSize: 12, color: "#6c6e7d" }}>{a.time}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", flexShrink: 0 }}>{a.time?.split(" ")[1] || a.time}</span>
                   <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"} onClick={() => {
                     const cat = (categories || []).find(c => c.name === a.category);
                     if (cat) {
@@ -2578,22 +2610,153 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
                     } else if (setActiveAlert) setActiveAlert(a);
                   }}>대응</CC_Btn>
                 </div>))}
-                {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보가 없습니다</div>}
+                {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>✅ 현재 활성 경보가 없습니다</div>}
               </CC_Card>
+
+              {/* 진행중 사건 */}
+              <CC_Card title="사건 / 신고" sub={`${(settings.incidents || []).filter(i => i.status !== "closed").length}건 진행중`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("incident")}>전체 →</CC_Btn>}>
+                {(settings.incidents || []).filter(i => i.status !== "closed").slice(0, 5).map(i => (<div key={i.id} className="cc-list-row">
+                  <span style={{ fontSize: 16 }}>{i.priority === "high" ? "🔴" : i.priority === "medium" ? "🟠" : "🔵"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa" }}>{i.type}</div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {i.location} · {i.desc}</div>
+                  </div>
+                  <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", flexShrink: 0 }}>{i.time?.split(" ")[1] || i.time}</span>
+                </div>))}
+                {(settings.incidents || []).filter(i => i.status !== "closed").length === 0 && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>✅ 진행중 사건 없음</div>}
+              </CC_Card>
+
+              {/* 구역별 혼잡도 */}
               <CC_Card title="구역별 혼잡도" sub={`${(settings.zones || []).length}개 구역`}>
-                {(settings.zones || []).slice(0, 6).map(z => {
+                {(settings.zones || []).slice(0, 7).map(z => {
                   const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
                   const cl = c?.level || "smooth";
                   const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
                   const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
-                  return (<div key={z.id} className="cc-list-row" style={{ padding: "10px 0" }}>
-                    <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+                  return (<div key={z.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                    <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {z.name}</span>
                     <CC_Chip level={lv}>{lbl}</CC_Chip>
                   </div>);
                 })}
                 {(settings.zones || []).length === 0 && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>구역 미등록</div>}
               </CC_Card>
             </div>
+
+            {/* 보조 그리드: 프로그램 + 인력 + 자산 + SMS (4열) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1.5fr", gap: 16, marginBottom: 16 }}>
+              {/* 진행 프로그램 */}
+              <CC_Card title="진행 / 다음 프로그램" sub={`총 ${(settings.programs || []).length}건`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("program")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                  const todays = (settings.programs || []).filter(p => p.date === "always" || p.date === todayStr);
+                  const active = todays.filter(p => {
+                    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+                    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+                  });
+                  const upcoming = todays.filter(p => {
+                    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                    return sh*60+sm > nowMin;
+                  }).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+                  if (active.length === 0 && upcoming.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>오늘 예정된 프로그램이 없습니다</div>;
+                  return (<>
+                    {active.slice(0, 2).map(p => (<div key={p.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(76,217,154,0.08)", border: "1px solid rgba(76,217,154,0.2)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", animation: "blink 1.5s infinite" }} />
+                        <span style={{ fontSize: 11, color: "#4cd99a", fontWeight: 700 }}>● 진행중</span>
+                        <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto" }}>{p.time}~{p.endTime}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa" }}>{p.title}</div>
+                      {p.location && <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>📍 {p.location}</div>}
+                    </div>))}
+                    {upcoming.slice(0, 3).map(p => (<div key={p.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                      <span className="mono" style={{ fontSize: 12, color: "#6b8aff", minWidth: 44 }}>{p.time}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</div>
+                        {p.location && <div style={{ fontSize: 10, color: "#6c6e7d" }}>📍 {p.location}</div>}
+                      </div>
+                    </div>))}
+                  </>);
+                })()}
+              </CC_Card>
+
+              {/* 인력 현황 */}
+              <CC_Card title="인력 현황" sub="근무지별" action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("workforce")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const sites = (settings.workSites || []).filter(s => s.id !== "_pool" && (s.workers || []).length > 0);
+                  if (sites.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>근무자 미배치</div>;
+                  return sites.slice(0, 5).map(s => {
+                    const ws = s.workers || [];
+                    const onDuty = ws.filter(w => w.onDuty).length;
+                    return (<div key={s.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                      <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
+                      <span className="mono" style={{ fontSize: 12, color: "#6b8aff", flexShrink: 0 }}>{onDuty}/{ws.length}</span>
+                    </div>);
+                  });
+                })()}
+              </CC_Card>
+
+              {/* 자산 현황 */}
+              <CC_Card title="자산 현황" sub="분배 / 보유" action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("resource")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const assets = settings.assets || [];
+                  if (assets.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>자산 미등록</div>;
+                  return assets.slice(0, 5).map(a => {
+                    const total = (a.units || []).length;
+                    const assigned = (a.units || []).filter(u => u.assignedTo).length;
+                    const ratio = total > 0 ? Math.round((assigned / total) * 100) : 0;
+                    const color = ratio > 80 ? "#ff5e7e" : ratio > 50 ? "#ff9a3c" : "#4cd99a";
+                    return (<div key={a.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.icon || "📦"} {a.name}</span>
+                        <span className="mono" style={{ fontSize: 11, color: color, flexShrink: 0 }}>{assigned}/{total}</span>
+                      </div>
+                      <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                        <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+                      </div>
+                    </div>);
+                  });
+                })()}
+              </CC_Card>
+
+              {/* 최근 SMS 발송 */}
+              <CC_Card title="최근 SMS" sub={`${(smsLog || []).length}건 누적`}>
+                {(() => {
+                  const recent = (smsLog || []).slice(0, 5);
+                  if (recent.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>발송 내역 없음</div>;
+                  return recent.map((s, i) => (<div key={i} className="cc-list-row" style={{ padding: "8px 0" }}>
+                    <span style={{ fontSize: 14 }}>📨</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.message || s.text || "(메시지)"}</div>
+                      <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 2 }}>{s.recipients?.length || s.targets?.length || 0}명 · {s.time}</div>
+                    </div>
+                  </div>));
+                })()}
+              </CC_Card>
+            </div>
+
+            {/* 시간대별 인파 추이 그래프 */}
+            {(() => {
+              const crowd = categories.find(c => c.id === "crowd");
+              const history = (crowd?.history || []).slice(-24);
+              if (history.length < 2) return null;
+              return (<CC_Card title="시간대별 인파 추이" sub={`최근 ${history.length}회 측정 · 30분 간격`} style={{ marginBottom: 16 }}>
+                <div style={{ width: "100%", height: 200 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={history} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                      <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={50} />
+                      <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()}명`, "체류"]} />
+                      {crowd.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={crowd.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 11 }} />}
+                      {crowd.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={crowd.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 11 }} />}
+                      <Line type="monotone" dataKey="value" stroke="#6b8aff" strokeWidth={2.5} dot={{ fill: "#6b8aff", r: 3 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CC_Card>);
+            })()}
           </>}
 
           {/* MONITOR 탭 */}
