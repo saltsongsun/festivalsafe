@@ -10589,6 +10589,51 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const [refreshKey, setRefreshKey] = useState(0);
   const prevLevels = useRef({}); const lastSms = useRef(0); const alertCooldown = useRef({});
 
+  // 🔒 근무자 자동 백업: 근무자 수가 변경될 때마다 백업 (최대 1분에 1번)
+  const lastWorkerBackup = useRef(0);
+  const lastWorkerCount = useRef(-1);
+  useEffect(() => {
+    const totalWorkers = (settings.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+    
+    // 첫 로드 시는 카운트만 기록
+    if (lastWorkerCount.current < 0) {
+      lastWorkerCount.current = totalWorkers;
+      return;
+    }
+    
+    const prev = lastWorkerCount.current;
+    
+    // 근무자가 50% 이상 갑자기 감소하면 경고 + 강제 백업
+    if (prev > 5 && totalWorkers < prev * 0.5) {
+      console.warn(`⚠️ [자동백업] 근무자 급감 감지: ${prev}명 → ${totalWorkers}명`);
+      console.warn(`💡 복구: window._safeflow.listBackups() → window._safeflow.restoreBackup(0)`);
+    }
+    
+    // 변경 감지 + 1분에 1번만 백업
+    const now = Date.now();
+    if (totalWorkers !== prev && now - lastWorkerBackup.current > 60000) {
+      lastWorkerBackup.current = now;
+      // localStorage에 백업 (Supabase 비용 절감)
+      try {
+        const ts = new Date().toISOString();
+        const list = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+        const backupKey = `${fid}_workers_backup_${now}`;
+        const data = { ts, workSites: settings.workSites || [], total: totalWorkers };
+        localStorage.setItem(backupKey, JSON.stringify(data));
+        list.unshift({ key: backupKey, ts, total: totalWorkers });
+        // 최근 10개만
+        if (list.length > 10) {
+          const removed = list.splice(10);
+          removed.forEach(r => { try { localStorage.removeItem(r.key); } catch {} });
+        }
+        localStorage.setItem('_worker_backups', JSON.stringify(list));
+        console.log(`📦 [자동백업] 근무자 ${totalWorkers}명 백업 완료`);
+      } catch (e) { console.warn('[자동백업] 실패:', e); }
+    }
+    
+    lastWorkerCount.current = totalWorkers;
+  }, [settings.workSites, fid]);
+
   const active = isActive(settings);
   const role = ROLES[session.role] || ROLES.viewer;
   const myAccount = accounts.find(a => a.id === session.id);
