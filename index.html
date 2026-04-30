@@ -559,8 +559,12 @@
 
   <script>
   if('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(function(reg) {
-      setInterval(function() { reg.update(); }, 60000);
+    // 🔄 옛 SW 강제 업데이트 (POST 캐시 에러 등 해결)
+    navigator.serviceWorker.register('/sw.js?v=3', { updateViaCache: 'none' }).then(function(reg) {
+      // 즉시 업데이트 체크
+      reg.update().catch(function(){});
+      // 1분마다 업데이트 체크
+      setInterval(function() { reg.update().catch(function(){}); }, 60000);
       reg.addEventListener('updatefound', function() {
         var nw = reg.installing;
         if (nw) nw.addEventListener('statechange', function() {
@@ -584,6 +588,18 @@
         if (reg && reg.waiting) reg.waiting.postMessage('skipWaiting');
         else window.location.reload();
       });
+    };
+    // 🛠️ 캐시 강제 클리어 헬퍼 (콘솔에서 실행)
+    window._clearAllCaches = async function() {
+      console.log('🧹 캐시 클리어 시작...');
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+      console.log('✅ 캐시 ' + keys.length + '개 삭제');
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      console.log('✅ Service Worker ' + regs.length + '개 해제');
+      console.log('🔄 3초 후 재로딩...');
+      setTimeout(() => location.reload(true), 3000);
     };
   }
 
