@@ -340,6 +340,34 @@ function getFcstParams(settings) {
   return { nx, ny, bd, bt };
 }
 
+// 단기예보 base_time: 02,05,08,11,14,17,20,23시 발표 (해당 시각 10분 이후 호출 가능)
+function getShortFcstParams(settings) {
+  const loc = settings.location || {};
+  const kma = settings.kma || {};
+  const grid = latLonToGrid(loc.lat || 35.18, loc.lon || 128.11);
+  const nx = kma.nxOverride || grid.nx;
+  const ny = kma.nyOverride || grid.ny;
+  const now = new Date();
+  const baseTimes = [2, 5, 8, 11, 14, 17, 20, 23];
+  let h = now.getHours();
+  let m = now.getMinutes();
+  // 가장 최근 발표시각 찾기 (10분 이후 발표 완료)
+  let baseHour = null;
+  for (let i = baseTimes.length - 1; i >= 0; i--) {
+    const bt = baseTimes[i];
+    if (h > bt || (h === bt && m >= 10)) { baseHour = bt; break; }
+  }
+  let dateObj = new Date(now);
+  if (baseHour === null) {
+    // 오늘 02시 이전 → 어제 23시
+    baseHour = 23;
+    dateObj.setDate(dateObj.getDate() - 1);
+  }
+  const bd = `${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, '0')}${String(dateObj.getDate()).padStart(2, '0')}`;
+  const bt = `${String(baseHour).padStart(2, '0')}00`;
+  return { nx, ny, bd, bt };
+}
+
 function getKmaParams(settings) {
   const loc = settings.location || {};
   const kma = settings.kma || {};
@@ -1139,11 +1167,11 @@ function MobileNewDashboard({ session, settings, categories, alerts, onCardClick
       </div>
 
       {/* 최우선 알림 배너 */}
-      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`} onClick={() => onAlertClick && onAlertClick(topAlert)}>
+      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
         <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
         <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
         <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
-        <button style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
+        <button onClick={() => onAlertClick && onAlertClick(topAlert)} style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
       </div>}
 
       {/* 메트릭 그리드 (2열) */}
@@ -1436,7 +1464,7 @@ const MCC_STYLES = `
 `;
 
 // ─── 모바일 관제센터 (B안: 하단네비 + 세로카드) ─────────────────────
-function MobileControlCenter({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert }) {
+function MobileControlCenter({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
   const [page, setPage] = useState("dashboard");
   const [showMore, setShowMore] = useState(false);
 
@@ -1494,7 +1522,7 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
       </div>
 
       {/* 페이지별 컨텐츠 */}
-      {page === "dashboard" && <MCC_Dashboard session={session} settings={settings} categories={sortedCats} alerts={alerts} overall={overall} overallColor={overallColor} overallLabel={overallLabel} topAlert={topAlert} setPage={setPage} setActiveAlert={setActiveAlert} />}
+      {page === "dashboard" && <MCC_Dashboard session={session} settings={settings} categories={sortedCats} alerts={alerts} overall={overall} overallColor={overallColor} overallLabel={overallLabel} topAlert={topAlert} setPage={setPage} setActiveAlert={setActiveAlert} onAction={onAction} />}
       {page === "monitor" && <MCC_Monitor categories={categories} />}
       {page === "alert" && <MCC_Alert settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
       {page === "incident" && <MCC_Incident settings={settings} setSettings={setSettings} session={session} />}
@@ -1550,7 +1578,7 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
 }
 
 // ─── 모바일 대시보드 ───────────────────────────────────────────
-function MCC_Dashboard({ session, settings, categories, alerts, overall, overallColor, overallLabel, topAlert, setPage, setActiveAlert }) {
+function MCC_Dashboard({ session, settings, categories, alerts, overall, overallColor, overallLabel, topAlert, setPage, setActiveAlert, onAction }) {
   const incidents = settings.incidents || [];
   return (<>
     {/* 종합 위험도 hero */}
@@ -1561,11 +1589,21 @@ function MCC_Dashboard({ session, settings, categories, alerts, overall, overall
     </div>
 
     {/* 최우선 알림 배너 */}
-    {topAlert && <div className={`mcc-banner ${CC_LEVEL_MAP[topAlert.level]}`} onClick={() => setActiveAlert && setActiveAlert(topAlert)}>
+    {topAlert && <div className={`mcc-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
       <span className={`mcc-chip ${CC_LEVEL_MAP[topAlert.level]}`}><span className="dot pulse" />● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</span>
       <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, color: "#f4f5fa" }}>{topAlert.category}</div>
       <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4, lineHeight: 1.4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
-      <button className="mcc-btn primary full" style={{ marginTop: 10 }}>대응 시작 →</button>
+      <button className="mcc-btn primary full" style={{ marginTop: 10 }} onClick={() => {
+        // 1) 해당 카테고리 찾기 → 모달 열기 + handling 시작
+        const cat = (categories || []).find(c => c.name === topAlert.category);
+        if (cat) {
+          if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+          if (setActiveAlert) setActiveAlert(cat);
+        } else {
+          // 카테고리를 못 찾으면 알림 모달
+          if (setActiveAlert) setActiveAlert(topAlert);
+        }
+      }}>대응 시작 →</button>
     </div>}
 
     {/* 메트릭 그리드 */}
@@ -1593,7 +1631,11 @@ function MCC_Dashboard({ session, settings, categories, alerts, overall, overall
         </div>
         {(alerts || []).length > 0 && <button className="mcc-btn" style={{ padding: "5px 10px", fontSize: 11 }} onClick={() => setPage("alert")}>전체 →</button>}
       </div>
-      {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="mcc-list-row" onClick={() => setActiveAlert && setActiveAlert(a)}>
+      {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="mcc-list-row" onClick={() => {
+        const cat = (categories || []).find(c => c.name === a.category);
+        if (cat && setActiveAlert) setActiveAlert(cat);
+        else if (setActiveAlert) setActiveAlert(a);
+      }} style={{ cursor: "pointer" }}>
         <span className={`mcc-chip ${CC_LEVEL_MAP[a.level]}`}><span className={`dot ${a.level === "ORANGE" || a.level === "RED" ? "pulse" : ""}`} />●</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.category}</div>
@@ -2032,7 +2074,7 @@ function MCC_Map({ settings, session }) {
   </>);
 }
 
-function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert }) {
+function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
   // 페이지 변경 시 사이드바 닫기
@@ -2110,7 +2152,13 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: "#f4f5fa" }}>{topAlert.category} - {(topAlert.message || "").split("\n")[2] || "확인 필요"}</div>
                 </div>
-                <CC_Btn variant="primary">대응 시작 →</CC_Btn>
+                <CC_Btn variant="primary" onClick={() => {
+                  const cat = (categories || []).find(c => c.name === topAlert.category);
+                  if (cat) {
+                    if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+                    if (setActiveAlert) setActiveAlert(cat);
+                  } else if (setActiveAlert) setActiveAlert(topAlert);
+                }}>대응 시작 →</CC_Btn>
               </div>
             </CC_Card>}
 
@@ -2139,7 +2187,13 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                     <div style={{ fontSize: 12, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
                   </div>
                   <span className="mono" style={{ fontSize: 12, color: "#6c6e7d" }}>{a.time}</span>
-                  <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"}>대응</CC_Btn>
+                  <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"} onClick={() => {
+                    const cat = (categories || []).find(c => c.name === a.category);
+                    if (cat) {
+                      if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+                      if (setActiveAlert) setActiveAlert(cat);
+                    } else if (setActiveAlert) setActiveAlert(a);
+                  }}>대응</CC_Btn>
                 </div>))}
                 {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보가 없습니다</div>}
               </CC_Card>
@@ -3039,6 +3093,25 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: li.color }} /><span style={{ color: "#94A3B8", fontSize: 14 }}>실황</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#FFA726", borderTop: "2px dashed #FF9800" }} /><span style={{ color: "#94A3B8", fontSize: 14 }}>예보</span></div>
+            </div>
+          </div>}
+
+          {/* 단기 예보 그래프 (향후 3일) */}
+          {(selected.shortForecast || []).length > 0 && <div style={{ marginBottom: 16 }}>
+            <h3 style={{ color: "#42A5F5", fontSize: 13, marginBottom: 8 }}>📅 단기 예보 (향후 3일, 3시간 간격)</h3>
+            <div style={{ width: "100%", height: 200 }}>
+              <ResponsiveContainer>
+                <LineChart data={selected.shortForecast} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                  <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 11 }} interval={Math.floor(selected.shortForecast.length / 8)} />
+                  <YAxis tick={{ fill: "#556", fontSize: 13 }} width={45} />
+                  <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "단기예보"]} />
+                  <Line type="monotone" dataKey="value" stroke="#42A5F5" strokeWidth={2} dot={{ fill: "#42A5F5", r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#42A5F5" }} /><span style={{ color: "#94A3B8", fontSize: 13 }}>단기예보 (기상청)</span></div>
             </div>
           </div>}
 
@@ -9269,6 +9342,7 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
     const doFetch = async () => {
       let dataMap = null;
       let fcstData = null;
+      let shortFcstData = null;
       let mode = "sim";
 
       if (kma.serviceKey) {
@@ -9301,6 +9375,33 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
             });
           }
         } catch {}
+
+        // 3) 단기예보 (getVilageFcst) — 향후 3일 예보 (3시간 간격)
+        try {
+          const sp = getShortFcstParams(settings);
+          const url3 = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${encodeURIComponent(kma.serviceKey)}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${sp.bd}&base_time=${sp.bt}&nx=${sp.nx}&ny=${sp.ny}`;
+          const res3 = await fetch(url3);
+          const json3 = await res3.json();
+          const items3 = json3?.response?.body?.items?.item;
+          if (items3 && items3.length > 0) {
+            shortFcstData = {};
+            // 단기예보 카테고리 매핑: TMP(기온) → T1H, POP(강수확률), PCP(강수량) → RN1, WSD(풍속), REH(습도), SKY(하늘), PTY(강수형태)
+            items3.forEach(i => {
+              const cat = i.category;
+              const mappedCat = cat === "TMP" ? "T1H" : cat === "PCP" ? "RN1" : cat;
+              if (!shortFcstData[mappedCat]) shortFcstData[mappedCat] = [];
+              let val = parseFloat(i.fcstValue);
+              if (cat === "PCP" && (i.fcstValue === "강수없음" || i.fcstValue === "-" || isNaN(val))) val = 0;
+              if (isNaN(val)) val = 0;
+              shortFcstData[mappedCat].push({ 
+                time: `${i.fcstDate.slice(4,6)}/${i.fcstDate.slice(6)} ${i.fcstTime.slice(0,2)}:${i.fcstTime.slice(2)}`,
+                value: Math.round(val * 10) / 10,
+                fcstDate: i.fcstDate,
+                fcstTime: i.fcstTime
+              });
+            });
+          }
+        } catch (e) { console.warn("[KMA] 단기예보 실패:", e); }
       }
 
       // 실패 시 시뮬레이션
@@ -9322,7 +9423,14 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
 
       setCategories(p => p.map(c => {
         if (c.kmaCategory && dataMap[c.kmaCategory] !== undefined && !c.apiConfig?.enabled) {
-          return { ...c, currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, lastUpdated: new Date().toLocaleTimeString("ko-KR"), forecast: fcstData[c.kmaCategory] || [], dataType: "실황" };
+          return { 
+            ...c, 
+            currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, 
+            lastUpdated: new Date().toLocaleTimeString("ko-KR"), 
+            forecast: fcstData[c.kmaCategory] || [], 
+            shortForecast: (shortFcstData && shortFcstData[c.kmaCategory]) || [],
+            dataType: "실황" 
+          };
         }
         return c;
       }));
@@ -10233,6 +10341,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           settings={settings}
           setSettings={setSettings}
           categories={categories}
+          setCategories={setCategories}
           alerts={alerts}
           setAlerts={setAlerts}
           smsLog={smsLog}
@@ -10240,6 +10349,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
           onLogout={onLogout}
           onMobileSwitch={toggleMobileView}
           setActiveAlert={setActiveAlert}
+          onAction={handleAction}
         />
       </CCErrorBoundary>);
     }
@@ -10251,6 +10361,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         settings={settings}
         setSettings={setSettings}
         categories={categories}
+        setCategories={setCategories}
         alerts={alerts}
         setAlerts={setAlerts}
         smsLog={smsLog}
@@ -10258,6 +10369,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         onLogout={onLogout}
         onMobileSwitch={toggleMobileView}
         setActiveAlert={setActiveAlert}
+        onAction={handleAction}
         onNav={(id) => {
           const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
           if (map[id]) { setPage(map[id]); }
