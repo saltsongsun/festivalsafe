@@ -261,7 +261,7 @@ const DEFAULT_SETTINGS = {
   mapAreas: [],
   workerLocations: {},
   assets: [],
-  assetCategories: ["무전기", "의자", "테이블", "조명", "음향", "안전장비", "기타"],
+  assetCategories: ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"],
   workDiaries: [],          // [{id, workerId, workerName, date, shift, startTs, endTs, content, status}]
   shifts: [],               // [{id, name, startTime, endTime, color}]
   // 실시간 협업
@@ -1616,7 +1616,7 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
     { id: "workforce", name: "인력 관리", emoji: "👷" },
   ];
   const adminItems = [
-    { id: "resource", name: "리소스 관리", emoji: "📦" },
+    { id: "resource", name: "물자 관리", emoji: "📦" },
     { id: "report", name: "리포트", emoji: "📊" },
     { id: "user", name: "사용자 관리", emoji: "👥" },
     { id: "settings", name: "설정", emoji: "⚙️" },
@@ -1830,7 +1830,7 @@ function MobileControlCenter({ session, accounts, setAccounts, settings, setSett
     alert: { title: "알림 / 경보", sub: "단계별 메시지 발송" },
     incident: { title: "사건 / 신고", sub: "현장 신고 접수 및 추적" },
     map: { title: "지도 상황도", sub: "구역・핀・히트맵" },
-    resource: { title: "리소스 관리", sub: "자산 및 인력" },
+    resource: { title: "물자 관리", sub: "자산 및 인력" },
     report: { title: "리포트", sub: "일일 종합" },
     user: { title: "사용자 관리", sub: "계정 목록" },
     settings: { title: "설정", sub: "축제 정보" },
@@ -1902,7 +1902,7 @@ function MobileControlCenter({ session, accounts, setAccounts, settings, setSett
               { id: "stage", icon: "🎤", label: "공연 관리" },
               { id: "workforce", icon: "👷", label: "인력 관리" },
               { id: "map", icon: "🗺️", label: "지도 상황도" },
-              { id: "resource", icon: "📦", label: "리소스 관리" },
+              { id: "resource", icon: "📦", label: "물자 관리" },
               { id: "report", icon: "📊", label: "리포트" },
               { id: "user", icon: "👥", label: "사용자 관리" },
               { id: "settings", icon: "⚙️", label: "설정" },
@@ -3811,56 +3811,206 @@ function CC_MapPage({ settings, setSettings, session }) {
   </div>);
 }
 
-// ─── PC: 06. 리소스 관리 ───────────────────────────────────
+// ─── PC: 06. 물자 관리 ───────────────────────────────────
 function CC_ResourcePage({ settings, setSettings, session, accounts }) {
   const assets = settings.assets || [];
+  const cats = settings.assetCategories || ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"];
   const workSites = settings.workSites || [];
   const allWorkers = workSites.flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name })));
   const totalAssets = assets.reduce((s, a) => s + (a.total || 0), 0);
   const availAssets = assets.reduce((s, a) => s + (a.qty || 0), 0);
+  const assignedAssets = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "assigned").length, 0);
   const broken = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "broken").length, 0);
   const lost = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "lost").length, 0);
+  const lowStock = assets.filter(a => a.total > 0 && (a.qty || 0) / a.total < 0.3).length;
+  const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+
+  // 카테고리별 통계
+  const byCategory = {};
+  cats.forEach(c => { byCategory[c] = { count: 0, total: 0, qty: 0 }; });
+  assets.forEach(a => {
+    const c = a.category || "기타";
+    if (!byCategory[c]) byCategory[c] = { count: 0, total: 0, qty: 0 };
+    byCategory[c].count += 1;
+    byCategory[c].total += (a.total || 0);
+    byCategory[c].qty += (a.qty || 0);
+  });
+
+  // 빠른 추가 폼
+  const [addOpen, setAddOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ name: "", category: "무전기", total: 1, qty: 1, location: "" });
+  const [filter, setFilter] = useState("all");
+
+  const addQuick = () => {
+    if (!newItem.name.trim()) { alert("물자명을 입력하세요"); return; }
+    const id = "asset_" + Date.now();
+    setSettings(prev => ({ ...prev, assets: [...(prev.assets || []), { ...newItem, id, status: "available", trackUnits: false, units: [] }] }));
+    setNewItem({ name: "", category: newItem.category, total: 1, qty: 1, location: "" });
+    setAddOpen(false);
+  };
+
+  const deleteAsset = (id) => {
+    if (!confirm("이 물자를 삭제하시겠습니까?")) return;
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).filter(a => a.id !== id) }));
+  };
+
+  const updateAsset = (id, field, val) => {
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => a.id === id ? { ...a, [field]: val } : a) }));
+  };
+
+  const filtered = filter === "all" ? assets : assets.filter(a => a.category === filter);
+
+  // 카테고리 아이콘 매핑
+  const catIcon = { "무전기": "📻", "생수": "💧", "리플렛": "📄", "멀티탭": "🔌", "응급키트": "🩹", "조끼": "🦺", "안전모": "⛑️", "안전장비": "🦺", "의자": "🪑", "테이블": "🪟", "조명": "💡", "음향": "🔊", "기타": "📦" };
 
   return (<div>
-    <div className="cc-stats-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
-      {[{ n: "전체 자산", v: totalAssets, c: "#6b8aff" }, { n: "사용 가능", v: availAssets, c: "#4cd99a" }, { n: "고장", v: broken, c: "#ff9a3c" }, { n: "분실", v: lost, c: "#ff5e7e" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
-        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
+    {/* KPI 6개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "전체 물자", value: assets.length, sub: "품목", color: "#6b8aff", icon: "📦" },
+        { label: "총 수량", value: totalAssets, sub: "개", color: "#42A5F5", icon: "🔢" },
+        { label: "사용 가능", value: availAssets, sub: `${totalAssets > 0 ? Math.round(availAssets/totalAssets*100) : 0}%`, color: "#4cd99a", icon: "✅" },
+        { label: "사용중", value: assignedAssets, sub: "할당됨", color: "#a980ff", icon: "🔄" },
+        { label: "고장/분실", value: broken + lost, sub: `${broken}/${lost}`, color: (broken+lost)>0?"#ff5e7e":"#4cd99a", icon: "⚠️" },
+        { label: "재고 부족", value: lowStock, sub: "30% 미만", color: lowStock>0?"#ff9a3c":"#4cd99a", icon: "📉" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>
+        </div>
       </div>))}
     </div>
 
-    <CC_Card title="자산 목록" sub={`${assets.length}개 분류`}>
-      {assets.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 자산이 없습니다 (모바일에서 등록)</div> :
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>자산</th>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>분류</th>
-              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>가용</th>
-              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>총수량</th>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map(a => { const ratio = a.total ? a.qty / a.total : 0; const lv = ratio < 0.3 ? "red" : ratio < 0.6 ? "yellow" : "green"; return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              <td style={{ padding: "12px 8px", color: "#f4f5fa", fontWeight: 600 }}>{a.name}</td>
-              <td style={{ padding: "12px 8px", color: "#b0b3c4" }}>{a.category}</td>
-              <td style={{ padding: "12px 8px", textAlign: "right", color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{a.qty || 0}</td>
-              <td style={{ padding: "12px 8px", textAlign: "right", color: "#b0b3c4", fontFamily: "JetBrains Mono" }}>{a.total || 0}</td>
-              <td style={{ padding: "12px 8px" }}><CC_Chip level={lv}>{Math.round(ratio * 100)}%</CC_Chip></td>
-            </tr>); })}
-          </tbody>
-        </table>
-      }
-    </CC_Card>
+    {/* 빠른 추가 폼 */}
+    {canEdit && <CC_Card style={{ marginBottom: 16 }}>
+      {!addOpen ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>📦</span>
+            <span style={{ fontSize: 14, color: "#94A3B8" }}>새 물자를 빠르게 추가하거나 카테고리별로 일괄 추가할 수 있습니다</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* 빠른 추가 (카테고리별 프리셋) */}
+            {[
+              { cat: "무전기", icon: "📻", name: "무전기", default: 10 },
+              { cat: "생수", icon: "💧", name: "생수 500ml", default: 100 },
+              { cat: "리플렛", icon: "📄", name: "안내 리플렛", default: 500 },
+              { cat: "멀티탭", icon: "🔌", name: "멀티탭", default: 5 },
+              { cat: "응급키트", icon: "🩹", name: "응급키트", default: 3 },
+              { cat: "조끼", icon: "🦺", name: "안전조끼", default: 20 },
+            ].map(p => (
+              <CC_Btn key={p.cat} size="sm" variant="ghost" onClick={() => {
+                setNewItem({ name: p.name, category: p.cat, total: p.default, qty: p.default, location: "" });
+                setAddOpen(true);
+              }}>{p.icon} {p.cat}</CC_Btn>
+            ))}
+            <CC_Btn size="sm" variant="primary" onClick={() => setAddOpen(true)}>+ 직접 추가</CC_Btn>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1.2fr auto auto", gap: 8, alignItems: "center" }}>
+            <input value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})} placeholder="물자명 (예: 무전기 LTE)" autoFocus style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
+            <select value={newItem.category} onChange={e=>setNewItem({...newItem, category: e.target.value})} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#14151f", color: "#f4f5fa", fontSize: 13 }}>
+              {cats.map(c => <option key={c} value={c}>{catIcon[c] || "📦"} {c}</option>)}
+            </select>
+            <input type="number" min="1" value={newItem.total} onChange={e=>{ const v = parseInt(e.target.value || "1"); setNewItem({...newItem, total: v, qty: v}); }} placeholder="총수량" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono" }} />
+            <input type="number" min="0" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty: parseInt(e.target.value || "0")})} placeholder="가용" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono" }} />
+            <input value={newItem.location} onChange={e=>setNewItem({...newItem, location: e.target.value})} placeholder="보관 위치 (선택)" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
+            <CC_Btn size="sm" variant="primary" onClick={addQuick}>✓ 추가</CC_Btn>
+            <CC_Btn size="sm" variant="ghost" onClick={() => { setAddOpen(false); setNewItem({ name: "", category: cats[0], total: 1, qty: 1, location: "" }); }}>✕</CC_Btn>
+          </div>
+        </div>
+      )}
+    </CC_Card>}
 
-    <CC_Card title="근무자 현황" sub={`총 ${allWorkers.length}명`} style={{ marginTop: 16 }}>
-      {workSites.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 근무자가 없습니다</div> :
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-          {workSites.map(s => (<div key={s.id} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 6 }}>📍 {s.name || "미배치"}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#6b8aff" }}>{(s.workers || []).length}<span style={{ fontSize: 12, color: "#6c6e7d", marginLeft: 4 }}>명</span></div>
-          </div>))}
+    {/* 메인: 카테고리 통계 + 자산 목록 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 2.2fr", gap: 16, marginBottom: 16 }}>
+      {/* 카테고리별 분포 */}
+      <CC_Card title="📊 카테고리별 현황" sub={`${Object.values(byCategory).filter(v=>v.count>0).length}개 사용중`}>
+        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+          <div onClick={() => setFilter("all")} style={{ padding: "10px 12px", marginBottom: 4, borderRadius: 8, background: filter === "all" ? "rgba(107,138,255,0.12)" : "rgba(255,255,255,0.02)", border: filter === "all" ? "1px solid rgba(107,138,255,0.3)" : "1px solid rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa" }}>📦 전체</span>
+            <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700 }}>{assets.length} 품목 / {totalAssets} 개</span>
+          </div>
+          {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].total-a[1].total).map(([cat, v]) => {
+            const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
+            const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
+            return (<div key={cat} onClick={() => setFilter(cat)} style={{ padding: "10px 12px", marginBottom: 4, borderRadius: 8, background: filter === cat ? "rgba(107,138,255,0.12)" : "rgba(255,255,255,0.02)", border: filter === cat ? "1px solid rgba(107,138,255,0.3)" : "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{catIcon[cat] || "📦"} {cat}</span>
+                <span className="mono" style={{ fontSize: 11, color, fontWeight: 700 }}>{v.qty}/{v.total}</span>
+              </div>
+              <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
+                <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+              </div>
+              <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 4 }}>{v.count} 품목 · {ratio}% 가용</div>
+            </div>);
+          })}
+        </div>
+      </CC_Card>
+
+      {/* 물자 목록 */}
+      <CC_Card title={`📦 물자 목록 ${filter !== "all" ? `(${filter})` : ""}`} sub={`${filtered.length}개 품목`}>
+        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 물자가 없습니다. 위에서 추가하세요.</div> :
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, background: "#14151f", zIndex: 1 }}>
+                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>물자명</th>
+                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>분류</th>
+                  <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>가용</th>
+                  <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>총수량</th>
+                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>위치</th>
+                  <th style={{ padding: "10px 8px", textAlign: "center", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>상태</th>
+                  {canEdit && <th style={{ padding: "10px 8px", textAlign: "center", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 60 }}></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(a => { 
+                  const ratio = a.total ? a.qty / a.total : 0; 
+                  const lv = ratio < 0.3 ? "red" : ratio < 0.6 ? "yellow" : "green"; 
+                  return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <td style={{ padding: "10px 8px", color: "#f4f5fa", fontWeight: 600 }}>{catIcon[a.category] || "📦"} {a.name}</td>
+                    <td style={{ padding: "10px 8px", color: "#b0b3c4" }}>{a.category}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                      {canEdit ? <input type="number" min="0" max={a.total} value={a.qty || 0} onChange={e => updateAsset(a.id, "qty", parseInt(e.target.value || "0"))} style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 13, textAlign: "right" }} /> : <span className="mono" style={{ color: "#f4f5fa" }}>{a.qty || 0}</span>}
+                    </td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                      {canEdit ? <input type="number" min="1" value={a.total || 0} onChange={e => updateAsset(a.id, "total", parseInt(e.target.value || "1"))} style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontFamily: "JetBrains Mono", fontSize: 13, textAlign: "right" }} /> : <span className="mono" style={{ color: "#b0b3c4" }}>{a.total || 0}</span>}
+                    </td>
+                    <td style={{ padding: "10px 8px", color: "#94A3B8", fontSize: 12 }}>
+                      {canEdit ? <input value={a.location || ""} onChange={e => updateAsset(a.id, "location", e.target.value)} placeholder="-" style={{ width: "100%", padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 12 }} /> : (a.location || "-")}
+                    </td>
+                    <td style={{ padding: "10px 8px", textAlign: "center" }}><CC_Chip level={lv}>{Math.round(ratio * 100)}%</CC_Chip></td>
+                    {canEdit && <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                      <button onClick={() => deleteAsset(a.id)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer" }}>🗑</button>
+                    </td>}
+                  </tr>);
+                })}
+              </tbody>
+            </table>
+          }
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 근무지별 분배 현황 */}
+    <CC_Card title="🏠 근무지별 분배 현황" sub={`${workSites.filter(s=>s.id!=="_pool").length}개 근무지`} style={{ marginBottom: 16 }}>
+      {workSites.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 근무지가 없습니다</div> :
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+          {workSites.filter(s => s.id !== "_pool").map(s => {
+            const ws = s.workers || [];
+            const radiosHere = assets.filter(a => a.category === "무전기").reduce((sum, a) => sum + (a.units || []).filter(u => ws.find(w => w.id === u.assignedTo)).length, 0);
+            return (<div key={s.id} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>🏠 {s.name}</div>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#94A3B8" }}>
+                <span>👥 {ws.length}명</span>
+                {radiosHere > 0 && <span>📻 {radiosHere}</span>}
+              </div>
+            </div>);
+          })}
         </div>
       }
     </CC_Card>
@@ -8254,7 +8404,7 @@ function LocationPage({ settings, setSettings, session }) {
 // ─── 2.0: Asset Management (장비/물품) ─────────────────────────────
 function AssetsPage({ settings, setSettings, session }) {
   const assets = settings.assets || [];
-  const cats = settings.assetCategories || ["무전기", "의자", "테이블", "조명", "음향", "안전장비", "기타"];
+  const cats = settings.assetCategories || ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"];
   const [filter, setFilter] = useState("all");
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -8366,7 +8516,7 @@ function AssetsPage({ settings, setSettings, session }) {
 
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <PageHeader icon="📦" title="장비/물품 관리" subtitle="자산 인벤토리 + 무전기 할당" accent="#42A5F5" />
+      <PageHeader icon="📦" title="물자 관리" subtitle="무전기·생수·리플렛·멀티탭 등 자산 인벤토리" accent="#42A5F5" />
 
       {/* 통계 */}
       <Card>
@@ -8386,7 +8536,25 @@ function AssetsPage({ settings, setSettings, session }) {
         ); })}
       </div>
 
-      {canEdit && !addMode && !editId && <button onClick={() => setAddMode(true)} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(33,150,243,0.4)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>+ 새 장비/물품 등록</button>}
+      {canEdit && !addMode && !editId && <>
+        {/* 빠른 추가 프리셋 */}
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
+          {[
+            { cat: "무전기", icon: "📻", name: "무전기", default: 10 },
+            { cat: "생수", icon: "💧", name: "생수 500ml", default: 100 },
+            { cat: "리플렛", icon: "📄", name: "안내 리플렛", default: 500 },
+            { cat: "멀티탭", icon: "🔌", name: "멀티탭", default: 5 },
+            { cat: "응급키트", icon: "🩹", name: "응급키트", default: 3 },
+            { cat: "조끼", icon: "🦺", name: "안전조끼", default: 20 },
+          ].map(p => (
+            <button key={p.cat} onClick={() => {
+              setNewAsset({ name: p.name, category: p.cat, total: p.default, qty: p.default, location: "", status: "available", trackUnits: false, units: [] });
+              setAddMode(true);
+            }} style={{ padding: "8px 12px", borderRadius: 999, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>{p.icon} {p.cat}</button>
+          ))}
+        </div>
+        <button onClick={() => setAddMode(true)} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(33,150,243,0.4)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>+ 직접 등록</button>
+      </>}
       {addMode && <Form asset={newAsset} onSave={saveAsset} onCancel={() => setAddMode(false)} />}
 
       {/* 자산 목록 */}
@@ -10796,7 +10964,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { k: "shuttle", icon: "🚌", label: "셔틀버스" },
             { k: "program", icon: "🎭", label: "축제 프로그램" },
             { k: "stage", icon: "🎤", label: "공연관리" },
-            { k: "assets", icon: "📦", label: "장비/물품 관리 (2.0)" },
+            { k: "assets", icon: "📦", label: "물자 관리 (2.0)" },
             { k: "timeline", icon: "📋", label: "상황일지" },
           ]},
           { group: "👤 인력/위치", items: [
@@ -10873,7 +11041,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "stage", icon: "🎤", label: "공연관리", feat: "stage" },
             { id: "location", icon: "📍", label: "위치", feat: "location" },
             { id: "emergency", icon: "🚨", label: "비상연락망" },
-            { id: "assets", icon: "📦", label: "장비", feat: "assets" },
+            { id: "assets", icon: "📦", label: "물자", feat: "assets" },
             { id: "shifts", icon: "📝", label: "근무일지", feat: "shifts" },
             { id: "workers", icon: "👥", label: "근무자관리", feat: "workers" },
             { id: "reports", icon: "📄", label: "보고서", feat: "reports" },
@@ -12076,7 +12244,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.heatmap !== false && { id: "heatmap", icon: "🗺️", label: "히트맵" },
     ft.location !== false && { id: "location", icon: "📍", label: "위치" },
     { id: "emergency", icon: "🚨", label: "비상연락망" },
-    ft.assets !== false && { id: "assets", icon: "📦", label: "장비" },
+    ft.assets !== false && { id: "assets", icon: "📦", label: "물자" },
     ft.shifts !== false && { id: "shifts", icon: "📝", label: "근무일지" },
     ft.workers !== false && { id: "workers", icon: "👥", label: "근무자" },
     ft.reports !== false && { id: "reports", icon: "📄", label: "보고서" },
