@@ -1313,6 +1313,725 @@ class CCErrorBoundary extends React.Component {
   }
 }
 
+// ─── 모바일 관제센터 CSS (하단 네비 + 세로 카드) ─────────────────────
+const MCC_STYLES = `
+  .mcc-root { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #07070d; color: #f4f5fa; min-height: 100vh; padding: 0 0 calc(env(safe-area-inset-bottom) + 80px); -webkit-font-smoothing: antialiased; }
+  .mcc-root .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* 상단바 */
+  .mcc-topbar { padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; background: linear-gradient(180deg, #0e0f17 0%, rgba(14,15,23,0.85) 100%); position: sticky; top: 0; z-index: 50; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px; }
+  .mcc-brand-logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, #6b8aff 0%, #a980ff 50%, #ff5e7e 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(107,138,255,0.4); color: #fff; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+  .mcc-brand-info { flex: 1; min-width: 0; }
+  .mcc-brand-name { font-size: 14px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .mcc-brand-sub { font-size: 11px; color: #6c6e7d; margin-top: 1px; display: flex; align-items: center; gap: 6px; }
+  .mcc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #4cd99a; box-shadow: 0 0 6px #4cd99a; animation: cc-livepulse 2s ease-in-out infinite; }
+  .mcc-icon-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: #b0b3c4; font-size: 16px; cursor: pointer; flex-shrink: 0; position: relative; }
+
+  /* 페이지 헤더 */
+  .mcc-page-header { padding: 14px 16px 8px; }
+  .mcc-page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #f4f5fa; }
+  .mcc-page-sub { font-size: 12px; color: #6c6e7d; margin-top: 4px; }
+
+  /* 종합 위험도 hero */
+  .mcc-hero { margin: 4px 16px 14px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(107,138,255,0.12), rgba(169,128,255,0.04)); border: 1px solid rgba(107,138,255,0.2); }
+  .mcc-hero-label { font-size: 11px; color: #b0b3c4; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; }
+  .mcc-hero-status { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; color: #f4f5fa; line-height: 1.2; }
+  .mcc-hero-time { font-size: 11px; color: #6c6e7d; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+  /* 카드 */
+  .mcc-card { margin: 0 16px 12px; padding: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); }
+  .mcc-card-h { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+  .mcc-card-title { font-size: 14px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .mcc-card-sub { font-size: 11px; color: #6c6e7d; margin-top: 2px; }
+
+  /* 메트릭 그리드 (2열) */
+  .mcc-metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 16px 12px; }
+  .mcc-metric { padding: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 4px 12px -6px rgba(0,0,0,0.4); transition: transform 0.15s; cursor: pointer; }
+  .mcc-metric:active { transform: scale(0.97); }
+  .mcc-metric.alert { border-color: rgba(245,196,81,0.3); background: linear-gradient(180deg, rgba(245,196,81,0.08), rgba(245,196,81,0.02)), #0e0f17; }
+  .mcc-metric.danger { border-color: rgba(255,154,60,0.4); background: linear-gradient(180deg, rgba(255,154,60,0.1), rgba(255,154,60,0.02)), #0e0f17; }
+  .mcc-metric.red-alert { border-color: rgba(255,94,126,0.4); background: linear-gradient(180deg, rgba(255,94,126,0.1), rgba(255,94,126,0.02)), #0e0f17; }
+  .mcc-metric-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .mcc-metric-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .mcc-metric-icon { width: 22px; height: 22px; border-radius: 6px; background: #1d1f2c; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .mcc-metric.alert .mcc-metric-icon { background: rgba(245,196,81,0.15); }
+  .mcc-metric.danger .mcc-metric-icon { background: rgba(255,154,60,0.18); }
+  .mcc-metric.red-alert .mcc-metric-icon { background: rgba(255,94,126,0.18); }
+  .mcc-metric-val { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-family: 'JetBrains Mono', monospace; color: #f4f5fa; }
+  .mcc-metric.danger .mcc-metric-val { color: #ff9a3c; }
+  .mcc-metric.red-alert .mcc-metric-val { color: #ff5e7e; }
+  .mcc-metric-unit { font-size: 11px; color: #6c6e7d; margin-left: 4px; font-weight: 400; font-family: inherit; }
+  .mcc-metric-trend { font-size: 10px; color: #6c6e7d; margin-top: 4px; }
+
+  /* 하단 네비 */
+  .mcc-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 0 calc(env(safe-area-inset-bottom) + 8px); background: rgba(7,7,13,0.92); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-around; z-index: 100; }
+  .mcc-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 10px; cursor: pointer; color: #6c6e7d; min-width: 56px; transition: color 0.15s; }
+  .mcc-nav-item.active { color: #6b8aff; }
+  .mcc-nav-item.active .mcc-nav-icon { transform: translateY(-2px); }
+  .mcc-nav-icon { font-size: 22px; transition: transform 0.15s; position: relative; }
+  .mcc-nav-label { font-size: 10px; font-weight: 600; }
+  .mcc-nav-badge { position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; border-radius: 8px; background: #ff5e7e; color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 0 8px rgba(255,94,126,0.5); }
+
+  /* 더보기 시트 */
+  .mcc-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200; animation: cc-fade-in 0.2s ease; }
+  .mcc-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, #14151f 0%, #0e0f17 100%); border-radius: 20px 20px 0 0; padding: 12px 16px calc(env(safe-area-inset-bottom) + 24px); border-top: 1px solid rgba(255,255,255,0.08); z-index: 201; animation: mcc-sheet-up 0.25s cubic-bezier(0.4, 0, 0.2, 1); max-height: 80vh; overflow-y: auto; }
+  @keyframes mcc-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .mcc-sheet-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 16px; }
+  .mcc-sheet-title { font-size: 16px; font-weight: 700; color: #f4f5fa; margin-bottom: 14px; }
+  .mcc-sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mcc-sheet-item { padding: 14px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; color: #b0b3c4; transition: all 0.15s; }
+  .mcc-sheet-item:active { background: rgba(107,138,255,0.1); border-color: rgba(107,138,255,0.3); }
+  .mcc-sheet-item-icon { font-size: 22px; }
+  .mcc-sheet-item-label { font-size: 12px; font-weight: 600; text-align: center; }
+  .mcc-sheet-item-badge { position: absolute; top: 8px; right: 8px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ff5e7e; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+  /* 칩 */
+  .mcc-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1; }
+  .mcc-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
+  .mcc-chip.blue { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .mcc-chip.yellow { background: rgba(245,196,81,0.14); color: #f5c451; }
+  .mcc-chip.orange { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+  .mcc-chip.red { background: rgba(255,94,126,0.16); color: #ff5e7e; }
+  .mcc-chip.green { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .mcc-chip .dot.pulse { animation: cc-pulse 1.6s ease-in-out infinite; }
+
+  /* 리스트 */
+  .mcc-list-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .mcc-list-row:last-child { border-bottom: 0; }
+  .mcc-list-row:active { background: rgba(255,255,255,0.02); }
+
+  /* 알림 배너 */
+  .mcc-banner { margin: 12px 16px; padding: 16px; border-radius: 16px; }
+  .mcc-banner.orange { background: linear-gradient(180deg, rgba(255,154,60,0.18), rgba(255,154,60,0.04)); border: 1px solid rgba(255,154,60,0.3); }
+  .mcc-banner.yellow { background: linear-gradient(180deg, rgba(245,196,81,0.15), rgba(245,196,81,0.03)); border: 1px solid rgba(245,196,81,0.25); }
+  .mcc-banner.red { background: linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04)); border: 1px solid rgba(255,94,126,0.3); }
+
+  /* 빠른 액션 */
+  .mcc-quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mcc-quick-btn { padding: 14px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #b0b3c4; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .mcc-quick-btn.primary { background: linear-gradient(180deg, rgba(107,138,255,0.12), rgba(107,138,255,0.03)); border-color: rgba(107,138,255,0.25); color: #8fa6ff; }
+
+  /* 인풋 */
+  .mcc-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #0e0f17; color: #f4f5fa; font-size: 16px; font-family: inherit; box-sizing: border-box; }
+  .mcc-textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #0e0f17; color: #f4f5fa; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: vertical; }
+
+  /* 버튼 */
+  .mcc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)); color: #f4f5fa; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .mcc-btn.primary { background: linear-gradient(180deg, #7c98ff, #5a7aff); border-color: rgba(255,255,255,0.18); color: #fff; }
+  .mcc-btn.danger { background: linear-gradient(180deg, #ff738e, #ff4f72); border-color: rgba(255,255,255,0.15); color: #fff; }
+  .mcc-btn.lg { padding: 14px 20px; font-size: 14px; }
+  .mcc-btn.full { width: 100%; }
+
+  /* 단계 진행바 */
+  .mcc-step-bar { display: flex; gap: 4px; padding: 12px 16px; }
+  .mcc-step { flex: 1; padding: 8px 4px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); color: #6c6e7d; font-size: 10px; font-weight: 600; text-align: center; }
+  .mcc-step.active { background: rgba(107,138,255,0.15); border-color: rgba(107,138,255,0.4); color: #8fa6ff; }
+  .mcc-step.done { background: rgba(76,217,154,0.08); border-color: rgba(76,217,154,0.25); color: #4cd99a; }
+
+  /* 통계 4-카드 (모바일은 2열) */
+  .mcc-stats-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+  .mcc-stat { padding: 14px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+  .mcc-stat-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .mcc-stat-val { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+`;
+
+// ─── 모바일 관제센터 (B안: 하단네비 + 세로카드) ─────────────────────
+function MobileControlCenter({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert }) {
+  const [page, setPage] = useState("dashboard");
+  const [showMore, setShowMore] = useState(false);
+
+  const overall = useMemo(() => {
+    const lvs = (categories || []).map(c => getLevel(c));
+    if (lvs.includes("RED")) return "RED";
+    if (lvs.includes("ORANGE")) return "ORANGE";
+    if (lvs.includes("YELLOW")) return "YELLOW";
+    return "BLUE";
+  }, [categories]);
+  const overallColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[overall];
+  const overallLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[overall];
+
+  const sortedCats = [...(categories || [])].sort((a, b) => {
+    const ord = { RED: 0, ORANGE: 1, YELLOW: 2, BLUE: 3 };
+    return ord[getLevel(a)] - ord[getLevel(b)];
+  });
+  const topAlert = alerts && alerts[0];
+  const unreadAlerts = (alerts || []).filter(a => a.level === "ORANGE" || a.level === "RED").length;
+  const incidents = settings.incidents || [];
+  const openIncidents = incidents.filter(i => i.status !== "closed").length;
+
+  // 페이지별 타이틀
+  const titles = {
+    dashboard: { title: "대시보드", sub: "실시간 모니터링" },
+    monitor: { title: "실시간 모니터링", sub: "환경 카테고리 상세" },
+    alert: { title: "알림 / 경보", sub: "단계별 메시지 발송" },
+    incident: { title: "사건 / 신고", sub: "현장 신고 접수 및 추적" },
+    map: { title: "지도 상황도", sub: "구역・핀・히트맵" },
+    resource: { title: "리소스 관리", sub: "자산 및 인력" },
+    report: { title: "리포트", sub: "일일 종합" },
+    user: { title: "사용자 관리", sub: "계정 목록" },
+    settings: { title: "설정", sub: "축제 정보" },
+  };
+  const curTitle = titles[page] || titles.dashboard;
+
+  return (<>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>{MCC_STYLES}</style>
+    <div className="mcc-root">
+      {/* 상단바 */}
+      <div className="mcc-topbar">
+        <div className="mcc-brand-logo">S</div>
+        <div className="mcc-brand-info">
+          <div className="mcc-brand-name">SAFEFLOW</div>
+          <div className="mcc-brand-sub">
+            <span className="mcc-live-dot"/>
+            <span>{session?.name}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{settings?.festivalName || "축제"}</span>
+          </div>
+        </div>
+        <button className="mcc-icon-btn" onClick={onMobileSwitch} title="모바일 보기">📱</button>
+      </div>
+
+      {/* 페이지별 컨텐츠 */}
+      {page === "dashboard" && <MCC_Dashboard session={session} settings={settings} categories={sortedCats} alerts={alerts} overall={overall} overallColor={overallColor} overallLabel={overallLabel} topAlert={topAlert} setPage={setPage} setActiveAlert={setActiveAlert} />}
+      {page === "monitor" && <MCC_Monitor categories={categories} />}
+      {page === "alert" && <MCC_Alert settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
+      {page === "incident" && <MCC_Incident settings={settings} setSettings={setSettings} session={session} />}
+      {page === "map" && <MCC_Map settings={settings} session={session} />}
+      {page === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
+      {page === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
+      {page === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
+      {page === "settings" && <CC_SettingsPage settings={settings} setSettings={setSettings} session={session} onMobileSwitch={onMobileSwitch} />}
+
+      {/* 하단 네비 (5탭) */}
+      <div className="mcc-bottom-nav">
+        {[
+          { id: "dashboard", icon: "🏠", label: "홈" },
+          { id: "monitor", icon: "📡", label: "모니터" },
+          { id: "alert", icon: "🔔", label: "경보", badge: unreadAlerts > 0 ? unreadAlerts : null },
+          { id: "incident", icon: "📁", label: "사건", badge: openIncidents > 0 ? openIncidents : null },
+          { id: "_more", icon: "⋯", label: "더보기" },
+        ].map(it => (<div key={it.id} className={`mcc-nav-item ${page === it.id ? "active" : ""}`} onClick={() => it.id === "_more" ? setShowMore(true) : setPage(it.id)}>
+          <div className="mcc-nav-icon">
+            {it.icon}
+            {it.badge && <span className="mcc-nav-badge">{it.badge > 9 ? "9+" : it.badge}</span>}
+          </div>
+          <span className="mcc-nav-label">{it.label}</span>
+        </div>))}
+      </div>
+
+      {/* 더보기 시트 */}
+      {showMore && <>
+        <div className="mcc-sheet-overlay" onClick={() => setShowMore(false)} />
+        <div className="mcc-sheet">
+          <div className="mcc-sheet-handle" />
+          <div className="mcc-sheet-title">더보기</div>
+          <div className="mcc-sheet-grid">
+            {[
+              { id: "map", icon: "🗺️", label: "지도 상황도" },
+              { id: "resource", icon: "📦", label: "리소스 관리" },
+              { id: "report", icon: "📊", label: "리포트" },
+              { id: "user", icon: "👥", label: "사용자 관리" },
+              { id: "settings", icon: "⚙️", label: "설정" },
+            ].map(it => (<div key={it.id} className="mcc-sheet-item" onClick={() => { setPage(it.id); setShowMore(false); }}>
+              <div className="mcc-sheet-item-icon">{it.icon}</div>
+              <div className="mcc-sheet-item-label">{it.label}</div>
+            </div>))}
+            <div className="mcc-sheet-item" onClick={onLogout} style={{ color: "#ff5e7e", borderColor: "rgba(255,94,126,0.2)" }}>
+              <div className="mcc-sheet-item-icon">🚪</div>
+              <div className="mcc-sheet-item-label">로그아웃</div>
+            </div>
+          </div>
+        </div>
+      </>}
+    </div>
+  </>);
+}
+
+// ─── 모바일 대시보드 ───────────────────────────────────────────
+function MCC_Dashboard({ session, settings, categories, alerts, overall, overallColor, overallLabel, topAlert, setPage, setActiveAlert }) {
+  const incidents = settings.incidents || [];
+  return (<>
+    {/* 종합 위험도 hero */}
+    <div className="mcc-hero">
+      <div className="mcc-hero-label">현재 종합 위험도</div>
+      <div className="mcc-hero-status">지금 <span style={{ color: overallColor }}>{overallLabel}</span> 단계예요</div>
+      <div className="mcc-hero-time">{new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+    </div>
+
+    {/* 최우선 알림 배너 */}
+    {topAlert && <div className={`mcc-banner ${CC_LEVEL_MAP[topAlert.level]}`} onClick={() => setActiveAlert && setActiveAlert(topAlert)}>
+      <span className={`mcc-chip ${CC_LEVEL_MAP[topAlert.level]}`}><span className="dot pulse" />● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</span>
+      <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, color: "#f4f5fa" }}>{topAlert.category}</div>
+      <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4, lineHeight: 1.4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
+      <button className="mcc-btn primary full" style={{ marginTop: 10 }}>대응 시작 →</button>
+    </div>}
+
+    {/* 메트릭 그리드 */}
+    <div className="mcc-metric-grid">
+      {categories.map(cat => {
+        const lv = getLevel(cat);
+        const cls = lv === "YELLOW" ? "alert" : lv === "ORANGE" ? "danger" : lv === "RED" ? "red-alert" : "";
+        return (<div key={cat.id} className={`mcc-metric ${cls}`} onClick={() => setPage("monitor")}>
+          <div className="mcc-metric-h">
+            <span className="mcc-metric-name"><span className="mcc-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
+            <span className={`mcc-chip ${CC_LEVEL_MAP[lv]}`}><span className="dot" />{CC_LEVEL_LABEL[lv]}</span>
+          </div>
+          <div className="mcc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="mcc-metric-unit">{cat.unit}</span></div>
+          <div className="mcc-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
+        </div>);
+      })}
+    </div>
+
+    {/* 활성 경보 */}
+    <div className="mcc-card">
+      <div className="mcc-card-h">
+        <div>
+          <div className="mcc-card-title">활성 경보 {(alerts || []).length}건</div>
+          <div className="mcc-card-sub">실시간 갱신</div>
+        </div>
+        {(alerts || []).length > 0 && <button className="mcc-btn" style={{ padding: "5px 10px", fontSize: 11 }} onClick={() => setPage("alert")}>전체 →</button>}
+      </div>
+      {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="mcc-list-row" onClick={() => setActiveAlert && setActiveAlert(a)}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[a.level]}`}><span className={`dot ${a.level === "ORANGE" || a.level === "RED" ? "pulse" : ""}`} />●</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.category}</div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+        </div>
+        <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{a.time?.split(" ")[1] || a.time}</span>
+      </div>))}
+      {(!alerts || alerts.length === 0) && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보 없음 ✓</div>}
+    </div>
+
+    {/* 구역별 혼잡도 */}
+    {(settings.zones || []).length > 0 && <div className="mcc-card">
+      <div className="mcc-card-h">
+        <div>
+          <div className="mcc-card-title">구역별 혼잡도</div>
+          <div className="mcc-card-sub">{(settings.zones || []).length}개 구역</div>
+        </div>
+      </div>
+      {(settings.zones || []).slice(0, 5).map(z => {
+        const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+        const cl = c?.level || "smooth";
+        const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+        const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+        return (<div key={z.id} className="mcc-list-row">
+          <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+          <span className={`mcc-chip ${lv}`}>{lbl}</span>
+        </div>);
+      })}
+    </div>}
+
+    {/* 빠른 액션 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>빠른 액션</div>
+      <div className="mcc-quick-grid">
+        <button className="mcc-quick-btn primary" onClick={() => setPage("alert")}>🔔 경보 발령</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("incident")}>📁 사건 등록</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("map")}>🗺️ 지도 상황</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("monitor")}>📡 모니터링</button>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── 모바일 모니터링 ───────────────────────────────────────────
+function MCC_Monitor({ categories }) {
+  const [selId, setSelId] = useState(categories?.[0]?.id);
+  const cat = (categories || []).find(c => c.id === selId) || categories?.[0];
+  if (!cat) return <div className="mcc-page-header"><div className="mcc-page-title">실시간 모니터링</div><div className="mcc-page-sub">데이터가 없습니다</div></div>;
+  const lv = getLevel(cat);
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  const history = (cat.history || []).slice(-24);
+  const trendPoints = history.length > 5 ? history.map((h, i) => ({ x: i * (100 / Math.max(1, history.length - 1)), y: h.value || 0 })) : [];
+  const minV = Math.min(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const maxV = Math.max(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const range = maxV - minV || 1;
+  const pathD = trendPoints.length > 0 ? trendPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${36 - ((p.y - minV) / range) * 30}`).join(" ") : "";
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">실시간 모니터링</div>
+      <div className="mcc-page-sub">환경 카테고리 상세</div>
+    </div>
+
+    {/* 카테고리 칩 가로 스크롤 */}
+    <div style={{ padding: "0 16px 12px", display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+      {(categories || []).map(c => {
+        const cv = getLevel(c);
+        const cvColor = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[cv];
+        return (<button key={c.id} onClick={() => setSelId(c.id)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 999, border: selId === c.id ? `1.5px solid ${cvColor}` : "1px solid rgba(255,255,255,0.1)", background: selId === c.id ? `${cvColor}20` : "rgba(255,255,255,0.03)", color: selId === c.id ? cvColor : "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+          {c.icon || "📊"} {c.name}
+        </button>);
+      })}
+    </div>
+
+    {/* 큰 수치 카드 */}
+    <div className="mcc-card">
+      <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>현재 수치</div>
+      <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1, fontFamily: "JetBrains Mono", color: lvColor, letterSpacing: "-0.03em" }}>{(cat.currentValue || 0).toLocaleString()}</div>
+      <div style={{ fontSize: 14, color: "#6c6e7d", marginTop: 4 }}>{cat.unit}</div>
+      <div style={{ marginTop: 14, display: "flex", gap: 6, alignItems: "center" }}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[lv]}`}><span className={`dot ${lv !== "BLUE" ? "pulse" : ""}`} />{CC_LEVEL_LABEL[lv]}</span>
+        <span style={{ fontSize: 11, color: "#6c6e7d" }}>{new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+    </div>
+
+    {/* 24h 차트 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>24시간 추이</div>
+      <svg viewBox="0 0 100 36" preserveAspectRatio="none" style={{ width: "100%", height: 100 }}>
+        <defs>
+          <linearGradient id={`mcc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+            <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {pathD && <>
+          <path d={`${pathD} L 100 36 L 0 36 Z`} fill={`url(#mcc-grad-${cat.id})`} stroke="none"/>
+          <path d={pathD} fill="none" stroke={lvColor} strokeWidth="1.5"/>
+        </>}
+        {!pathD && <text x="50" y="20" textAnchor="middle" fill="#6c6e7d" fontSize="3">데이터 부족</text>}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6c6e7d", marginTop: 6, fontFamily: "JetBrains Mono" }}>
+        <span>min {minV.toFixed(1)}</span>
+        <span>max {maxV.toFixed(1)}</span>
+      </div>
+    </div>
+
+    {/* 임계값 표 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>임계값</div>
+      {[{ k: "yellow", lbl: "주의 (YELLOW)", c: "#f5c451" }, { k: "orange", lbl: "경계 (ORANGE)", c: "#ff9a3c" }, { k: "red", lbl: "심각 (RED)", c: "#ff5e7e" }].map(t => (<div key={t.k} className="mcc-list-row">
+        <span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />
+        <span style={{ flex: 1, color: "#b0b3c4", fontSize: 13 }}>{t.lbl}</span>
+        <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{cat.thresholds?.[t.k] || "-"} {cat.unit}</span>
+      </div>))}
+    </div>
+
+    {/* 체크리스트 */}
+    {(cat.actionItems || []).length > 0 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>대응 체크리스트</div>
+      {cat.actionItems.map((item, i) => (<div key={i} className="mcc-list-row" style={{ alignItems: "flex-start" }}>
+        <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
+        <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+      </div>))}
+    </div>}
+  </>);
+}
+
+// ─── 모바일 알림/경보 발령 (5단계) ───────────────────────────────
+function MCC_Alert({ settings, setSettings, alerts, setAlerts, smsLog, setSmsLog, session }) {
+  const [step, setStep] = useState(1);
+  const [level, setLevel] = useState("YELLOW");
+  const [msg, setMsg] = useState("");
+  const [channels, setChannels] = useState({ sms: true, app: true, sound: false });
+  const [targets, setTargets] = useState("all");
+
+  const targetCount = targets === "managers" ? (settings.smsManagers || []).length : targets === "staff" ? (settings.smsStaff || []).length : (settings.smsManagers || []).length + (settings.smsStaff || []).length;
+  const lvLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[level];
+
+  const issueAlert = async () => {
+    if (!msg.trim()) { alert("메시지를 입력하세요."); return; }
+    if (!confirm(`${lvLabel} 단계 경보를 ${targetCount}명에게 발송합니다.\n발송 후 취소가 불가능합니다.\n진행하시겠습니까?`)) return;
+    const time = new Date().toLocaleString("ko-KR");
+    const newAlert = { category: "수동 발령", level, message: `[${settings.festivalName || "축제"} ${lvLabel}경보]\n\n${msg}\n\n발신: ${session?.name || "관리자"}\n시간: ${time}`, time };
+    if (setAlerts) setAlerts(p => [newAlert, ...p].slice(0, 100));
+    if (channels.sms) {
+      try {
+        const contacts = targets === "managers" ? settings.smsManagers : targets === "staff" ? settings.smsStaff : [...(settings.smsManagers || []), ...(settings.smsStaff || [])];
+        const r = await sendSolapi(settings, newAlert.message, contacts);
+        if (setSmsLog) setSmsLog(p => [{ time, level, message: msg, sentTo: contacts.length, success: r.ok ? r.success : 0, fail: r.ok ? r.fail : contacts.length }, ...p].slice(0, 100));
+      } catch {}
+    }
+    alert(`✅ 경보 발령 완료\n수신자: ${targetCount}명`);
+    setStep(1); setMsg(""); setLevel("YELLOW");
+  };
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">알림 / 경보 발령</div>
+      <div className="mcc-page-sub">단계별 메시지 발송</div>
+    </div>
+
+    {/* 진행 단계 */}
+    <div className="mcc-step-bar">
+      {[1, 2, 3, 4, 5].map(s => (<div key={s} className={`mcc-step ${step === s ? "active" : ""} ${step > s ? "done" : ""}`} onClick={() => s < step && setStep(s)}>
+        {step > s ? "✓" : s}
+      </div>))}
+    </div>
+
+    {step === 1 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>① 경보 단계 선택</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {["BLUE", "YELLOW", "ORANGE", "RED"].map(l => {
+          const c = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[l];
+          const lbl = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[l];
+          return (<div key={l} onClick={() => setLevel(l)} style={{ padding: 16, borderRadius: 12, background: level === l ? `${c}20` : "rgba(255,255,255,0.02)", border: `2px solid ${level === l ? c : "rgba(255,255,255,0.06)"}`, cursor: "pointer", textAlign: "center" }}>
+            <div style={{ width: 28, height: 28, borderRadius: 14, background: c, margin: "0 auto 6px", boxShadow: `0 0 12px ${c}80` }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: level === l ? c : "#f4f5fa" }}>{l}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{lbl}</div>
+          </div>);
+        })}
+      </div>
+      <button className="mcc-btn primary full lg" style={{ marginTop: 14 }} onClick={() => setStep(2)}>다음 →</button>
+    </div>}
+
+    {step === 2 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 8 }}>② 메시지 작성</div>
+      <div className="mcc-card-sub" style={{ marginBottom: 12 }}>{lvLabel} 단계로 발송됩니다</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        {[`${settings.festivalName || "축제"} 안전관리상황실`, "구역 통제 강화", "안전한 곳으로 이동", "상황 종료"].map((t, i) => (<button key={i} onClick={() => setMsg(m => m + (m ? "\n" : "") + t)} style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>+ {t.slice(0, 14)}{t.length > 14 ? "..." : ""}</button>))}
+      </div>
+      <textarea className="mcc-textarea" value={msg} onChange={e => setMsg(e.target.value)} placeholder="알림 메시지..." rows={5} />
+      <div style={{ marginTop: 6, fontSize: 11, color: "#6c6e7d", textAlign: "right" }}>{msg.length}자</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(1)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => msg.trim() && setStep(3)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 3 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>③ 발송 채널</div>
+      {[{ k: "sms", n: "SMS 문자", icon: "📱" }, { k: "app", n: "앱 푸시", icon: "🔔" }, { k: "sound", n: "방송 알림음", icon: "📢" }].map(c => (<div key={c.k} onClick={() => setChannels(p => ({ ...p, [c.k]: !p[c.k] }))} style={{ padding: 14, marginBottom: 8, borderRadius: 12, background: channels[c.k] ? "rgba(107,138,255,0.1)" : "rgba(255,255,255,0.02)", border: channels[c.k] ? "2px solid #6b8aff" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 22 }}>{c.icon}</span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{c.n}</span>
+        {channels[c.k] && <span style={{ color: "#6b8aff", fontSize: 16 }}>✓</span>}
+      </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(2)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setStep(4)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 4 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 8 }}>④ 발송 대상</div>
+      <div className="mcc-card-sub" style={{ marginBottom: 12 }}>{targetCount}명에게 발송</div>
+      {[{ k: "all", n: "전체", count: (settings.smsManagers || []).length + (settings.smsStaff || []).length }, { k: "managers", n: "관리자만", count: (settings.smsManagers || []).length }, { k: "staff", n: "안전요원만", count: (settings.smsStaff || []).length }].map(t => (<div key={t.k} onClick={() => setTargets(t.k)} style={{ padding: 14, marginBottom: 8, borderRadius: 12, background: targets === t.k ? "rgba(107,138,255,0.1)" : "rgba(255,255,255,0.02)", border: targets === t.k ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 18, height: 18, borderRadius: 9, border: targets === t.k ? "5px solid #6b8aff" : "2px solid rgba(255,255,255,0.2)" }} />
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{t.n}</span>
+        <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: targets === t.k ? "#6b8aff" : "#b0b3c4" }}>{t.count}<span style={{ fontSize: 11, marginLeft: 2, color: "#6c6e7d" }}>명</span></span>
+      </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(3)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setStep(5)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 5 && <div className="mcc-card" style={{ borderColor: "rgba(255,94,126,0.3)" }}>
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>⑤ 발령 확인</div>
+      <div style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 12 }}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[level]}`}><span className="dot pulse" />● {level} · {lvLabel}</span>
+        <div style={{ fontSize: 13, color: "#f4f5fa", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 8 }}>{msg}</div>
+      </div>
+      <div style={{ fontSize: 12, color: "#6c6e7d", lineHeight: 1.6, marginBottom: 12 }}>
+        📡 채널: {Object.keys(channels).filter(k => channels[k]).map(k => ({ sms: "SMS", app: "앱", sound: "방송" }[k])).join(" · ")}<br/>
+        👥 대상: {targetCount}명 ({targets === "all" ? "전체" : targets === "managers" ? "관리자" : "안전요원"})
+      </div>
+      <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,94,126,0.08)", border: "1px solid rgba(255,94,126,0.2)", color: "#ff5e7e", fontSize: 11, marginBottom: 12 }}>
+        ⚠️ 발송 후 취소 불가
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="mcc-btn" onClick={() => setStep(4)}>← 이전</button>
+        <button className="mcc-btn danger lg" style={{ flex: 1 }} onClick={issueAlert}>🚨 발령 실행</button>
+      </div>
+    </div>}
+
+    {/* 최근 이력 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>최근 발령 이력 ({(smsLog || []).length}건)</div>
+      {(smsLog || []).slice(0, 4).map((s, i) => (<div key={i} className="mcc-list-row">
+        <span className={`mcc-chip ${CC_LEVEL_MAP[s.level || "BLUE"]}`}>{s.level || "정보"}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.message}</div>
+          <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 2 }}>{s.time} · {s.sentTo || 0}건</div>
+        </div>
+      </div>))}
+      {(!smsLog || smsLog.length === 0) && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>발령 이력 없음</div>}
+    </div>
+  </>);
+}
+
+// ─── 모바일 사건/신고 ───────────────────────────────────────
+function MCC_Incident({ settings, setSettings, session }) {
+  const incidents = settings.incidents || [];
+  const today = new Date().toDateString();
+  const todayIncidents = incidents.filter(i => new Date(i.ts).toDateString() === today);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [newInc, setNewInc] = useState({ type: "", location: "", desc: "", priority: "low" });
+  const types = ["응급환자", "분실아동", "폭력/싸움", "시설고장", "민원/항의", "교통사고", "기타"];
+
+  const submit = () => {
+    if (!newInc.type || !newInc.location) { alert("종류와 위치를 입력하세요."); return; }
+    const inc = { id: "inc_" + Date.now(), ...newInc, ts: Date.now(), status: "open", reporter: session?.name || "?", time: new Date().toLocaleString("ko-KR") };
+    setSettings(p => ({ ...p, incidents: [inc, ...(p.incidents || [])] }));
+    setNewInc({ type: "", location: "", desc: "", priority: "low" });
+    setShowAdd(false);
+  };
+  const updateStatus = (id, status) => setSettings(p => ({ ...p, incidents: (p.incidents || []).map(i => i.id === id ? { ...i, status } : i) }));
+  const remove = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(p => ({ ...p, incidents: (p.incidents || []).filter(i => i.id !== id) })); };
+  const filtered = filter === "all" ? incidents : filter === "today" ? todayIncidents : incidents.filter(i => i.status === filter);
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">사건 / 신고</div>
+      <div className="mcc-page-sub">현장 신고 접수 · 추적</div>
+    </div>
+
+    {/* 통계 4-카드 */}
+    <div className="mcc-stats-4">
+      {[{ k: "today", n: "오늘", c: todayIncidents.length, color: "#6b8aff" }, { k: "open", n: "처리중", c: incidents.filter(i => i.status === "open").length, color: "#ff9a3c" }, { k: "in_progress", n: "조치중", c: incidents.filter(i => i.status === "in_progress").length, color: "#f5c451" }, { k: "closed", n: "완료", c: incidents.filter(i => i.status === "closed").length, color: "#4cd99a" }].map(s => (<div key={s.k} className="mcc-stat" onClick={() => setFilter(s.k)} style={{ cursor: "pointer", border: filter === s.k ? `1.5px solid ${s.color}40` : undefined, background: filter === s.k ? `${s.color}15` : undefined }}>
+        <div className="mcc-stat-name">{s.n}</div>
+        <div className="mcc-stat-val" style={{ color: s.color }}>{s.c}</div>
+      </div>))}
+    </div>
+
+    {/* 신규 등록 / 필터 */}
+    <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
+      <button className="mcc-btn" style={{ flex: 1 }} onClick={() => setFilter("all")}>전체 보기</button>
+      <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setShowAdd(!showAdd)}>+ 신규 등록</button>
+    </div>
+
+    {showAdd && <div className="mcc-card" style={{ borderColor: "rgba(107,138,255,0.3)" }}>
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>새 사건 등록</div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>종류</div>
+        <select className="mcc-input" value={newInc.type} onChange={e => setNewInc({ ...newInc, type: e.target.value })}>
+          <option value="">선택...</option>
+          {types.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>위치</div>
+        <input className="mcc-input" value={newInc.location} onChange={e => setNewInc({ ...newInc, location: e.target.value })} placeholder="A구역 / 정문 등" />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>긴급도</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+          {[{ k: "low", n: "낮음", c: "#4cd99a" }, { k: "mid", n: "보통", c: "#f5c451" }, { k: "high", n: "긴급", c: "#ff9a3c" }, { k: "critical", n: "치명", c: "#ff5e7e" }].map(p => (<button key={p.k} onClick={() => setNewInc({ ...newInc, priority: p.k })} style={{ padding: "8px", borderRadius: 8, border: newInc.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: newInc.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: newInc.priority === p.k ? p.c : "#b0b3c4", fontSize: 11, fontWeight: 600 }}>{p.n}</button>))}
+        </div>
+      </div>
+      <textarea className="mcc-textarea" value={newInc.desc} onChange={e => setNewInc({ ...newInc, desc: e.target.value })} placeholder="상세 내용 (선택)" rows={2} />
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button className="mcc-btn" onClick={() => setShowAdd(false)}>취소</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={submit}>등록</button>
+      </div>
+    </div>}
+
+    {/* 사건 카드 리스트 */}
+    {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>사건이 없습니다</div> :
+      filtered.map(i => {
+        const sLabel = i.status === "open" ? "처리중" : i.status === "in_progress" ? "조치중" : "완료";
+        const pColor = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+        const pLabel = { critical: "치명", high: "긴급", mid: "보통", low: "낮음" }[i.priority];
+        return (<div key={i.id} className="mcc-card">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span className={`mcc-chip ${i.status === "open" ? "orange" : i.status === "in_progress" ? "yellow" : "green"}`}><span className="dot" />{sLabel}</span>
+            <span style={{ color: pColor, fontSize: 12, fontWeight: 700 }}>● {pLabel}</span>
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#f4f5fa", marginBottom: 4 }}>{i.type}</div>
+          <div style={{ fontSize: 13, color: "#b0b3c4", marginBottom: 8 }}>📍 {i.location}</div>
+          {i.desc && <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5, marginBottom: 8, padding: 10, background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>{i.desc}</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#6c6e7d", marginBottom: 10 }}>
+            <span>👤 {i.reporter}</span>
+            <span className="mono">{i.time?.split(" ")[1] || i.time}</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {i.status !== "closed" && <button className="mcc-btn" style={{ flex: 1, fontSize: 12 }} onClick={() => updateStatus(i.id, i.status === "open" ? "in_progress" : "closed")}>{i.status === "open" ? "조치 시작" : "✓ 완료 처리"}</button>}
+            <button className="mcc-btn" style={{ color: "#ff5e7e" }} onClick={() => remove(i.id)}>🗑</button>
+          </div>
+        </div>);
+      })
+    }
+  </>);
+}
+
+// ─── 모바일 지도 상황도 ─────────────────────────────────────
+function MCC_Map({ settings, session }) {
+  const fid = session?.festivalId || "default";
+  const [mapImage] = usePersist(`${fid}_map_img_v1`, null);
+  const [mapAreas] = usePersist(`${fid}_map_areas_v1`, []);
+  const zones = settings.zones || [];
+  const congestion = settings.zoneCongestion || [];
+  const incidents = settings.incidents || [];
+
+  const getAreaColor = (zoneId) => {
+    const c = congestion.find(cc => cc.zoneId === zoneId);
+    if (!c) return "#6b8aff";
+    return c.level === "danger" ? "#ff5e7e" : c.level === "crowded" ? "#f5c451" : "#4cd99a";
+  };
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">지도 상황도</div>
+      <div className="mcc-page-sub">{zones.length}개 구역 · {incidents.filter(i => i.status !== "closed").length}건 진행</div>
+    </div>
+
+    <div className="mcc-card" style={{ padding: 0, overflow: "hidden" }}>
+      {!mapImage ? <div style={{ aspectRatio: "16/10", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#6c6e7d", gap: 10, padding: 20 }}>
+        <span style={{ fontSize: 48 }}>🗺️</span>
+        <span style={{ fontSize: 13 }}>도면이 등록되지 않았습니다</span>
+        <span style={{ fontSize: 11, textAlign: "center" }}>모바일 보기 → 🗺️ 히트맵에서 업로드하세요</span>
+      </div> :
+        <div style={{ position: "relative", width: "100%" }}>
+          <img src={mapImage} alt="map" style={{ width: "100%", display: "block" }} />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            {mapAreas.map(a => {
+              const z = zones.find(zz => zz.id === a.zoneId);
+              const color = getAreaColor(a.zoneId);
+              const points = (a.points || []).map(p => `${p.x},${p.y}`).join(" ");
+              return (<g key={a.id}>
+                <polygon points={points} fill={color} fillOpacity={0.3} stroke={color} strokeWidth="0.3" />
+                {z && (a.points || []).length > 0 && (() => { const cx = a.points.reduce((s, p) => s + p.x, 0) / a.points.length; const cy = a.points.reduce((s, p) => s + p.y, 0) / a.points.length; return <text x={cx} y={cy} textAnchor="middle" fill="#fff" fontSize="2.5" fontWeight="700" style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.6)", strokeWidth: "0.5" }}>{z.name}</text>; })()}
+              </g>);
+            })}
+          </svg>
+          {incidents.filter(i => i.status !== "closed").map((i, idx) => {
+            const x = 10 + (idx % 6) * 14; const y = 15 + Math.floor(idx / 6) * 18;
+            const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+            return (<div key={i.id} style={{ position: "absolute", left: `${x}%`, top: `${y}%`, width: 14, height: 14, borderRadius: 7, background: c, boxShadow: `0 0 10px ${c}, 0 0 0 2px rgba(0,0,0,0.4)`, animation: "cc-pulse 2s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700 }}>!</div>);
+          })}
+        </div>
+      }
+    </div>
+
+    {/* 구역 상태 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>구역 상태</div>
+      {zones.map(z => {
+        const c = congestion.find(cc => cc.zoneId === z.id);
+        const cl = c?.level || "smooth";
+        const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+        const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+        return (<div key={z.id} className="mcc-list-row">
+          <span style={{ flex: 1, fontSize: 13, color: "#f4f5fa" }}>📍 {z.name}</span>
+          <span className={`mcc-chip ${lv}`}>{lbl}</span>
+        </div>);
+      })}
+      {zones.length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>구역 미등록</div>}
+    </div>
+
+    {/* 활성 사건 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>활성 사건 ({incidents.filter(i => i.status !== "closed").length}건)</div>
+      {incidents.filter(i => i.status !== "closed").slice(0, 5).map(i => {
+        const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+        return (<div key={i.id} className="mcc-list-row">
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: c, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{i.type}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d" }}>{i.location}</div>
+          </div>
+        </div>);
+      })}
+      {incidents.filter(i => i.status !== "closed").length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>활성 사건 없음 ✓</div>}
+    </div>
+  </>);
+}
+
 function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
@@ -9505,6 +10224,26 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   // 🖥️ PC 관제센터 모드 - 1024px 이상 + 관리자 + 토글 안 한 경우
   if (useControlCenter) {
+    // 모바일 (768px 미만): 하단 네비 + 세로카드 구조
+    if (!isPC) {
+      return (<CCErrorBoundary>
+        <MobileControlCenter
+          session={session}
+          accounts={accounts}
+          settings={settings}
+          setSettings={setSettings}
+          categories={categories}
+          alerts={alerts}
+          setAlerts={setAlerts}
+          smsLog={smsLog}
+          setSmsLog={setSmsLog}
+          onLogout={onLogout}
+          onMobileSwitch={toggleMobileView}
+          setActiveAlert={setActiveAlert}
+        />
+      </CCErrorBoundary>);
+    }
+    // PC/태블릿: 사이드바 구조
     return (<CCErrorBoundary>
       <ControlCenterDashboard
         session={session}
