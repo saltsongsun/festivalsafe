@@ -5469,8 +5469,8 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
             <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>근무자 관리</div>
             <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>총 {stats.total}명 · 근무중 {stats.onDuty}명</div>
           </div>
-          {canEdit && stats.total > 0 && <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-            {setAccounts && (() => {
+          {canEdit && <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+            {setAccounts && stats.total > 0 && (() => {
               const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
               if (noAcc === 0) return null;
               return <button onClick={() => {
@@ -5492,7 +5492,49 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
                 alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
               }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>🔐 계정({noAcc})</button>;
             })()}
-            <button onClick={exportCSV} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📥 CSV</button>
+            {/* 사용자관리 → 근무자 복구 (workers 배열이 비었거나 accounts와 동기화 안됐을 때) */}
+            {(() => {
+              const fid = settings.festivalId || session?.festivalId || "default";
+              const workerRoles = ["manager", "zonemgr", "stagemgr", "counter", "parking", "shuttle"];
+              // 현재 축제의 worker 역할 계정들
+              const candidates = (accounts || []).filter(a => 
+                workerRoles.includes(a.role) && 
+                (a.festivalId === fid || (a.festivals || []).includes(fid))
+              );
+              // 이미 근무자로 등록된 사람 제외 (이름 또는 accountId로 매칭)
+              const missing = candidates.filter(a => 
+                !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
+              );
+              if (missing.length === 0) return null;
+              const roleNameMap = { manager: "운영", zonemgr: "구역관리", stagemgr: "무대관리", counter: "계수", parking: "주차", shuttle: "셔틀" };
+              return <button onClick={() => {
+                if (!confirm(`📥 사용자관리 → 근무자 복구\n\n사용자관리에 ${missing.length}명의 계정이 있지만 근무자 목록에 없습니다.\n이들을 '미배치' 근무지로 복구합니다.\n\n복구 후 ⚙️관리에서 적절한 근무지로 이동시킬 수 있습니다.\n\n진행하시겠습니까?`)) return;
+                setSettings(prev => {
+                  const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+                  // 미배치 사이트 자동 생성
+                  let pi = ws.findIndex(s => s.id === "_pool");
+                  if (pi < 0) {
+                    ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
+                    pi = ws.length - 1;
+                  }
+                  missing.forEach(a => {
+                    const w = {
+                      id: "w_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                      name: a.name,
+                      phone: a.phone || "",
+                      role: roleNameMap[a.role] || a.role,
+                      meals: 1,
+                      mealNote: "",
+                      accountId: a.id
+                    };
+                    ws[pi].workers = [...(ws[pi].workers || []), w];
+                  });
+                  return { ...prev, workSites: ws };
+                });
+                alert(`✅ ${missing.length}명 복구 완료\n\n'미배치' 근무지에 추가되었습니다.\n⚙️관리에서 근무지로 이동시키세요.`);
+              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.4)", background: "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>📥 복구({missing.length})</button>;
+            })()}
+            {stats.total > 0 && <button onClick={exportCSV} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📥 CSV</button>}
           </div>}
         </div>
       </div>
@@ -5549,7 +5591,30 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     </Card>}
 
     {/* 근무자 카드 목록 */}
-    {filtered.length === 0 && <EmptyState icon="👥" title={search ? "검색 결과 없음" : "등록된 근무자가 없습니다"} description={canEdit && !search ? "축제관리 또는 ⚙️관리 → 인력관리에서 등록하세요" : ""} />}
+    {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", marginTop: 12 }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>👥</div>
+      <div style={{ color: "#f4f5fa", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{search ? "검색 결과 없음" : "등록된 근무자가 없습니다"}</div>
+      {canEdit && !search && (() => {
+        const fid = settings.festivalId || session?.festivalId || "default";
+        const workerRoles = ["manager", "zonemgr", "stagemgr", "counter", "parking", "shuttle"];
+        const candidates = (accounts || []).filter(a => 
+          workerRoles.includes(a.role) && 
+          (a.festivalId === fid || (a.festivals || []).includes(fid))
+        );
+        const missing = candidates.filter(a => 
+          !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
+        );
+        if (missing.length > 0) {
+          return (<>
+            <div style={{ color: "#ff9a3c", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+              💡 사용자관리에 <b style={{ color: "#FFB74D" }}>{missing.length}명</b>의 계정이 있습니다.<br/>
+              위의 <b style={{ color: "#FFB74D" }}>📥 복구</b> 버튼을 누르면 자동으로 가져옵니다.
+            </div>
+          </>);
+        }
+        return <div style={{ color: "#6c6e7d", fontSize: 13 }}>축제관리 또는 ⚙️관리 → 인력관리에서 등록하세요</div>;
+      })()}
+    </div>}
 
     {filtered.map(w => {
       const isEditing = editId?.workerId === w.id;
