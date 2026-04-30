@@ -3584,6 +3584,36 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             </div>
           </div>}
 
+          {/* 📊 실황 그래프 (인파 외 카테고리: 풍속/강수/기온 등) */}
+          {selected.id !== "crowd" && (selected.history || []).length >= 2 && <div style={{ marginBottom: 16 }}>
+            <h3 style={{ color: li.color, fontSize: 13, marginBottom: 8 }}>📊 실황 추이 (최근 24시간)</h3>
+            <div style={{ width: "100%", height: 180 }}>
+              <ResponsiveContainer>
+                <LineChart data={(selected.history || []).slice(-24)} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                  <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 13 }} />
+                  <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
+                  <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "실황"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" label={{ value: "주의", fill: "#FFC107", fontSize: 12 }} />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" label={{ value: "경계", fill: "#FFA726", fontSize: 12 }} />}
+                  {selected.thresholds?.RED?.[0] > 0 && <ReferenceLine y={selected.thresholds.RED[0]} stroke="#EF5350" strokeDasharray="4 4" label={{ value: "심각", fill: "#EF5350", fontSize: 12 }} />}
+                  <Line type="monotone" dataKey="value" stroke={li.color} strokeWidth={2.5} dot={{ fill: li.color, r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4, fontSize: 12, color: "#94A3B8" }}>
+              <span>● 실시간 측정값</span>
+              <span>점선: 임계값</span>
+            </div>
+          </div>}
+
+          {/* 📊 실황 데이터 부족 안내 (history 너무 짧을 때) */}
+          {selected.id !== "crowd" && (selected.history || []).length < 2 && selected.kmaCategory && <div style={{ marginBottom: 16, padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+            <div style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>실황 데이터 수집 중</div>
+            <div style={{ color: "#6c6e7d", fontSize: 11 }}>10분마다 자동 갱신됩니다 (현재값: {selected.currentValue}{selected.unit})</div>
+          </div>}
+
           {/* 초단기 예보 그래프 */}
           {(selected.forecast || []).length > 0 && <div style={{ marginBottom: 16 }}>
             <h3 style={{ color: "#FFA726", fontSize: 13, marginBottom: 8 }}>📋 초단기 예보 (향후 6시간)</h3>
@@ -3594,6 +3624,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 13 }} />
                   <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "예보"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" />}
                   <Line type="monotone" dataKey="value" stroke="#FFA726" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#FFA726", r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -3614,6 +3646,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 11 }} interval={Math.floor(selected.shortForecast.length / 8)} />
                   <YAxis tick={{ fill: "#556", fontSize: 13 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "단기예보"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" />}
                   <Line type="monotone" dataKey="value" stroke="#42A5F5" strokeWidth={2} dot={{ fill: "#42A5F5", r: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -10047,12 +10081,24 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
 
       setCategories(p => p.map(c => {
         if (c.kmaCategory && dataMap[c.kmaCategory] !== undefined && !c.apiConfig?.enabled) {
+          const newValue = Math.round(dataMap[c.kmaCategory] * 10) / 10;
+          const timeStr = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+          // history 누적: 마지막 시각이 같으면 업데이트, 다르면 추가, 최대 48개 (8시간 이상 - 10분 간격)
+          const prevHistory = c.history || [];
+          let newHistory = [...prevHistory];
+          if (newHistory.length > 0 && newHistory[newHistory.length - 1].time === timeStr) {
+            newHistory[newHistory.length - 1] = { time: timeStr, value: newValue };
+          } else {
+            newHistory.push({ time: timeStr, value: newValue });
+          }
+          if (newHistory.length > 48) newHistory = newHistory.slice(-48);
           return { 
             ...c, 
-            currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, 
+            currentValue: newValue, 
             lastUpdated: new Date().toLocaleTimeString("ko-KR"), 
             forecast: fcstData[c.kmaCategory] || [], 
             shortForecast: (shortFcstData && shortFcstData[c.kmaCategory]) || [],
+            history: newHistory,
             dataType: "실황" 
           };
         }
@@ -10089,9 +10135,19 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
           const pm10 = parseFloat(item.pm10Value) || 0;
           const pm25 = parseFloat(item.pm25Value) || 0;
           const time = new Date().toLocaleTimeString("ko-KR");
+          const timeStr = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+          const updateHist = (prevHist, newVal) => {
+            let h = [...(prevHist || [])];
+            if (h.length > 0 && h[h.length - 1].time === timeStr) {
+              h[h.length - 1] = { time: timeStr, value: newVal };
+            } else {
+              h.push({ time: timeStr, value: newVal });
+            }
+            return h.length > 48 ? h.slice(-48) : h;
+          };
           setCategories(p => p.map(c => {
-            if (c.id === "pm10") return { ...c, currentValue: pm10, lastUpdated: time, dataType: "실황" };
-            if (c.id === "pm25") return { ...c, currentValue: pm25, lastUpdated: time, dataType: "실황" };
+            if (c.id === "pm10") return { ...c, currentValue: pm10, lastUpdated: time, history: updateHist(c.history, pm10), dataType: "실황" };
+            if (c.id === "pm25") return { ...c, currentValue: pm25, lastUpdated: time, history: updateHist(c.history, pm25), dataType: "실황" };
             return c;
           }));
           setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, lastFetch: new Date().toLocaleString("ko-KR") } }));
