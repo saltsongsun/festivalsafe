@@ -474,9 +474,29 @@ function usePersist(key, init) {
       if (e.detail?.key === key && e.detail?.value) {
         const j = typeof e.detail.value === "string" ? e.detail.value : JSON.stringify(e.detail.value);
         if (j !== lastJson.current) {
-          lastJson.current = j;
           try {
             const p = JSON.parse(j);
+            
+            // 🛡️ Realtime 보호: settings의 workSites가 갑자기 50% 이상 줄면 무시 (다른 기기의 옛 데이터)
+            if (key.endsWith("_set_v10") && typeof p === "object" && !Array.isArray(p) && valRef.current && typeof valRef.current === "object") {
+              const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              const incomingWorkers = (p.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              
+              if (myWorkers > 5 && incomingWorkers < myWorkers * 0.5) {
+                console.warn(`[usePersist] 🛡️ Realtime 보호: 근무자 급감 거부 (${myWorkers} → ${incomingWorkers}). 다른 기기의 옛 데이터로 추정`);
+                // 무시하고 내 데이터를 다시 저장 (자기 보정)
+                if (window.storage && supabaseLoaded.current) {
+                  const myJson = JSON.stringify(valRef.current);
+                  selfSave.current = true;
+                  window.storage.set(key, myJson).finally(() => {
+                    setTimeout(() => { selfSave.current = false; }, 3000);
+                  });
+                }
+                return;
+              }
+            }
+            
+            lastJson.current = j;
             setVal(p);
             valRef.current = p;
             localStorage.setItem(key, j);
@@ -498,11 +518,11 @@ function usePersist(key, init) {
     userInteracted.current = true; // 사용자 직접 변경 표시
     try { localStorage.setItem(key, json); } catch (e) { console.warn("[usePersist] localStorage 실패:", key); }
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const latestJson = JSON.stringify(valRef.current);
+    saveTimer.current = setTimeout(async () => {
+      let latestVal = valRef.current;
       // 🚫 Supabase 로드 전이면 저장 보류 (옛 로컬 데이터로 클라우드 덮어쓰기 방지)
       if (!supabaseLoaded.current) {
-        pendingSave.current = latestJson;
+        pendingSave.current = JSON.stringify(latestVal);
         console.log("[usePersist] ⏸️ Supabase 로드 대기 중 - 저장 보류:", key.slice(0, 50));
         return;
       }
@@ -510,6 +530,37 @@ function usePersist(key, init) {
         console.warn("[usePersist] window.storage 없음, 저장 스킵:", key);
         return;
       }
+      
+      // 🔒 데이터 손실 방지: settings 키일 때 클라우드 최신값 비교
+      // workSites/zones 같은 중요 데이터가 줄어들면 머지 시도
+      if (key.endsWith("_set_v10") && typeof latestVal === "object" && !Array.isArray(latestVal)) {
+        try {
+          const cloudRes = await window.storage.get(key);
+          if (cloudRes?.value) {
+            const cloud = JSON.parse(cloudRes.value);
+            // workSites: 클라우드가 더 많으면 머지 (내 변경분 + 클라우드 최신)
+            const myWorkers = (latestVal.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+            const cloudWorkers = (cloud.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+            
+            if (cloudWorkers > myWorkers && cloudWorkers - myWorkers >= 3) {
+              // 클라우드가 3명 이상 더 많음 → 클라우드 우선 (내가 옛날 데이터 들고 있음)
+              console.warn(`[usePersist] 🛡️ 데이터 보호: 클라우드 근무자 ${cloudWorkers}명 > 내 ${myWorkers}명. 클라우드 데이터로 머지`);
+              // 내가 변경한 다른 필드는 살리고 workSites/zones만 클라우드 사용
+              latestVal = { 
+                ...latestVal, 
+                workSites: cloud.workSites,
+                zones: cloud.zones || latestVal.zones,
+                emergencyContacts: cloud.emergencyContacts && cloud.emergencyContacts.length > (latestVal.emergencyContacts || []).length ? cloud.emergencyContacts : latestVal.emergencyContacts
+              };
+              setVal(latestVal); valRef.current = latestVal;
+              try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
+            }
+          }
+        } catch (e) { console.warn("[usePersist] 클라우드 머지 체크 실패:", e); }
+      }
+      
+      const latestJson = JSON.stringify(latestVal);
+      lastJson.current = latestJson;
       selfSave.current = true;
       window.storage.set(key, latestJson).then(r => {
         if (r) console.log("[usePersist] ✅ 저장 완료:", key.slice(0, 50));
