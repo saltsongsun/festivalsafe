@@ -4233,33 +4233,44 @@ function FestivalStatusPage({ settings, setSettings, session, accounts, setAccou
     </div>);
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
-    <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <PageHeader icon="🎪" title={settings.festivalName || "축제관리"} subtitle={`운영 ${opStart}~${opEnd} · ${now.toLocaleTimeString("ko-KR")}`} accent="#FFA726" />
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 500, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(255,167,38,0.12), rgba(255,167,38,0.04))", border: "1px solid rgba(255,167,38,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #FFA726, #FF6F00)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(255,167,38,0.4)" }}>🎪</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{settings.festivalName || "축제관리"}</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>운영 {opStart}~{opEnd} · {now.toLocaleTimeString("ko-KR")}</div>
+          </div>
+        </div>
+      </div>
 
       {/* 긴급상황 배너 */}
-      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 14, background: settings.emergencyLevel >= 3 ? "linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04))" : "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", border: `1.5px solid ${settings.emergencyLevel >= 3 ? "rgba(255,94,126,0.3)" : "rgba(255,154,60,0.3)"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>{["", "🔵", "🟡", "🟠", "🔴"][settings.emergencyLevel]}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
-            {settings.emergencyMessage && <div style={{ color: "#E2E8F0", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
+            <div style={{ color: settings.emergencyLevel >= 3 ? "#ff5e7e" : "#ff9a3c", fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
+            {settings.emergencyMessage && <div style={{ color: "#E2E8F0", fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>{settings.emergencyMessage}</div>}
           </div>
-          <span style={{ color: "#94A3B8", fontSize: 12 }}>{settings.emergencyAt}</span>
+          <span style={{ color: "#6c6e7d", fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>{settings.emergencyAt}</span>
         </div>
       </div>}
 
-      {/* 종합 현황 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#42A5F5", icon: "📍" },
-          { label: "근무지", value: workSites.filter(s=>s.zoneId).length, color: "#009688", icon: "🏠" },
-          { label: "근무자", value: totalWorkers, color: "#66BB6A", icon: "👷" },
-          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#EF5350" : "#556", icon: "🔔" }
+      {/* v2 종합 현황 4-카드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#6b8aff", icon: "📍" },
+          { label: "근무지", value: workSites.filter(s=>s.zoneId).length, color: "#4cd99a", icon: "🏠" },
+          { label: "근무자", value: totalWorkers, color: "#a980ff", icon: "👷" },
+          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#ff5e7e" : "#6c6e7d", icon: "🔔" }
         ].map(c => (
-          <div key={c.label} style={{ padding: "10px 6px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${c.color}33`, textAlign: "center" }}>
-            <div style={{ fontSize: 14 }}>{c.icon}</div>
-            <div style={{ color: c.color, fontSize: 22, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
-            <div style={{ color: "#94A3B8", fontSize: 12 }}>{c.label}</div>
+          <div key={c.label} style={{ padding: "12px 8px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: `1px solid ${c.color}25`, textAlign: "center", boxShadow: "0 4px 12px -6px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 16, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ color: c.color, fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>{c.value}</div>
+            <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{c.label}</div>
           </div>
         ))}
       </div>
@@ -4273,34 +4284,34 @@ function FestivalStatusPage({ settings, setSettings, session, accounts, setAccou
         const hasZone = congestionData.length > 0;
         const hasSite = siteCongs.length > 0;
         if (!hasZone && !hasSite) return null;
-        return (<div style={{ marginBottom: 10 }}>
-          {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 4 }}>
-            <span style={{ color: "#94A3B8", fontSize: 12, lineHeight: "24px" }}>👥인파</span>
-            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#66BB6A" },
-              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FFA726" },
-              { icon: "🔴", label: "위험", count: dangerCount, color: "#EF5350" }
+        return (<div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center", marginBottom: hasSite ? 6 : 0 }}>
+            <span style={{ color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>👥 인파</span>
+            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#4cd99a" },
+              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#f5c451" },
+              { icon: "🔴", label: "위험", count: dangerCount, color: "#ff5e7e" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 999, background: `${c.color}15`, color: c.color, fontSize: 11, fontWeight: 700, border: `1px solid ${c.color}25` }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
-          {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-            <span style={{ color: "#94A3B8", fontSize: 12, lineHeight: "24px" }}>🏠근무지</span>
-            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#66BB6A" },
-              { icon: "🟡", label: "보통", count: sCrowded, color: "#FFA726" },
-              { icon: "🔴", label: "밀집", count: sDanger, color: "#EF5350" }
+          {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+            <span style={{ color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>🏠 근무지</span>
+            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#4cd99a" },
+              { icon: "🟡", label: "보통", count: sCrowded, color: "#f5c451" },
+              { icon: "🔴", label: "밀집", count: sDanger, color: "#ff5e7e" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 999, background: `${c.color}15`, color: c.color, fontSize: 11, fontWeight: 700, border: `1px solid ${c.color}25` }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
         </div>);
       })()}
 
-      {/* 모드 전환 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
-        <button onClick={() => setMode("festival")} style={{ padding: "12px", borderRadius: 10, border: mode === "festival" ? "2px solid #2196F3" : "1px solid #333", background: mode === "festival" ? "rgba(33,150,243,0.1)" : "transparent", color: mode === "festival" ? "#42A5F5" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>🎪 축제관리</button>
-        <button onClick={() => setMode("safety")} style={{ padding: "12px", borderRadius: 10, border: mode === "safety" ? "2px solid #F44336" : "1px solid #333", background: mode === "safety" ? "rgba(244,67,54,0.1)" : "transparent", color: mode === "safety" ? "#EF5350" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer", position: "relative" }}>
+      {/* v2 모드 전환 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <button onClick={() => setMode("festival")} style={{ padding: "13px", borderRadius: 12, border: mode === "festival" ? "2px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: mode === "festival" ? "linear-gradient(180deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05))" : "rgba(255,255,255,0.02)", color: mode === "festival" ? "#8fa6ff" : "#94a3b8", fontSize: 14, fontWeight: 700, cursor: "pointer", letterSpacing: "-0.01em" }}>🎪 축제관리</button>
+        <button onClick={() => setMode("safety")} style={{ padding: "13px", borderRadius: 12, border: mode === "safety" ? "2px solid #ff5e7e" : "1px solid rgba(255,255,255,0.08)", background: mode === "safety" ? "linear-gradient(180deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))" : "rgba(255,255,255,0.02)", color: mode === "safety" ? "#ff738e" : "#94a3b8", fontSize: 14, fontWeight: 700, cursor: "pointer", position: "relative", letterSpacing: "-0.01em" }}>
           🛡️ 안전관리
-          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
+          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -6, right: -6, minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10, background: "linear-gradient(135deg, #ff5e7e, #ff4f72)", color: "#fff", boxShadow: "0 0 10px rgba(255,94,126,0.6)", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
         </button>
       </div>
 
@@ -4739,37 +4750,54 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     timeGroups[key].push(pg);
   });
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
-    <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <PageHeader icon="🎭" title="축제 프로그램" subtitle={`${programs.length}개 프로그램`} accent="#AB47BC" action={["admin","manager","sysadmin"].includes(session?.role) ? <Btn variant="outline" color="#AB47BC" icon="⚙️" onClick={onManage} style={{ padding: "8px 12px", fontSize: 12 }}>관리</Btn> : null} />
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 500, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(171,71,188,0.12), rgba(171,71,188,0.04))", border: "1px solid rgba(171,71,188,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #AB47BC, #7B1FA2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(171,71,188,0.4)" }}>🎭</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>축제 프로그램</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>{programs.length}개 프로그램 · 진행 {nowGroup.length}개</div>
+          </div>
+          {["admin","manager","sysadmin"].includes(session?.role) && <button onClick={onManage} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(171,71,188,0.3)", background: "rgba(171,71,188,0.1)", color: "#E1BEE7", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>⚙️ 관리</button>}
+        </div>
+      </div>
 
-      {/* 일자 선택 */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
-        <button onClick={() => setSelDate("all")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "all" ? "2px solid #9C27B0" : "1px solid #333", background: selDate === "all" ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === "all" ? "#E1BEE7" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체</button>
+      {/* v2 일자 선택 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+        <button onClick={() => setSelDate("all")} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === "all" ? "1.5px solid #AB47BC" : "1px solid rgba(255,255,255,0.1)", background: selDate === "all" ? "rgba(171,71,188,0.15)" : "rgba(255,255,255,0.03)", color: selDate === "all" ? "#E1BEE7" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>전체</button>
         {dates.map((d, i) => {
           const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
           const isToday = d === todayStr;
-          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === d ? "2px solid #9C27B0" : isToday ? "1px solid #4CAF50" : "1px solid #333", background: selDate === d ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === d ? "#E1BEE7" : isToday ? "#66BB6A" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
+          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === d ? "1.5px solid #AB47BC" : isToday ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.1)", background: selDate === d ? "rgba(171,71,188,0.15)" : isToday ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.03)", color: selDate === d ? "#E1BEE7" : isToday ? "#4cd99a" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ●" : ""}
           </button>);
         })}
-        <button onClick={() => { setSelDate("always"); setAlwaysOpen(true); }} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "always" ? "2px solid #009688" : "1px solid #333", background: selDate === "always" ? "rgba(0,150,136,0.15)" : "transparent", color: selDate === "always" ? "#009688" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>상시</button>
+        <button onClick={() => { setSelDate("always"); setAlwaysOpen(true); }} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === "always" ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.1)", background: selDate === "always" ? "rgba(76,217,154,0.15)" : "rgba(255,255,255,0.03)", color: selDate === "always" ? "#4cd99a" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>상시</button>
       </div>
 
-      {/* 카테고리 */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
-        {Object.entries(CATS).map(([k, v]) => (
-          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? `2px solid ${v.color}` : "1px solid #333", background: selCat === k ? `${v.color}15` : "transparent", color: selCat === k ? v.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{v.label} {k !== "all" ? dateFiltered.filter(p => p.category === k).length : dateFiltered.length}</button>
-        ))}
+      {/* v2 카테고리 필터 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginBottom: 14 }}>
+        {Object.entries(CATS).map(([k, v]) => {
+          const v2Color = k === "all" ? "#6b8aff" : k === "O" ? "#6b8aff" : k === "P" ? "#ff5e7e" : k === "E" ? "#4cd99a" : "#ff9a3c";
+          const cnt = k !== "all" ? dateFiltered.filter(p => p.category === k).length : dateFiltered.length;
+          return (<button key={k} onClick={() => setSelCat(k)} style={{ padding: "10px 4px", borderRadius: 12, border: selCat === k ? `1.5px solid ${v2Color}` : "1px solid rgba(255,255,255,0.08)", background: selCat === k ? `${v2Color}15` : "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", color: selCat === k ? v2Color : "#b0b3c4", fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center", lineHeight: 1.3 }}>
+            <div>{v.label}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", marginTop: 2, fontSize: 14, fontWeight: 700 }}>{cnt}</div>
+          </button>);
+        })}
       </div>
 
       {/* 프로그램 목록 */}
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>해당 조건의 프로그램이 없습니다.</div>}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#6c6e7d", fontSize: 13 }}>해당 조건의 프로그램이 없습니다.</div>}
 
       {/* 진행중 프로그램 */}
       {nowGroup.length > 0 && <div style={{ marginBottom: 14 }}>
-        <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 800, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ animation: "blink 2s infinite" }}>●</span> 진행중 {nowGroup.length}개
+        <div style={{ color: "#4cd99a", fontSize: 11, fontWeight: 700, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", boxShadow: "0 0 8px #4cd99a", animation: "blink 2s infinite" }}></span> 진행중 {nowGroup.length}개
         </div>
         {nowGroup.map(pg => renderPgCard(pg))}
       </div>}
@@ -5429,43 +5457,63 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     URL.revokeObjectURL(url);
   };
 
-  return (<PageContainer maxWidth={900}>
-    <PageHeader icon="👥" title="근무자 관리" subtitle={`총 ${stats.total}명 · 근무중 ${stats.onDuty}명`} accent="#42A5F5" action={canEdit && stats.total > 0 ? <div style={{ display: "flex", gap: 6 }}>
-      {setAccounts && (() => {
-        const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
-        if (noAcc === 0) return null;
-        return <Btn variant="primary" color="#66BB6A" icon="🔐" onClick={() => {
-          if (!confirm(`계정이 없는 근무자 ${noAcc}명에 대해 일괄로 계정을 생성합니다.\n\n로그인 ID: 이름\n비밀번호: 1234\n\n진행할까요?`)) return;
-          const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
-          const fid = settings.festivalId || session?.festivalId || "default";
-          const newAccs = [];
-          let created = 0, skipped = 0;
-          allWorkers.forEach(w => {
-            if (w.accountId || accounts?.find(a => a.id === w.name)) { skipped++; return; }
-            const accRole = roleMap[w.role] || "manager";
-            newAccs.push({ id: w.name, password: simpleHash("1234"), name: w.name, role: accRole, festivalId: fid, festivals: [fid], workerId: w.id, siteId: w.siteId });
-            created++;
-          });
-          if (newAccs.length > 0) {
-            setAccounts(prev => [...prev, ...newAccs]);
-            // 근무자에도 accountId 연결
-            setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
-          }
-          alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
-        }} style={{ padding: "8px 12px", fontSize: 12 }}>계정생성 ({noAcc})</Btn>;
-      })()}
-      <Btn variant="secondary" icon="📥" onClick={exportCSV} style={{ padding: "8px 12px", fontSize: 12 }}>CSV</Btn>
-    </div> : null} />
-
-    {/* 통계 카드 */}
-    <Card>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, textAlign: "center" }}>
-        <div><div style={{ color: "#42A5F5", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.total}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>👤 총인원</div></div>
-        <div><div style={{ color: "#66BB6A", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.onDuty}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🟢 근무중</div></div>
-        <div><div style={{ color: "#AB47BC", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.withRadio}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>📻 무전기</div></div>
-        <div><div style={{ color: "#FFA726", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.totalMeals}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🍱 식수</div></div>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04))", border: "1px solid rgba(107,138,255,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #6b8aff, #5a7aff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(107,138,255,0.4)" }}>👥</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>근무자 관리</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>총 {stats.total}명 · 근무중 {stats.onDuty}명</div>
+          </div>
+          {canEdit && stats.total > 0 && <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {setAccounts && (() => {
+              const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
+              if (noAcc === 0) return null;
+              return <button onClick={() => {
+                if (!confirm(`계정이 없는 근무자 ${noAcc}명에 대해 일괄로 계정을 생성합니다.\n\n로그인 ID: 이름\n비밀번호: 1234\n\n진행할까요?`)) return;
+                const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
+                const fid = settings.festivalId || session?.festivalId || "default";
+                const newAccs = [];
+                let created = 0, skipped = 0;
+                allWorkers.forEach(w => {
+                  if (w.accountId || accounts?.find(a => a.id === w.name)) { skipped++; return; }
+                  const accRole = roleMap[w.role] || "manager";
+                  newAccs.push({ id: w.name, password: simpleHash("1234"), name: w.name, role: accRole, festivalId: fid, festivals: [fid], workerId: w.id, siteId: w.siteId });
+                  created++;
+                });
+                if (newAccs.length > 0) {
+                  setAccounts(prev => [...prev, ...newAccs]);
+                  setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
+                }
+                alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
+              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>🔐 계정({noAcc})</button>;
+            })()}
+            <button onClick={exportCSV} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📥 CSV</button>
+          </div>}
+        </div>
       </div>
-    </Card>
+
+      {/* v2 통계 카드 (4개) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+        {[
+          { label: "총인원", value: stats.total, color: "#6b8aff", icon: "👤" },
+          { label: "근무중", value: stats.onDuty, color: "#4cd99a", icon: "🟢" },
+          { label: "무전기", value: stats.withRadio, color: "#a980ff", icon: "📻" },
+          { label: "식수", value: stats.totalMeals, color: "#ff9a3c", icon: "🍱" }
+        ].map(c => (
+          <div key={c.label} style={{ padding: "12px 8px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: `1px solid ${c.color}25`, textAlign: "center", boxShadow: "0 4px 12px -6px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 14, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ color: c.color, fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>{c.value}</div>
+            <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 검색 + 추가 버튼 (기존 컴포넌트 유지) */}
 
     {/* 검색 */}
     <Card style={{ padding: 12 }}>
@@ -5760,7 +5808,8 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
       {toast.msg}
     </div>}
     <style>{`@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
-  </PageContainer>);
+    </div>
+  </div>);
 }
 
 // ─── 2.1: 근무일지 / 교대관리 (Shifts) ─────────────────────────────
