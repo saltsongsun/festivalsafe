@@ -1375,7 +1375,7 @@ function CategoryDetailModal({ cat, settings, onClose, onAction, session }) {
   </div>);
 }
 
-function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert }) {
+function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert, onDeleteAlert }) {
   const overall = useMemo(() => {
     const lvs = (categories || []).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
@@ -1425,22 +1425,33 @@ function MobileNewDashboard({ session, settings, categories, alerts, onCardClick
       </div>
 
       {/* 최우선 알림 배너 */}
-      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
-        <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
-        <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
-        <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
-        <button onClick={() => {
-          // 카테고리 찾기 → handling 시작 + 모달 열기
-          const cat = (categories || []).find(c => c.name === topAlert.category || c.id === topAlert.catId);
-          if (cat) {
-            if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
-            if (setActiveAlert) setActiveAlert(cat);
-            else if (onCardClick) onCardClick(cat.id);
-          } else if (onAlertClick) {
-            onAlertClick(topAlert);
-          }
-        }} style={{ width: "100%", marginTop: 10, padding: "12px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
-      </div>}
+      {topAlert && (() => {
+        const isManualAlert = topAlert.category === "수동 발령" || !topAlert.catId;
+        const linkedCat = !isManualAlert ? (categories || []).find(c => c.name === topAlert.category || c.id === topAlert.catId) : null;
+        return (<div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`} style={{ position: "relative" }}>
+          {/* X 닫기 버튼 (우상단) */}
+          <button onClick={(e) => { e.stopPropagation(); if (onDeleteAlert) onDeleteAlert(0); }} style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#b0b3c4", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, zIndex: 2 }} title="알림 닫기">✕</button>
+          <div style={{ paddingRight: 36 }}>
+            <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
+            <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4, whiteSpace: "pre-wrap", maxHeight: 60, overflow: "hidden" }}>{(topAlert.message || "").split("\n").slice(0, 3).join(" · ") || "임계값 도달 - 확인 필요"}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={() => {
+              if (linkedCat) {
+                // 카테고리 알림 → handling 시작 + 카테고리 모달 열기
+                if (linkedCat.actionStatus !== "handling" && onAction) onAction(linkedCat.id, "handling");
+                if (onCardClick) onCardClick(linkedCat.id);
+              } else {
+                // 수동 발령 → 메시지 전체 모달 표시
+                if (setActiveAlert) setActiveAlert(topAlert);
+                else if (onAlertClick) onAlertClick(topAlert);
+              }
+            }} style={{ flex: 1, padding: "12px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{isManualAlert ? "📨 메시지 보기" : "대응 시작 →"}</button>
+            {onDeleteAlert && <button onClick={(e) => { e.stopPropagation(); if (confirm(`${isManualAlert ? "이 발령을" : "이 알림을"} 삭제하시겠습니까?`)) onDeleteAlert(0); }} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(255,94,126,0.25)", background: "rgba(255,94,126,0.08)", color: "#ff5e7e", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>🗑 삭제</button>}
+          </div>
+        </div>);
+      })()}
 
       {/* 메트릭 그리드 (2열) */}
       <div className="md-grid2">
@@ -1597,6 +1608,12 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
     { id: "incident", name: "사건 / 신고", emoji: "📁" },
     { id: "map", name: "지도 상황도", emoji: "🗺️" },
   ];
+  const operationsItems = [
+    { id: "festival", name: "축제 관리", emoji: "🎪" },
+    { id: "program", name: "프로그램 관리", emoji: "🎭" },
+    { id: "stage", name: "공연 관리", emoji: "🎤" },
+    { id: "workforce", name: "인력 관리", emoji: "👷" },
+  ];
   const adminItems = [
     { id: "resource", name: "리소스 관리", emoji: "📦" },
     { id: "report", name: "리포트", emoji: "📊" },
@@ -1608,6 +1625,12 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map(it => (<div key={it.id} className={`cc-sb-item ${active === it.id ? "active" : ""}`} onClick={() => onNav(it.id)}>
         <span style={{ fontSize: 16 }}>{it.emoji}</span><span>{it.name}</span>{it.badge && <span className="cc-badge">{it.badge}</span>}
+      </div>))}
+    </div>
+    <div className="cc-sb-section" style={{ marginTop: 14 }}>운영</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {operationsItems.map(it => (<div key={it.id} className={`cc-sb-item ${active === it.id ? "active" : ""}`} onClick={() => onNav(it.id)}>
+        <span style={{ fontSize: 16 }}>{it.emoji}</span><span>{it.name}</span>
       </div>))}
     </div>
     <div className="cc-sb-section" style={{ marginTop: 14 }}>관리</div>
@@ -1775,7 +1798,7 @@ const MCC_STYLES = `
 `;
 
 // ─── 모바일 관제센터 (B안: 하단네비 + 세로카드) ─────────────────────
-function MobileControlCenter({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
+function MobileControlCenter({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
   const [page, setPage] = useState("dashboard");
   const [showMore, setShowMore] = useState(false);
 
@@ -1842,6 +1865,10 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
       {page === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
       {page === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
       {page === "settings" && <CC_SettingsPage settings={settings} setSettings={setSettings} session={session} onMobileSwitch={onMobileSwitch} />}
+      {page === "festival" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
+      {page === "program" && <ProgramPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "stage" && <StageMgmtPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "workforce" && <WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
 
       {/* 하단 네비 (5탭) */}
       <div className="mcc-bottom-nav">
@@ -1868,6 +1895,10 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
           <div className="mcc-sheet-title">더보기</div>
           <div className="mcc-sheet-grid">
             {[
+              { id: "festival", icon: "🎪", label: "축제 관리" },
+              { id: "program", icon: "🎭", label: "프로그램" },
+              { id: "stage", icon: "🎤", label: "공연 관리" },
+              { id: "workforce", icon: "👷", label: "인력 관리" },
               { id: "map", icon: "🗺️", label: "지도 상황도" },
               { id: "resource", icon: "📦", label: "리소스 관리" },
               { id: "report", icon: "📊", label: "리포트" },
@@ -2426,7 +2457,7 @@ function MCC_Map({ settings, session }) {
   </>);
 }
 
-function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
+function ControlCenterDashboard({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
   // 페이지 변경 시 사이드바 닫기
@@ -2570,6 +2601,10 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
           {ccPage === "alert" && <CC_AlertPage settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
           {ccPage === "incident" && <CC_IncidentPage settings={settings} setSettings={setSettings} session={session} />}
           {ccPage === "map" && <CC_MapPage settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "festival" && <div style={{ padding: "0 0 24px" }}><FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} /></div>}
+          {ccPage === "program" && <div style={{ padding: "0 0 24px" }}><ProgramPage settings={settings} setSettings={setSettings} session={session} /></div>}
+          {ccPage === "stage" && <div style={{ padding: "0 0 24px" }}><StageMgmtPage settings={settings} setSettings={setSettings} session={session} /></div>}
+          {ccPage === "workforce" && <div style={{ padding: "0 0 24px" }}><WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} /></div>}
           {ccPage === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
           {ccPage === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
           {ccPage === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
@@ -11289,6 +11324,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         <MobileControlCenter
           session={session}
           accounts={accounts}
+          setAccounts={setAccounts}
           settings={settings}
           setSettings={setSettings}
           categories={categories}
@@ -11309,6 +11345,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       <ControlCenterDashboard
         session={session}
         accounts={accounts}
+        setAccounts={setAccounts}
         settings={settings}
         setSettings={setSettings}
         categories={categories}
@@ -11428,6 +11465,20 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
             onCardClick(cat.id);
           } else {
             setActiveAlert(cat);
+          }
+        }}
+        onDeleteAlert={(idx) => {
+          const now = Date.now();
+          if (idx === "all") {
+            categories.forEach(c => { ["ORANGE", "RED"].forEach(lv => { alertCooldown.current[`${c.id}_${lv}`] = now; }); });
+            setAlerts([]);
+          } else {
+            const target = alerts[idx];
+            if (target) {
+              const cat = categories.find(c => c.name === target.category);
+              if (cat) alertCooldown.current[`${cat.id}_${target.level}`] = now;
+            }
+            setAlerts(p => p.filter((_, i) => i !== idx));
           }
         }}
       />}
