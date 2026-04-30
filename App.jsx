@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -106,6 +106,7 @@ const DEFAULT_SETTINGS = {
   notices: [],
   messages: [],
   incidents: [],
+  emergencyContacts: [],  // 비상연락망: { id, group, name, role, phone, priority, note }
   shuttleStops: [],
   shuttleBuses: [],
   festivalDates: ["2026-05-02","2026-05-03","2026-05-04","2026-05-05"],
@@ -340,6 +341,34 @@ function getFcstParams(settings) {
   return { nx, ny, bd, bt };
 }
 
+// 단기예보 base_time: 02,05,08,11,14,17,20,23시 발표 (해당 시각 10분 이후 호출 가능)
+function getShortFcstParams(settings) {
+  const loc = settings.location || {};
+  const kma = settings.kma || {};
+  const grid = latLonToGrid(loc.lat || 35.18, loc.lon || 128.11);
+  const nx = kma.nxOverride || grid.nx;
+  const ny = kma.nyOverride || grid.ny;
+  const now = new Date();
+  const baseTimes = [2, 5, 8, 11, 14, 17, 20, 23];
+  let h = now.getHours();
+  let m = now.getMinutes();
+  // 가장 최근 발표시각 찾기 (10분 이후 발표 완료)
+  let baseHour = null;
+  for (let i = baseTimes.length - 1; i >= 0; i--) {
+    const bt = baseTimes[i];
+    if (h > bt || (h === bt && m >= 10)) { baseHour = bt; break; }
+  }
+  let dateObj = new Date(now);
+  if (baseHour === null) {
+    // 오늘 02시 이전 → 어제 23시
+    baseHour = 23;
+    dateObj.setDate(dateObj.getDate() - 1);
+  }
+  const bd = `${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, '0')}${String(dateObj.getDate()).padStart(2, '0')}`;
+  const bt = `${String(baseHour).padStart(2, '0')}00`;
+  return { nx, ny, bd, bt };
+}
+
 function getKmaParams(settings) {
   const loc = settings.location || {};
   const kma = settings.kma || {};
@@ -445,9 +474,29 @@ function usePersist(key, init) {
       if (e.detail?.key === key && e.detail?.value) {
         const j = typeof e.detail.value === "string" ? e.detail.value : JSON.stringify(e.detail.value);
         if (j !== lastJson.current) {
-          lastJson.current = j;
           try {
             const p = JSON.parse(j);
+            
+            // 🛡️ Realtime 보호: settings의 workSites가 갑자기 50% 이상 줄면 무시 (다른 기기의 옛 데이터)
+            if (key.endsWith("_set_v10") && typeof p === "object" && !Array.isArray(p) && valRef.current && typeof valRef.current === "object") {
+              const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              const incomingWorkers = (p.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              
+              if (myWorkers > 5 && incomingWorkers < myWorkers * 0.5) {
+                console.warn(`[usePersist] 🛡️ Realtime 보호: 근무자 급감 거부 (${myWorkers} → ${incomingWorkers}). 다른 기기의 옛 데이터로 추정`);
+                // 무시하고 내 데이터를 다시 저장 (자기 보정)
+                if (window.storage && supabaseLoaded.current) {
+                  const myJson = JSON.stringify(valRef.current);
+                  selfSave.current = true;
+                  window.storage.set(key, myJson).finally(() => {
+                    setTimeout(() => { selfSave.current = false; }, 3000);
+                  });
+                }
+                return;
+              }
+            }
+            
+            lastJson.current = j;
             setVal(p);
             valRef.current = p;
             localStorage.setItem(key, j);
@@ -469,11 +518,11 @@ function usePersist(key, init) {
     userInteracted.current = true; // 사용자 직접 변경 표시
     try { localStorage.setItem(key, json); } catch (e) { console.warn("[usePersist] localStorage 실패:", key); }
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const latestJson = JSON.stringify(valRef.current);
+    saveTimer.current = setTimeout(async () => {
+      let latestVal = valRef.current;
       // 🚫 Supabase 로드 전이면 저장 보류 (옛 로컬 데이터로 클라우드 덮어쓰기 방지)
       if (!supabaseLoaded.current) {
-        pendingSave.current = latestJson;
+        pendingSave.current = JSON.stringify(latestVal);
         console.log("[usePersist] ⏸️ Supabase 로드 대기 중 - 저장 보류:", key.slice(0, 50));
         return;
       }
@@ -481,6 +530,37 @@ function usePersist(key, init) {
         console.warn("[usePersist] window.storage 없음, 저장 스킵:", key);
         return;
       }
+      
+      // 🔒 데이터 손실 방지: settings 키일 때 클라우드 최신값 비교
+      // workSites/zones 같은 중요 데이터가 줄어들면 머지 시도
+      if (key.endsWith("_set_v10") && typeof latestVal === "object" && !Array.isArray(latestVal)) {
+        try {
+          const cloudRes = await window.storage.get(key);
+          if (cloudRes?.value) {
+            const cloud = JSON.parse(cloudRes.value);
+            // workSites: 클라우드가 더 많으면 머지 (내 변경분 + 클라우드 최신)
+            const myWorkers = (latestVal.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+            const cloudWorkers = (cloud.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+            
+            if (cloudWorkers > myWorkers && cloudWorkers - myWorkers >= 3) {
+              // 클라우드가 3명 이상 더 많음 → 클라우드 우선 (내가 옛날 데이터 들고 있음)
+              console.warn(`[usePersist] 🛡️ 데이터 보호: 클라우드 근무자 ${cloudWorkers}명 > 내 ${myWorkers}명. 클라우드 데이터로 머지`);
+              // 내가 변경한 다른 필드는 살리고 workSites/zones만 클라우드 사용
+              latestVal = { 
+                ...latestVal, 
+                workSites: cloud.workSites,
+                zones: cloud.zones || latestVal.zones,
+                emergencyContacts: cloud.emergencyContacts && cloud.emergencyContacts.length > (latestVal.emergencyContacts || []).length ? cloud.emergencyContacts : latestVal.emergencyContacts
+              };
+              setVal(latestVal); valRef.current = latestVal;
+              try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
+            }
+          }
+        } catch (e) { console.warn("[usePersist] 클라우드 머지 체크 실패:", e); }
+      }
+      
+      const latestJson = JSON.stringify(latestVal);
+      lastJson.current = latestJson;
       selfSave.current = true;
       window.storage.set(key, latestJson).then(r => {
         if (r) console.log("[usePersist] ✅ 저장 완료:", key.slice(0, 50));
@@ -817,10 +897,466 @@ const CC_STYLES = `
   .cc-g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .cc-list-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
   .cc-list-row:last-child { border-bottom: 0; }
+
+  /* ═══════════════════════════════════════════════════════════ */
+  /* 햄버거 메뉴 + 모바일 사이드바 드로어                         */
+  /* ═══════════════════════════════════════════════════════════ */
+  .cc-mobile-menu-btn { display: none; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; width: 40px; height: 40px; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; color: #f4f5fa; flex-shrink: 0; }
+  .cc-sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 999; animation: cc-fade-in 0.2s ease; }
+  @keyframes cc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes cc-slide-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+
+  /* ═══════════════════════════════════════════════════════════ */
+  /* 태블릿 (1024px 미만, 768px 이상) — 좁은 사이드바             */
+  /* ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 1023px) {
+    .cc-root { padding: 16px 20px 80px; }
+    .cc-layout { gap: 14px; }
+    .cc-sidebar { width: 200px; padding: 14px 10px; }
+    .cc-g4 { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════ */
+  /* 모바일 (768px 미만) — 사이드바 드로어 + 단일 컬럼            */
+  /* ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 767px) {
+    .cc-root { padding: 12px 12px 90px; }
+    .cc-topbar { padding: 8px 0; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+    .cc-brand-logo { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+    .cc-brand-name { font-size: 14px; }
+    .cc-brand-sub { font-size: 10px; }
+    .cc-crumbs { gap: 8px; font-size: 11px; flex-wrap: wrap; }
+    .cc-crumbs span { font-size: 11px; }
+
+    .cc-mobile-menu-btn { display: flex; }
+
+    .cc-layout { display: block; }
+    .cc-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 260px;
+      max-width: 80vw;
+      border-radius: 0 16px 16px 0;
+      z-index: 1000;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease-out;
+      overflow-y: auto;
+      padding-top: max(20px, env(safe-area-inset-top));
+    }
+    .cc-sidebar.open { transform: translateX(0); animation: cc-slide-in 0.25s ease-out; }
+    .cc-sidebar-overlay.open { display: block; }
+
+    .cc-main-col { width: 100%; }
+
+    .cc-g4 { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .cc-card { padding: 14px; }
+    .cc-card-h { margin-bottom: 10px; }
+    .cc-card-title { font-size: 13px; }
+    .cc-metric { padding: 14px; }
+    .cc-metric-val { font-size: 22px; }
+    .cc-metric-icon { width: 22px; height: 22px; }
+
+    /* 그리팅 영역 */
+    .cc-greeting-box { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+    .cc-greeting-text { font-size: 20px !important; }
+
+    /* 2열 그리드 → 1열로 (대시보드 활성경보+구역혼잡도) */
+    .cc-grid-2col { grid-template-columns: 1fr !important; }
+
+    /* 테이블: 가로 스크롤 가능하게 */
+    table { font-size: 12px; }
+    table th, table td { padding: 8px 6px !important; white-space: nowrap; }
+
+    /* 알림 발령 5단계 - 작은 패딩 */
+    .cc-step-bar { gap: 4px !important; }
+    .cc-step-bar > div { padding: 8px 6px !important; font-size: 10px !important; }
+
+    /* 통계 카드 4개 → 2열로 */
+    .cc-stats-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+    /* 인풋 폰트 16px (iOS zoom 방지) */
+    input, select, textarea { font-size: 16px !important; }
+  }
+
+  /* 작은 모바일 (480px 미만) — 메트릭 1열 */
+  @media (max-width: 479px) {
+    .cc-g4 { grid-template-columns: 1fr; }
+  }
 `;
 
 const CC_LEVEL_MAP = { BLUE: "blue", YELLOW: "yellow", ORANGE: "orange", RED: "red" };
 const CC_LEVEL_LABEL = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" };
+
+// ─── Mobile Design System (클로드디자인 v2 모바일) ─────────────────
+const MD_GLOBAL_V2 = `
+  /* ═══════════════════════════════════════════════════════════ */
+  /* v2 활성: 모든 페이지에 클로드디자인 톤 입히기                */
+  /* ═══════════════════════════════════════════════════════════ */
+  body.md-v2-active { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif !important; }
+  body.md-v2-active * { font-family: inherit; }
+  body.md-v2-active .mono, body.md-v2-active [style*="JetBrains Mono"] { font-family: 'JetBrains Mono', monospace !important; }
+
+  /* 메인 배경: 더 깊은 검정으로 */
+  body.md-v2-active div[style*="linear-gradient(180deg, #0a0d1a"] { 
+    background: linear-gradient(180deg, #07070d 0%, #0e0f17 100%) !important; 
+  }
+  body.md-v2-active { background: #07070d; }
+  
+  /* 상단바 v2 톤 */
+  body.md-v2-active div[style*="rgba(10,10,26,0.95)"] { 
+    background: rgba(7,7,13,0.85) !important; 
+    backdrop-filter: blur(20px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  }
+  
+  /* 카드 v2 그라데이션 */
+  body.md-v2-active div[style*="linear-gradient(145deg, rgba(255,255,255,0.04)"],
+  body.md-v2-active div[style*="background: \\"rgba(255,255,255,0.02)\\""],
+  body.md-v2-active div[style*="background: rgba(255,255,255,0.02)"], 
+  body.md-v2-active div[style*="background: rgba(255,255,255,0.03)"] { 
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17 !important;
+  }
+  
+  /* 보더 톤 통일 */
+  body.md-v2-active [style*="rgba(255,255,255,0.04)"]:not([style*="background"]),
+  body.md-v2-active [style*="rgba(255,255,255,0.05)"]:not([style*="background"]),
+  body.md-v2-active [style*="rgba(255,255,255,0.06)"]:not([style*="background"]) { 
+    border-color: rgba(255,255,255,0.08) !important; 
+  }
+  
+  /* 색상 팔레트 매핑: SAFEFLOW → 클로드디자인 v2 */
+  /* 파랑 #42A5F5 → #6b8aff (accent) */
+  body.md-v2-active [style*="color: \\"#42A5F5\\""] { color: #8fa6ff !important; }
+  body.md-v2-active [style*="color:#42A5F5"] { color: #8fa6ff !important; }
+  body.md-v2-active [style*="background: \\"#42A5F5\\""] { background: linear-gradient(180deg, #7c98ff, #5a7aff) !important; }
+  
+  /* 타이틀 letter-spacing 더 빡빡하게 */
+  body.md-v2-active h1, body.md-v2-active h2, body.md-v2-active h3 { 
+    letter-spacing: -0.02em !important; 
+  }
+  
+  /* 인풋/셀렉트/텍스트에어리어 v2 톤 */
+  body.md-v2-active input:not([type="checkbox"]):not([type="radio"]), 
+  body.md-v2-active select, 
+  body.md-v2-active textarea { 
+    font-family: inherit !important;
+    border-radius: 10px !important;
+    background: #0e0f17 !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+  body.md-v2-active input:focus, body.md-v2-active select:focus, body.md-v2-active textarea:focus {
+    border-color: rgba(107,138,255,0.4) !important;
+    outline: none !important;
+  }
+  
+  /* 버튼 글로벌 톤 */
+  body.md-v2-active button[style*="background: \\"rgba(33,150,243"],
+  body.md-v2-active button[style*="background:rgba(33,150,243"] { 
+    background: linear-gradient(180deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05)) !important; 
+    color: #8fa6ff !important; 
+    border-color: rgba(107,138,255,0.25) !important;
+  }
+  
+  /* 둥글기 통일 */
+  body.md-v2-active div[style*="borderRadius: 12"] { border-radius: 14px !important; }
+  body.md-v2-active div[style*="borderRadius: 16"] { border-radius: 16px !important; }
+  
+  /* PageHeader 액센트 라인 */
+  body.md-v2-active div[style*="borderLeft"][style*="solid"] { border-left-width: 3px !important; }
+  
+  /* 하단 네비게이션 v2 톤 */
+  body.md-v2-active nav[style*="position"][style*="fixed"][style*="bottom"] {
+    background: rgba(7,7,13,0.92) !important;
+    backdrop-filter: blur(20px) !important;
+    border-top-color: rgba(255,255,255,0.06) !important;
+  }
+  
+  /* 그림자 더 깊게 */
+  body.md-v2-active div[style*="boxShadow: \\"0 4px 24px rgba(0,0,0,0.2)\\""] {
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 32px -16px rgba(0,0,0,0.6) !important;
+  }
+`;
+
+const MD_STYLES = `
+  .md-root { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #07070d; color: #f4f5fa; min-height: 100vh; padding-bottom: 80px; }
+  .md-root .mono { font-family: 'JetBrains Mono', monospace; }
+  .md-root * { -webkit-tap-highlight-color: transparent; }
+
+  .md-topbar { padding: calc(env(safe-area-inset-top) + 14px) 18px 14px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(180deg, #0e0f17 0%, rgba(14,15,23,0.85) 100%); position: sticky; top: 0; z-index: 50; backdrop-filter: blur(16px); }
+  .md-topbar .greet { display: flex; flex-direction: column; }
+  .md-topbar .greet-sub { font-size: 11px; color: #6c6e7d; }
+  .md-topbar .greet-fest { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: #f4f5fa; }
+  .md-topbar .actions { display: flex; gap: 6px; }
+  .md-topbar .icon-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; color: #b0b3c4; font-size: 16px; }
+  .md-topbar .icon-btn .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #ff5e7e; border-radius: 50%; box-shadow: 0 0 8px #ff5e7e; }
+
+  .md-banner { margin: 12px 16px; padding: 16px; border-radius: 16px; box-shadow: 0 12px 32px -16px rgba(0,0,0,0.6); }
+  .md-banner.orange { background: linear-gradient(180deg, rgba(255,154,60,0.18), rgba(255,154,60,0.04)); border: 1px solid rgba(255,154,60,0.3); }
+  .md-banner.yellow { background: linear-gradient(180deg, rgba(245,196,81,0.15), rgba(245,196,81,0.03)); border: 1px solid rgba(245,196,81,0.25); }
+  .md-banner.red { background: linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04)); border: 1px solid rgba(255,94,126,0.3); }
+  .md-banner.blue { background: linear-gradient(180deg, rgba(76,217,154,0.12), rgba(76,217,154,0.03)); border: 1px solid rgba(76,217,154,0.2); }
+
+  .md-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1; }
+  .md-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
+  .md-chip.blue { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .md-chip.yellow { background: rgba(245,196,81,0.14); color: #f5c451; }
+  .md-chip.orange { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+  .md-chip.red { background: rgba(255,94,126,0.16); color: #ff5e7e; }
+  .md-chip.green { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .md-chip .dot.pulse { animation: cc-pulse 1.6s ease-in-out infinite; }
+
+  .md-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; margin-bottom: 12px; }
+  .md-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px; margin-bottom: 12px; }
+
+  .md-metric { padding: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); cursor: pointer; transition: transform 0.15s; }
+  .md-metric:active { transform: scale(0.97); }
+  .md-metric.alert { border-color: rgba(245,196,81,0.3); background: linear-gradient(180deg, rgba(245,196,81,0.08), rgba(245,196,81,0.02)), #0e0f17; }
+  .md-metric.danger { border-color: rgba(255,154,60,0.4); background: linear-gradient(180deg, rgba(255,154,60,0.1), rgba(255,154,60,0.02)), #0e0f17; }
+  .md-metric.red-alert { border-color: rgba(255,94,126,0.4); background: linear-gradient(180deg, rgba(255,94,126,0.1), rgba(255,94,126,0.02)), #0e0f17; }
+  .md-metric-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .md-metric-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .md-metric-icon { width: 22px; height: 22px; border-radius: 6px; background: #1d1f2c; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .md-metric.alert .md-metric-icon { background: rgba(245,196,81,0.15); }
+  .md-metric.danger .md-metric-icon { background: rgba(255,154,60,0.18); }
+  .md-metric.red-alert .md-metric-icon { background: rgba(255,94,126,0.18); }
+  .md-metric-val { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-family: 'JetBrains Mono', monospace; color: #f4f5fa; }
+  .md-metric.danger .md-metric-val { color: #ff9a3c; }
+  .md-metric.red-alert .md-metric-val { color: #ff5e7e; }
+  .md-metric-unit { font-size: 11px; color: #6c6e7d; margin-left: 4px; font-weight: 400; font-family: inherit; }
+  .md-metric-trend { font-size: 10px; color: #6c6e7d; margin-top: 4px; }
+
+  .md-card { margin: 0 16px 12px; padding: 14px 16px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); }
+  .md-card-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .md-card-title { font-size: 13px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .md-card-sub { font-size: 11px; color: #6c6e7d; margin-top: 2px; }
+
+  .md-list-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .md-list-row:last-child { border-bottom: 0; }
+
+  .md-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 0 calc(env(safe-area-inset-bottom) + 8px); background: rgba(7,7,13,0.92); backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-around; z-index: 100; }
+  .md-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 12px; cursor: pointer; color: #6c6e7d; min-width: 56px; }
+  .md-nav-item.active { color: #6b8aff; }
+  .md-nav-item.active .md-nav-icon { transform: translateY(-2px); }
+  .md-nav-icon { font-size: 22px; transition: transform 0.15s; position: relative; }
+  .md-nav-label { font-size: 10px; font-weight: 600; }
+  .md-nav-badge { position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; border-radius: 8px; background: #ff5e7e; color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 0 8px rgba(255,94,126,0.5); }
+
+  .md-overall-hero { margin: 12px 16px 16px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(107,138,255,0.08), rgba(169,128,255,0.04)); border: 1px solid rgba(107,138,255,0.18); }
+  .md-overall-label { font-size: 11px; color: #6c6e7d; letter-spacing: 0.04em; }
+  .md-overall-status { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; color: #f4f5fa; }
+  .md-overall-time { font-size: 11px; color: #6c6e7d; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+`;
+
+const MD_LEVEL_COLORS = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" };
+
+const MD_Chip = ({ level, children, pulse }) => (<span className={`md-chip ${level || "blue"}`}><span className={`dot ${pulse ? "pulse" : ""}`} />{children}</span>);
+
+const MD_Metric = ({ cat, onClick }) => {
+  const lv = getLevel(cat);
+  const isAlert = lv === "YELLOW";
+  const isDanger = lv === "ORANGE";
+  const isRed = lv === "RED";
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  
+  // 현황 24h 추이 데이터
+  const history = (cat.history || []).slice(-24);
+  // 예보 데이터 (초단기 6시간)
+  const forecast = (cat.forecast || []).slice(0, 6);
+  // 단기예보 (3일) — 있으면 우선 사용 안하고 초단기만
+  const nextFc = forecast[0];
+  
+  // sparkline 그리기
+  const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+  let sparklinePath = "";
+  if (sparkData.length > 1) {
+    const min = Math.min(...sparkData);
+    const max = Math.max(...sparkData);
+    const range = max - min || 1;
+    sparklinePath = sparkData.map((v, i) => {
+      const x = (i / (sparkData.length - 1)) * 100;
+      const y = 24 - ((v - min) / range) * 20;
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    }).join(" ");
+  }
+  
+  return (<div className={`md-metric ${isAlert ? "alert" : ""} ${isDanger ? "danger" : ""} ${isRed ? "red-alert" : ""}`} onClick={onClick}>
+    <div className="md-metric-h">
+      <span className="md-metric-name"><span className="md-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
+      <MD_Chip level={CC_LEVEL_MAP[lv]}>{CC_LEVEL_LABEL[lv]}</MD_Chip>
+    </div>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+      <div className="md-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="md-metric-unit">{cat.unit}</span></div>
+      {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+        <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+          <span style={{ fontSize: 11, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+        </div>
+      </div>}
+    </div>
+    {/* 24h 스파크라인 */}
+    {sparklinePath && <svg viewBox="0 0 100 26" preserveAspectRatio="none" style={{ width: "100%", height: 22, marginBottom: 4, display: "block" }}>
+      <defs>
+        <linearGradient id={`md-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d={`${sparklinePath} L 100 26 L 0 26 Z`} fill={`url(#md-grad-${cat.id})`} stroke="none"/>
+      <path d={sparklinePath} fill="none" stroke={lvColor} strokeWidth="1.2"/>
+    </svg>}
+    {/* 6h 예보 미니 막대 */}
+    {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 12, alignItems: "flex-end", marginBottom: 4 }}>
+      {forecast.slice(0, 6).map((f, i) => {
+        const vals = forecast.slice(0, 6).map(x => x.value);
+        const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+        const h = 2 + ((f.value - mn) / rng) * 10;
+        return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+      })}
+    </div>}
+    <div className="md-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
+  </div>);
+};
+
+// ─── Mobile 클로드디자인 대시보드 ──────────────────────────────────
+function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign }) {
+  const overall = useMemo(() => {
+    const lvs = (categories || []).map(c => getLevel(c));
+    if (lvs.includes("RED")) return "RED";
+    if (lvs.includes("ORANGE")) return "ORANGE";
+    if (lvs.includes("YELLOW")) return "YELLOW";
+    return "BLUE";
+  }, [categories]);
+  const overallColor = MD_LEVEL_COLORS[overall];
+  const overallLabel = CC_LEVEL_LABEL[overall];
+
+  const sortedCats = [...(categories || [])].sort((a, b) => {
+    const ord = { RED: 0, ORANGE: 1, YELLOW: 2, BLUE: 3 };
+    return ord[getLevel(a)] - ord[getLevel(b)];
+  });
+
+  const topAlert = alerts && alerts[0];
+  const unreadAlerts = (alerts || []).filter(a => a.level === "ORANGE" || a.level === "RED").length;
+
+  return (<>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>{MD_STYLES}</style>
+    <div className="md-root">
+      {/* 상단바 */}
+      <div className="md-topbar">
+        <div className="greet">
+          <div className="greet-sub">관제센터 · {session?.name}</div>
+          <div className="greet-fest">{settings?.festivalName || "축제 미설정"}</div>
+        </div>
+        <div className="actions">
+          <button className="icon-btn" onClick={onSearch}>🔍</button>
+          <button className="icon-btn" onClick={() => onPageChange && onPageChange("chat")}>
+            🔔
+            {unreadAlerts > 0 && <span className="dot" />}
+          </button>
+          <button className="icon-btn" onClick={onSwitchToOldDesign} title="기존 디자인으로">⚙️</button>
+        </div>
+      </div>
+
+      {/* 종합 상태 히어로 */}
+      <div className="md-overall-hero">
+        <div className="md-overall-label">현재 종합 위험도</div>
+        <div className="md-overall-status">
+          지금 <span style={{ color: overallColor }}>{overallLabel}</span> 단계예요
+        </div>
+        <div className="md-overall-time">{new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+      </div>
+
+      {/* 최우선 알림 배너 */}
+      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
+        <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
+        <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
+        <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
+        <button onClick={() => onAlertClick && onAlertClick(topAlert)} style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
+      </div>}
+
+      {/* 메트릭 그리드 (2열) */}
+      <div className="md-grid2">
+        {sortedCats.slice(0, 4).map(cat => (<MD_Metric key={cat.id} cat={cat} onClick={() => onCardClick && onCardClick(cat.id)} />))}
+      </div>
+      {sortedCats.length > 4 && <div className="md-grid2">
+        {sortedCats.slice(4).map(cat => (<MD_Metric key={cat.id} cat={cat} onClick={() => onCardClick && onCardClick(cat.id)} />))}
+      </div>}
+
+      {/* 활성 경보 카드 */}
+      <div className="md-card">
+        <div className="md-card-h">
+          <div>
+            <div className="md-card-title">활성 경보 {(alerts || []).length}건</div>
+            <div className="md-card-sub">실시간 갱신</div>
+          </div>
+          {(alerts || []).length > 0 && <button onClick={() => onPageChange && onPageChange("chat")} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>전체 →</button>}
+        </div>
+        {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="md-list-row" onClick={() => onAlertClick && onAlertClick(a)}>
+          <MD_Chip level={CC_LEVEL_MAP[a.level]} pulse={a.level === "ORANGE" || a.level === "RED"}>●</MD_Chip>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.category}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{a.time?.split(" ")[1] || a.time}</span>
+        </div>))}
+        {(!alerts || alerts.length === 0) && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보 없음 ✓</div>}
+      </div>
+
+      {/* 구역 혼잡도 카드 */}
+      {(settings.zones || []).length > 0 && <div className="md-card">
+        <div className="md-card-h">
+          <div className="md-card-title">구역별 혼잡도</div>
+          <div className="md-card-sub">{(settings.zones || []).length}개 구역</div>
+        </div>
+        {(settings.zones || []).slice(0, 5).map(z => {
+          const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+          const cl = c?.level || "smooth";
+          const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+          const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+          return (<div key={z.id} className="md-list-row">
+            <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+            <MD_Chip level={lv}>{lbl}</MD_Chip>
+          </div>);
+        })}
+      </div>}
+
+      {/* 빠른 액션 */}
+      <div className="md-card">
+        <div className="md-card-title" style={{ marginBottom: 10 }}>빠른 액션</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {isManager && <button onClick={() => onPageChange && onPageChange("chat")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(107,138,255,0.2)", background: "linear-gradient(180deg, rgba(107,138,255,0.1), rgba(107,138,255,0.02))", color: "#6b8aff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔔 경보 발령</button>}
+          <button onClick={() => onPageChange && onPageChange("heatmap")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗺️ 지도 상황</button>
+          <button onClick={() => onPageChange && onPageChange("congestion")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🚦 혼잡도</button>
+          <button onClick={() => onPageChange && onPageChange("counter")} style={{ padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>👥 인파계수</button>
+        </div>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── Mobile 새 하단 네비게이션 ─────────────────────────────────────
+function MobileNewBottomNav({ active, onChange, alertCount, onMore }) {
+  const items = [
+    { id: "dashboard", emoji: "🏠", label: "홈" },
+    { id: "counter", emoji: "📡", label: "모니터" },
+    { id: "heatmap", emoji: "🗺️", label: "지도" },
+    { id: "chat", emoji: "🔔", label: "알림", badge: alertCount > 0 ? alertCount : null },
+    { id: "_more", emoji: "⋯", label: "더보기" },
+  ];
+  return (<div className="md-bottom-nav">
+    {items.map(it => (<div key={it.id} className={`md-nav-item ${active === it.id ? "active" : ""}`} onClick={() => it.id === "_more" ? onMore && onMore() : onChange && onChange(it.id)}>
+      <div className="md-nav-icon">
+        {it.emoji}
+        {it.badge && <span className="md-nav-badge">{it.badge > 9 ? "9+" : it.badge}</span>}
+      </div>
+      <span className="md-nav-label">{it.label}</span>
+    </div>))}
+  </div>);
+}
 
 const CC_Chip = ({ level, children, pulse }) => (<span className={`cc-chip ${level || "blue"}`}><span className={`cc-dot ${pulse ? "pulse" : ""}`} />{children}</span>);
 const CC_Btn = ({ children, variant = "", size = "", onClick, style }) => (<button className={`cc-btn ${variant} ${size}`} onClick={onClick} style={style}>{children}</button>);
@@ -832,17 +1368,64 @@ const CC_Metric = ({ cat, onClick }) => {
   const isDanger = lv === "ORANGE";
   const isRed = lv === "RED";
   const isAlert = lv === "YELLOW";
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  
+  const history = (cat.history || []).slice(-24);
+  const forecast = (cat.forecast || []).slice(0, 6);
+  const nextFc = forecast[0];
+  const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+  let sparkPath = "";
+  if (sparkData.length > 1) {
+    const min = Math.min(...sparkData); const max = Math.max(...sparkData); const rng = max - min || 1;
+    sparkPath = sparkData.map((v, i) => {
+      const x = (i / (sparkData.length - 1)) * 100;
+      const y = 28 - ((v - min) / rng) * 22;
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    }).join(" ");
+  }
+  
   return (<div className={`cc-metric ${isAlert ? "alert" : ""} ${isDanger ? "danger" : ""} ${isRed ? "red-alert" : ""}`} onClick={onClick}>
     <div className="cc-metric-h">
       <span className="cc-metric-name"><span className="cc-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
       <CC_Chip level={lvLower}>{CC_LEVEL_LABEL[lv]}</CC_Chip>
     </div>
-    <div className="cc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="cc-metric-unit">{cat.unit}</span></div>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+      <div className="cc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="cc-metric-unit">{cat.unit}</span></div>
+      {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+        <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+          <span style={{ fontSize: 12, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+        </div>
+      </div>}
+    </div>
+    {sparkPath && <svg viewBox="0 0 100 30" preserveAspectRatio="none" style={{ width: "100%", height: 28, marginBottom: 4, display: "block" }}>
+      <defs>
+        <linearGradient id={`cc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d={`${sparkPath} L 100 30 L 0 30 Z`} fill={`url(#cc-grad-${cat.id})`} stroke="none"/>
+      <path d={sparkPath} fill="none" stroke={lvColor} strokeWidth="1.4"/>
+    </svg>}
+    {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 14, alignItems: "flex-end", marginBottom: 4 }}>
+      {forecast.slice(0, 6).map((f, i) => {
+        const vals = forecast.slice(0, 6).map(x => x.value);
+        const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+        const h = 3 + ((f.value - mn) / rng) * 11;
+        return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+      })}
+    </div>}
     <div className="cc-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"} {cat.unit}</div>
   </div>);
 };
 
 const CC_Sidebar = ({ active, alerts, settings, onNav, onLogout, festivalName }) => {
+  return (<div className="cc-sidebar"><CC_SidebarContent active={active} alerts={alerts} settings={settings} onNav={onNav} onLogout={onLogout} festivalName={festivalName} /></div>);
+};
+
+const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festivalName }) => {
   const items = [
     { id: "dashboard", name: "대시보드", emoji: "🏠" },
     { id: "monitor", name: "실시간 모니터링", emoji: "📡" },
@@ -856,7 +1439,7 @@ const CC_Sidebar = ({ active, alerts, settings, onNav, onLogout, festivalName })
     { id: "user", name: "사용자 관리", emoji: "👥" },
     { id: "settings", name: "설정", emoji: "⚙️" },
   ];
-  return (<div className="cc-sidebar">
+  return (<>
     <div className="cc-sb-section">메인</div>
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map(it => (<div key={it.id} className={`cc-sb-item ${active === it.id ? "active" : ""}`} onClick={() => onNav(it.id)}>
@@ -877,11 +1460,813 @@ const CC_Sidebar = ({ active, alerts, settings, onNav, onLogout, festivalName })
     <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
       <button onClick={onLogout} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 12, cursor: "pointer" }}>🚪 로그아웃</button>
     </div>
-  </div>);
+  </>);
 };
 
-function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert }) {
+// ─── ErrorBoundary - PC 관제센터 에러 시 모바일 모드로 fallback ─────
+class CCErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    console.error("[CCErrorBoundary] PC 관제센터 에러:", error);
+    console.error("[CCErrorBoundary] Info:", info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (<div style={{ minHeight: "100vh", background: "#0a0d1a", color: "#fff", padding: 40, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", fontFamily: "Pretendard" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🖥️⚠️</div>
+        <h2 style={{ color: "#FF5E7E", marginBottom: 12 }}>PC 관제센터 화면 오류</h2>
+        <p style={{ color: "#94A3B8", maxWidth: 500, marginBottom: 20 }}>새로 추가된 PC 관제센터 디자인에 일시적 오류가 발생했습니다.<br/>모바일 화면으로 전환하면 모든 기능을 사용하실 수 있습니다.</p>
+        <pre style={{ background: "rgba(244,67,54,0.1)", border: "1px solid rgba(244,67,54,0.3)", padding: 12, borderRadius: 8, fontSize: 11, maxWidth: 600, overflow: "auto", textAlign: "left", color: "#FF8A95", marginBottom: 20 }}>{String(this.state.error?.message || this.state.error)}</pre>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { localStorage.setItem("_force_mobile", "1"); location.reload(); }} style={{ padding: "12px 24px", borderRadius: 10, border: "none", background: "#42A5F5", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📱 모바일 화면으로 전환</button>
+          <button onClick={() => location.reload()} style={{ padding: "12px 24px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#94A3B8", fontSize: 14, cursor: "pointer" }}>🔄 새로고침</button>
+        </div>
+      </div>);
+    }
+    return this.props.children;
+  }
+}
+
+// ─── 모바일 관제센터 CSS (하단 네비 + 세로 카드) ─────────────────────
+const MCC_STYLES = `
+  .mcc-root { font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif; background: #07070d; color: #f4f5fa; min-height: 100vh; padding: 0 0 calc(env(safe-area-inset-bottom) + 80px); -webkit-font-smoothing: antialiased; }
+  .mcc-root .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* 상단바 */
+  .mcc-topbar { padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; background: linear-gradient(180deg, #0e0f17 0%, rgba(14,15,23,0.85) 100%); position: sticky; top: 0; z-index: 50; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px; }
+  .mcc-brand-logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, #6b8aff 0%, #a980ff 50%, #ff5e7e 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(107,138,255,0.4); color: #fff; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+  .mcc-brand-info { flex: 1; min-width: 0; }
+  .mcc-brand-name { font-size: 14px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .mcc-brand-sub { font-size: 11px; color: #6c6e7d; margin-top: 1px; display: flex; align-items: center; gap: 6px; }
+  .mcc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #4cd99a; box-shadow: 0 0 6px #4cd99a; animation: cc-livepulse 2s ease-in-out infinite; }
+  .mcc-icon-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: #b0b3c4; font-size: 16px; cursor: pointer; flex-shrink: 0; position: relative; }
+
+  /* 페이지 헤더 */
+  .mcc-page-header { padding: 14px 16px 8px; }
+  .mcc-page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #f4f5fa; }
+  .mcc-page-sub { font-size: 12px; color: #6c6e7d; margin-top: 4px; }
+
+  /* 종합 위험도 hero */
+  .mcc-hero { margin: 4px 16px 14px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(107,138,255,0.12), rgba(169,128,255,0.04)); border: 1px solid rgba(107,138,255,0.2); }
+  .mcc-hero-label { font-size: 11px; color: #b0b3c4; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; }
+  .mcc-hero-status { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; color: #f4f5fa; line-height: 1.2; }
+  .mcc-hero-time { font-size: 11px; color: #6c6e7d; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+  /* 카드 */
+  .mcc-card { margin: 0 16px 12px; padding: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 8px 24px -12px rgba(0,0,0,0.5); }
+  .mcc-card-h { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+  .mcc-card-title { font-size: 14px; font-weight: 700; color: #f4f5fa; letter-spacing: -0.01em; }
+  .mcc-card-sub { font-size: 11px; color: #6c6e7d; margin-top: 2px; }
+
+  /* 메트릭 그리드 (2열) */
+  .mcc-metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 16px 12px; }
+  .mcc-metric { padding: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 4px 12px -6px rgba(0,0,0,0.4); transition: transform 0.15s; cursor: pointer; }
+  .mcc-metric:active { transform: scale(0.97); }
+  .mcc-metric.alert { border-color: rgba(245,196,81,0.3); background: linear-gradient(180deg, rgba(245,196,81,0.08), rgba(245,196,81,0.02)), #0e0f17; }
+  .mcc-metric.danger { border-color: rgba(255,154,60,0.4); background: linear-gradient(180deg, rgba(255,154,60,0.1), rgba(255,154,60,0.02)), #0e0f17; }
+  .mcc-metric.red-alert { border-color: rgba(255,94,126,0.4); background: linear-gradient(180deg, rgba(255,94,126,0.1), rgba(255,94,126,0.02)), #0e0f17; }
+  .mcc-metric-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .mcc-metric-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .mcc-metric-icon { width: 22px; height: 22px; border-radius: 6px; background: #1d1f2c; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .mcc-metric.alert .mcc-metric-icon { background: rgba(245,196,81,0.15); }
+  .mcc-metric.danger .mcc-metric-icon { background: rgba(255,154,60,0.18); }
+  .mcc-metric.red-alert .mcc-metric-icon { background: rgba(255,94,126,0.18); }
+  .mcc-metric-val { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-family: 'JetBrains Mono', monospace; color: #f4f5fa; }
+  .mcc-metric.danger .mcc-metric-val { color: #ff9a3c; }
+  .mcc-metric.red-alert .mcc-metric-val { color: #ff5e7e; }
+  .mcc-metric-unit { font-size: 11px; color: #6c6e7d; margin-left: 4px; font-weight: 400; font-family: inherit; }
+  .mcc-metric-trend { font-size: 10px; color: #6c6e7d; margin-top: 4px; }
+
+  /* 하단 네비 */
+  .mcc-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 0 calc(env(safe-area-inset-bottom) + 8px); background: rgba(7,7,13,0.92); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-around; z-index: 100; }
+  .mcc-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 10px; cursor: pointer; color: #6c6e7d; min-width: 56px; transition: color 0.15s; }
+  .mcc-nav-item.active { color: #6b8aff; }
+  .mcc-nav-item.active .mcc-nav-icon { transform: translateY(-2px); }
+  .mcc-nav-icon { font-size: 22px; transition: transform 0.15s; position: relative; }
+  .mcc-nav-label { font-size: 10px; font-weight: 600; }
+  .mcc-nav-badge { position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; border-radius: 8px; background: #ff5e7e; color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 0 8px rgba(255,94,126,0.5); }
+
+  /* 더보기 시트 */
+  .mcc-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200; animation: cc-fade-in 0.2s ease; }
+  .mcc-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, #14151f 0%, #0e0f17 100%); border-radius: 20px 20px 0 0; padding: 12px 16px calc(env(safe-area-inset-bottom) + 24px); border-top: 1px solid rgba(255,255,255,0.08); z-index: 201; animation: mcc-sheet-up 0.25s cubic-bezier(0.4, 0, 0.2, 1); max-height: 80vh; overflow-y: auto; }
+  @keyframes mcc-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .mcc-sheet-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 16px; }
+  .mcc-sheet-title { font-size: 16px; font-weight: 700; color: #f4f5fa; margin-bottom: 14px; }
+  .mcc-sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mcc-sheet-item { padding: 14px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; color: #b0b3c4; transition: all 0.15s; }
+  .mcc-sheet-item:active { background: rgba(107,138,255,0.1); border-color: rgba(107,138,255,0.3); }
+  .mcc-sheet-item-icon { font-size: 22px; }
+  .mcc-sheet-item-label { font-size: 12px; font-weight: 600; text-align: center; }
+  .mcc-sheet-item-badge { position: absolute; top: 8px; right: 8px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ff5e7e; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+  /* 칩 */
+  .mcc-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1; }
+  .mcc-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
+  .mcc-chip.blue { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .mcc-chip.yellow { background: rgba(245,196,81,0.14); color: #f5c451; }
+  .mcc-chip.orange { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+  .mcc-chip.red { background: rgba(255,94,126,0.16); color: #ff5e7e; }
+  .mcc-chip.green { background: rgba(76,217,154,0.12); color: #4cd99a; }
+  .mcc-chip .dot.pulse { animation: cc-pulse 1.6s ease-in-out infinite; }
+
+  /* 리스트 */
+  .mcc-list-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .mcc-list-row:last-child { border-bottom: 0; }
+  .mcc-list-row:active { background: rgba(255,255,255,0.02); }
+
+  /* 알림 배너 */
+  .mcc-banner { margin: 12px 16px; padding: 16px; border-radius: 16px; }
+  .mcc-banner.orange { background: linear-gradient(180deg, rgba(255,154,60,0.18), rgba(255,154,60,0.04)); border: 1px solid rgba(255,154,60,0.3); }
+  .mcc-banner.yellow { background: linear-gradient(180deg, rgba(245,196,81,0.15), rgba(245,196,81,0.03)); border: 1px solid rgba(245,196,81,0.25); }
+  .mcc-banner.red { background: linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04)); border: 1px solid rgba(255,94,126,0.3); }
+
+  /* 빠른 액션 */
+  .mcc-quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mcc-quick-btn { padding: 14px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #b0b3c4; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .mcc-quick-btn.primary { background: linear-gradient(180deg, rgba(107,138,255,0.12), rgba(107,138,255,0.03)); border-color: rgba(107,138,255,0.25); color: #8fa6ff; }
+
+  /* 인풋 */
+  .mcc-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #0e0f17; color: #f4f5fa; font-size: 16px; font-family: inherit; box-sizing: border-box; }
+  .mcc-textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: #0e0f17; color: #f4f5fa; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: vertical; }
+
+  /* 버튼 */
+  .mcc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)); color: #f4f5fa; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .mcc-btn.primary { background: linear-gradient(180deg, #7c98ff, #5a7aff); border-color: rgba(255,255,255,0.18); color: #fff; }
+  .mcc-btn.danger { background: linear-gradient(180deg, #ff738e, #ff4f72); border-color: rgba(255,255,255,0.15); color: #fff; }
+  .mcc-btn.lg { padding: 14px 20px; font-size: 14px; }
+  .mcc-btn.full { width: 100%; }
+
+  /* 단계 진행바 */
+  .mcc-step-bar { display: flex; gap: 4px; padding: 12px 16px; }
+  .mcc-step { flex: 1; padding: 8px 4px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); color: #6c6e7d; font-size: 10px; font-weight: 600; text-align: center; }
+  .mcc-step.active { background: rgba(107,138,255,0.15); border-color: rgba(107,138,255,0.4); color: #8fa6ff; }
+  .mcc-step.done { background: rgba(76,217,154,0.08); border-color: rgba(76,217,154,0.25); color: #4cd99a; }
+
+  /* 통계 4-카드 (모바일은 2열) */
+  .mcc-stats-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+  .mcc-stat { padding: 14px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+  .mcc-stat-name { font-size: 10px; color: #6c6e7d; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .mcc-stat-val { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+`;
+
+// ─── 모바일 관제센터 (B안: 하단네비 + 세로카드) ─────────────────────
+function MobileControlCenter({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
+  const [page, setPage] = useState("dashboard");
+  const [showMore, setShowMore] = useState(false);
+
+  const overall = useMemo(() => {
+    const lvs = (categories || []).map(c => getLevel(c));
+    if (lvs.includes("RED")) return "RED";
+    if (lvs.includes("ORANGE")) return "ORANGE";
+    if (lvs.includes("YELLOW")) return "YELLOW";
+    return "BLUE";
+  }, [categories]);
+  const overallColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[overall];
+  const overallLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[overall];
+
+  const sortedCats = [...(categories || [])].sort((a, b) => {
+    const ord = { RED: 0, ORANGE: 1, YELLOW: 2, BLUE: 3 };
+    return ord[getLevel(a)] - ord[getLevel(b)];
+  });
+  const topAlert = alerts && alerts[0];
+  const unreadAlerts = (alerts || []).filter(a => a.level === "ORANGE" || a.level === "RED").length;
+  const incidents = settings.incidents || [];
+  const openIncidents = incidents.filter(i => i.status !== "closed").length;
+
+  // 페이지별 타이틀
+  const titles = {
+    dashboard: { title: "대시보드", sub: "실시간 모니터링" },
+    monitor: { title: "실시간 모니터링", sub: "환경 카테고리 상세" },
+    alert: { title: "알림 / 경보", sub: "단계별 메시지 발송" },
+    incident: { title: "사건 / 신고", sub: "현장 신고 접수 및 추적" },
+    map: { title: "지도 상황도", sub: "구역・핀・히트맵" },
+    resource: { title: "리소스 관리", sub: "자산 및 인력" },
+    report: { title: "리포트", sub: "일일 종합" },
+    user: { title: "사용자 관리", sub: "계정 목록" },
+    settings: { title: "설정", sub: "축제 정보" },
+  };
+  const curTitle = titles[page] || titles.dashboard;
+
+  return (<>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>{MCC_STYLES}</style>
+    <div className="mcc-root">
+      {/* 상단바 */}
+      <div className="mcc-topbar">
+        <div className="mcc-brand-logo">S</div>
+        <div className="mcc-brand-info">
+          <div className="mcc-brand-name">SAFEFLOW</div>
+          <div className="mcc-brand-sub">
+            <span className="mcc-live-dot"/>
+            <span>{session?.name}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{settings?.festivalName || "축제"}</span>
+          </div>
+        </div>
+        <button className="mcc-icon-btn" onClick={onMobileSwitch} title="모바일 보기">📱</button>
+      </div>
+
+      {/* 페이지별 컨텐츠 */}
+      {page === "dashboard" && <MCC_Dashboard session={session} settings={settings} categories={sortedCats} alerts={alerts} overall={overall} overallColor={overallColor} overallLabel={overallLabel} topAlert={topAlert} setPage={setPage} setActiveAlert={setActiveAlert} onAction={onAction} />}
+      {page === "monitor" && <MCC_Monitor categories={categories} />}
+      {page === "alert" && <MCC_Alert settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
+      {page === "incident" && <MCC_Incident settings={settings} setSettings={setSettings} session={session} />}
+      {page === "map" && <MCC_Map settings={settings} session={session} />}
+      {page === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
+      {page === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
+      {page === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
+      {page === "settings" && <CC_SettingsPage settings={settings} setSettings={setSettings} session={session} onMobileSwitch={onMobileSwitch} />}
+
+      {/* 하단 네비 (5탭) */}
+      <div className="mcc-bottom-nav">
+        {[
+          { id: "dashboard", icon: "🏠", label: "홈" },
+          { id: "monitor", icon: "📡", label: "모니터" },
+          { id: "alert", icon: "🔔", label: "경보", badge: unreadAlerts > 0 ? unreadAlerts : null },
+          { id: "incident", icon: "📁", label: "사건", badge: openIncidents > 0 ? openIncidents : null },
+          { id: "_more", icon: "⋯", label: "더보기" },
+        ].map(it => (<div key={it.id} className={`mcc-nav-item ${page === it.id ? "active" : ""}`} onClick={() => it.id === "_more" ? setShowMore(true) : setPage(it.id)}>
+          <div className="mcc-nav-icon">
+            {it.icon}
+            {it.badge && <span className="mcc-nav-badge">{it.badge > 9 ? "9+" : it.badge}</span>}
+          </div>
+          <span className="mcc-nav-label">{it.label}</span>
+        </div>))}
+      </div>
+
+      {/* 더보기 시트 */}
+      {showMore && <>
+        <div className="mcc-sheet-overlay" onClick={() => setShowMore(false)} />
+        <div className="mcc-sheet">
+          <div className="mcc-sheet-handle" />
+          <div className="mcc-sheet-title">더보기</div>
+          <div className="mcc-sheet-grid">
+            {[
+              { id: "map", icon: "🗺️", label: "지도 상황도" },
+              { id: "resource", icon: "📦", label: "리소스 관리" },
+              { id: "report", icon: "📊", label: "리포트" },
+              { id: "user", icon: "👥", label: "사용자 관리" },
+              { id: "settings", icon: "⚙️", label: "설정" },
+            ].map(it => (<div key={it.id} className="mcc-sheet-item" onClick={() => { setPage(it.id); setShowMore(false); }}>
+              <div className="mcc-sheet-item-icon">{it.icon}</div>
+              <div className="mcc-sheet-item-label">{it.label}</div>
+            </div>))}
+            <div className="mcc-sheet-item" onClick={onLogout} style={{ color: "#ff5e7e", borderColor: "rgba(255,94,126,0.2)" }}>
+              <div className="mcc-sheet-item-icon">🚪</div>
+              <div className="mcc-sheet-item-label">로그아웃</div>
+            </div>
+          </div>
+        </div>
+      </>}
+    </div>
+  </>);
+}
+
+// ─── 모바일 대시보드 ───────────────────────────────────────────
+function MCC_Dashboard({ session, settings, categories, alerts, overall, overallColor, overallLabel, topAlert, setPage, setActiveAlert, onAction }) {
+  const incidents = settings.incidents || [];
+  return (<>
+    {/* 종합 위험도 hero */}
+    <div className="mcc-hero">
+      <div className="mcc-hero-label">현재 종합 위험도</div>
+      <div className="mcc-hero-status">지금 <span style={{ color: overallColor }}>{overallLabel}</span> 단계예요</div>
+      <div className="mcc-hero-time">{new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+    </div>
+
+    {/* 최우선 알림 배너 */}
+    {topAlert && <div className={`mcc-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
+      <span className={`mcc-chip ${CC_LEVEL_MAP[topAlert.level]}`}><span className="dot pulse" />● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</span>
+      <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, color: "#f4f5fa" }}>{topAlert.category}</div>
+      <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4, lineHeight: 1.4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
+      <button className="mcc-btn primary full" style={{ marginTop: 10 }} onClick={() => {
+        // 1) 해당 카테고리 찾기 → 모달 열기 + handling 시작
+        const cat = (categories || []).find(c => c.name === topAlert.category);
+        if (cat) {
+          if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+          if (setActiveAlert) setActiveAlert(cat);
+        } else {
+          // 카테고리를 못 찾으면 알림 모달
+          if (setActiveAlert) setActiveAlert(topAlert);
+        }
+      }}>대응 시작 →</button>
+    </div>}
+
+    {/* 메트릭 그리드 */}
+    <div className="mcc-metric-grid">
+      {categories.map(cat => {
+        const lv = getLevel(cat);
+        const cls = lv === "YELLOW" ? "alert" : lv === "ORANGE" ? "danger" : lv === "RED" ? "red-alert" : "";
+        const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+        const history = (cat.history || []).slice(-24);
+        const forecast = (cat.forecast || []).slice(0, 6);
+        const nextFc = forecast[0];
+        const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+        let sparkPath = "";
+        if (sparkData.length > 1) {
+          const min = Math.min(...sparkData); const max = Math.max(...sparkData); const rng = max - min || 1;
+          sparkPath = sparkData.map((v, i) => {
+            const x = (i / (sparkData.length - 1)) * 100;
+            const y = 24 - ((v - min) / rng) * 20;
+            return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+          }).join(" ");
+        }
+        return (<div key={cat.id} className={`mcc-metric ${cls}`} onClick={() => setPage("monitor")}>
+          <div className="mcc-metric-h">
+            <span className="mcc-metric-name"><span className="mcc-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
+            <span className={`mcc-chip ${CC_LEVEL_MAP[lv]}`}><span className="dot" />{CC_LEVEL_LABEL[lv]}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+            <div className="mcc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="mcc-metric-unit">{cat.unit}</span></div>
+            {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+              <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+              <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+                <span style={{ fontSize: 11, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+              </div>
+            </div>}
+          </div>
+          {sparkPath && <svg viewBox="0 0 100 26" preserveAspectRatio="none" style={{ width: "100%", height: 22, marginBottom: 4, display: "block" }}>
+            <defs>
+              <linearGradient id={`mcc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+                <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d={`${sparkPath} L 100 26 L 0 26 Z`} fill={`url(#mcc-grad-${cat.id})`} stroke="none"/>
+            <path d={sparkPath} fill="none" stroke={lvColor} strokeWidth="1.2"/>
+          </svg>}
+          {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 12, alignItems: "flex-end", marginBottom: 4 }}>
+            {forecast.slice(0, 6).map((f, i) => {
+              const vals = forecast.slice(0, 6).map(x => x.value);
+              const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+              const h = 2 + ((f.value - mn) / rng) * 10;
+              return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+            })}
+          </div>}
+          <div className="mcc-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
+        </div>);
+      })}
+    </div>
+
+    {/* 활성 경보 */}
+    <div className="mcc-card">
+      <div className="mcc-card-h">
+        <div>
+          <div className="mcc-card-title">활성 경보 {(alerts || []).length}건</div>
+          <div className="mcc-card-sub">실시간 갱신</div>
+        </div>
+        {(alerts || []).length > 0 && <button className="mcc-btn" style={{ padding: "5px 10px", fontSize: 11 }} onClick={() => setPage("alert")}>전체 →</button>}
+      </div>
+      {(alerts || []).slice(0, 4).map((a, i) => (<div key={i} className="mcc-list-row" onClick={() => {
+        const cat = (categories || []).find(c => c.name === a.category);
+        if (cat && setActiveAlert) setActiveAlert(cat);
+        else if (setActiveAlert) setActiveAlert(a);
+      }} style={{ cursor: "pointer" }}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[a.level]}`}><span className={`dot ${a.level === "ORANGE" || a.level === "RED" ? "pulse" : ""}`} />●</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.category}</div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+        </div>
+        <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{a.time?.split(" ")[1] || a.time}</span>
+      </div>))}
+      {(!alerts || alerts.length === 0) && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보 없음 ✓</div>}
+    </div>
+
+    {/* 구역별 혼잡도 */}
+    {(settings.zones || []).length > 0 && <div className="mcc-card">
+      <div className="mcc-card-h">
+        <div>
+          <div className="mcc-card-title">구역별 혼잡도</div>
+          <div className="mcc-card-sub">{(settings.zones || []).length}개 구역</div>
+        </div>
+      </div>
+      {(settings.zones || []).slice(0, 5).map(z => {
+        const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
+        const cl = c?.level || "smooth";
+        const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+        const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+        return (<div key={z.id} className="mcc-list-row">
+          <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+          <span className={`mcc-chip ${lv}`}>{lbl}</span>
+        </div>);
+      })}
+    </div>}
+
+    {/* 빠른 액션 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>빠른 액션</div>
+      <div className="mcc-quick-grid">
+        <button className="mcc-quick-btn primary" onClick={() => setPage("alert")}>🔔 경보 발령</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("incident")}>📁 사건 등록</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("map")}>🗺️ 지도 상황</button>
+        <button className="mcc-quick-btn" onClick={() => setPage("monitor")}>📡 모니터링</button>
+      </div>
+    </div>
+  </>);
+}
+
+// ─── 모바일 모니터링 ───────────────────────────────────────────
+function MCC_Monitor({ categories }) {
+  const [selId, setSelId] = useState(categories?.[0]?.id);
+  const cat = (categories || []).find(c => c.id === selId) || categories?.[0];
+  if (!cat) return <div className="mcc-page-header"><div className="mcc-page-title">실시간 모니터링</div><div className="mcc-page-sub">데이터가 없습니다</div></div>;
+  const lv = getLevel(cat);
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  const history = (cat.history || []).slice(-24);
+  const trendPoints = history.length > 5 ? history.map((h, i) => ({ x: i * (100 / Math.max(1, history.length - 1)), y: h.value || 0 })) : [];
+  const minV = Math.min(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const maxV = Math.max(...trendPoints.map(p => p.y), cat.currentValue || 0);
+  const range = maxV - minV || 1;
+  const pathD = trendPoints.length > 0 ? trendPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${36 - ((p.y - minV) / range) * 30}`).join(" ") : "";
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">실시간 모니터링</div>
+      <div className="mcc-page-sub">환경 카테고리 상세</div>
+    </div>
+
+    {/* 카테고리 칩 가로 스크롤 */}
+    <div style={{ padding: "0 16px 12px", display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+      {(categories || []).map(c => {
+        const cv = getLevel(c);
+        const cvColor = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[cv];
+        return (<button key={c.id} onClick={() => setSelId(c.id)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 999, border: selId === c.id ? `1.5px solid ${cvColor}` : "1px solid rgba(255,255,255,0.1)", background: selId === c.id ? `${cvColor}20` : "rgba(255,255,255,0.03)", color: selId === c.id ? cvColor : "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+          {c.icon || "📊"} {c.name}
+        </button>);
+      })}
+    </div>
+
+    {/* 큰 수치 카드 */}
+    <div className="mcc-card">
+      <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>현재 수치</div>
+      <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1, fontFamily: "JetBrains Mono", color: lvColor, letterSpacing: "-0.03em" }}>{(cat.currentValue || 0).toLocaleString()}</div>
+      <div style={{ fontSize: 14, color: "#6c6e7d", marginTop: 4 }}>{cat.unit}</div>
+      <div style={{ marginTop: 14, display: "flex", gap: 6, alignItems: "center" }}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[lv]}`}><span className={`dot ${lv !== "BLUE" ? "pulse" : ""}`} />{CC_LEVEL_LABEL[lv]}</span>
+        <span style={{ fontSize: 11, color: "#6c6e7d" }}>{new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+    </div>
+
+    {/* 24h 차트 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>24시간 추이</div>
+      <svg viewBox="0 0 100 36" preserveAspectRatio="none" style={{ width: "100%", height: 100 }}>
+        <defs>
+          <linearGradient id={`mcc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+            <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {pathD && <>
+          <path d={`${pathD} L 100 36 L 0 36 Z`} fill={`url(#mcc-grad-${cat.id})`} stroke="none"/>
+          <path d={pathD} fill="none" stroke={lvColor} strokeWidth="1.5"/>
+        </>}
+        {!pathD && <text x="50" y="20" textAnchor="middle" fill="#6c6e7d" fontSize="3">데이터 부족</text>}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6c6e7d", marginTop: 6, fontFamily: "JetBrains Mono" }}>
+        <span>min {minV.toFixed(1)}</span>
+        <span>max {maxV.toFixed(1)}</span>
+      </div>
+    </div>
+
+    {/* 임계값 표 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>임계값</div>
+      {[{ k: "yellow", lbl: "주의 (YELLOW)", c: "#f5c451" }, { k: "orange", lbl: "경계 (ORANGE)", c: "#ff9a3c" }, { k: "red", lbl: "심각 (RED)", c: "#ff5e7e" }].map(t => (<div key={t.k} className="mcc-list-row">
+        <span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />
+        <span style={{ flex: 1, color: "#b0b3c4", fontSize: 13 }}>{t.lbl}</span>
+        <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{cat.thresholds?.[t.k] || "-"} {cat.unit}</span>
+      </div>))}
+    </div>
+
+    {/* 체크리스트 */}
+    {(cat.actionItems || []).length > 0 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>대응 체크리스트</div>
+      {cat.actionItems.map((item, i) => (<div key={i} className="mcc-list-row" style={{ alignItems: "flex-start" }}>
+        <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
+        <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+      </div>))}
+    </div>}
+  </>);
+}
+
+// ─── 모바일 알림/경보 발령 (5단계) ───────────────────────────────
+function MCC_Alert({ settings, setSettings, alerts, setAlerts, smsLog, setSmsLog, session }) {
+  const [step, setStep] = useState(1);
+  const [level, setLevel] = useState("YELLOW");
+  const [msg, setMsg] = useState("");
+  const [channels, setChannels] = useState({ sms: true, app: true, sound: false });
+  const [targets, setTargets] = useState("all");
+
+  const targetCount = targets === "managers" ? (settings.smsManagers || []).length : targets === "staff" ? (settings.smsStaff || []).length : (settings.smsManagers || []).length + (settings.smsStaff || []).length;
+  const lvLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[level];
+
+  const issueAlert = async () => {
+    if (!msg.trim()) { alert("메시지를 입력하세요."); return; }
+    if (!confirm(`${lvLabel} 단계 경보를 ${targetCount}명에게 발송합니다.\n발송 후 취소가 불가능합니다.\n진행하시겠습니까?`)) return;
+    const time = new Date().toLocaleString("ko-KR");
+    const newAlert = { category: "수동 발령", level, message: `[${settings.festivalName || "축제"} ${lvLabel}경보]\n\n${msg}\n\n발신: ${session?.name || "관리자"}\n시간: ${time}`, time };
+    if (setAlerts) setAlerts(p => [newAlert, ...p].slice(0, 100));
+    if (channels.sms) {
+      try {
+        const contacts = targets === "managers" ? settings.smsManagers : targets === "staff" ? settings.smsStaff : [...(settings.smsManagers || []), ...(settings.smsStaff || [])];
+        const r = await sendSolapi(settings, newAlert.message, contacts);
+        if (setSmsLog) setSmsLog(p => [{ time, level, message: msg, sentTo: contacts.length, success: r.ok ? r.success : 0, fail: r.ok ? r.fail : contacts.length }, ...p].slice(0, 100));
+      } catch {}
+    }
+    alert(`✅ 경보 발령 완료\n수신자: ${targetCount}명`);
+    setStep(1); setMsg(""); setLevel("YELLOW");
+  };
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">알림 / 경보 발령</div>
+      <div className="mcc-page-sub">단계별 메시지 발송</div>
+    </div>
+
+    {/* 진행 단계 */}
+    <div className="mcc-step-bar">
+      {[1, 2, 3, 4, 5].map(s => (<div key={s} className={`mcc-step ${step === s ? "active" : ""} ${step > s ? "done" : ""}`} onClick={() => s < step && setStep(s)}>
+        {step > s ? "✓" : s}
+      </div>))}
+    </div>
+
+    {step === 1 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>① 경보 단계 선택</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {["BLUE", "YELLOW", "ORANGE", "RED"].map(l => {
+          const c = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[l];
+          const lbl = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[l];
+          return (<div key={l} onClick={() => setLevel(l)} style={{ padding: 16, borderRadius: 12, background: level === l ? `${c}20` : "rgba(255,255,255,0.02)", border: `2px solid ${level === l ? c : "rgba(255,255,255,0.06)"}`, cursor: "pointer", textAlign: "center" }}>
+            <div style={{ width: 28, height: 28, borderRadius: 14, background: c, margin: "0 auto 6px", boxShadow: `0 0 12px ${c}80` }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: level === l ? c : "#f4f5fa" }}>{l}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{lbl}</div>
+          </div>);
+        })}
+      </div>
+      <button className="mcc-btn primary full lg" style={{ marginTop: 14 }} onClick={() => setStep(2)}>다음 →</button>
+    </div>}
+
+    {step === 2 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 8 }}>② 메시지 작성</div>
+      <div className="mcc-card-sub" style={{ marginBottom: 12 }}>{lvLabel} 단계로 발송됩니다</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        {[`${settings.festivalName || "축제"} 안전관리상황실`, "구역 통제 강화", "안전한 곳으로 이동", "상황 종료"].map((t, i) => (<button key={i} onClick={() => setMsg(m => m + (m ? "\n" : "") + t)} style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>+ {t.slice(0, 14)}{t.length > 14 ? "..." : ""}</button>))}
+      </div>
+      <textarea className="mcc-textarea" value={msg} onChange={e => setMsg(e.target.value)} placeholder="알림 메시지..." rows={5} />
+      <div style={{ marginTop: 6, fontSize: 11, color: "#6c6e7d", textAlign: "right" }}>{msg.length}자</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(1)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => msg.trim() && setStep(3)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 3 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>③ 발송 채널</div>
+      {[{ k: "sms", n: "SMS 문자", icon: "📱" }, { k: "app", n: "앱 푸시", icon: "🔔" }, { k: "sound", n: "방송 알림음", icon: "📢" }].map(c => (<div key={c.k} onClick={() => setChannels(p => ({ ...p, [c.k]: !p[c.k] }))} style={{ padding: 14, marginBottom: 8, borderRadius: 12, background: channels[c.k] ? "rgba(107,138,255,0.1)" : "rgba(255,255,255,0.02)", border: channels[c.k] ? "2px solid #6b8aff" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 22 }}>{c.icon}</span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{c.n}</span>
+        {channels[c.k] && <span style={{ color: "#6b8aff", fontSize: 16 }}>✓</span>}
+      </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(2)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setStep(4)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 4 && <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 8 }}>④ 발송 대상</div>
+      <div className="mcc-card-sub" style={{ marginBottom: 12 }}>{targetCount}명에게 발송</div>
+      {[{ k: "all", n: "전체", count: (settings.smsManagers || []).length + (settings.smsStaff || []).length }, { k: "managers", n: "관리자만", count: (settings.smsManagers || []).length }, { k: "staff", n: "안전요원만", count: (settings.smsStaff || []).length }].map(t => (<div key={t.k} onClick={() => setTargets(t.k)} style={{ padding: 14, marginBottom: 8, borderRadius: 12, background: targets === t.k ? "rgba(107,138,255,0.1)" : "rgba(255,255,255,0.02)", border: targets === t.k ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 18, height: 18, borderRadius: 9, border: targets === t.k ? "5px solid #6b8aff" : "2px solid rgba(255,255,255,0.2)" }} />
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{t.n}</span>
+        <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: targets === t.k ? "#6b8aff" : "#b0b3c4" }}>{t.count}<span style={{ fontSize: 11, marginLeft: 2, color: "#6c6e7d" }}>명</span></span>
+      </div>))}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="mcc-btn" onClick={() => setStep(3)}>← 이전</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setStep(5)}>다음 →</button>
+      </div>
+    </div>}
+
+    {step === 5 && <div className="mcc-card" style={{ borderColor: "rgba(255,94,126,0.3)" }}>
+      <div className="mcc-card-title" style={{ marginBottom: 12 }}>⑤ 발령 확인</div>
+      <div style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, marginBottom: 12 }}>
+        <span className={`mcc-chip ${CC_LEVEL_MAP[level]}`}><span className="dot pulse" />● {level} · {lvLabel}</span>
+        <div style={{ fontSize: 13, color: "#f4f5fa", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 8 }}>{msg}</div>
+      </div>
+      <div style={{ fontSize: 12, color: "#6c6e7d", lineHeight: 1.6, marginBottom: 12 }}>
+        📡 채널: {Object.keys(channels).filter(k => channels[k]).map(k => ({ sms: "SMS", app: "앱", sound: "방송" }[k])).join(" · ")}<br/>
+        👥 대상: {targetCount}명 ({targets === "all" ? "전체" : targets === "managers" ? "관리자" : "안전요원"})
+      </div>
+      <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,94,126,0.08)", border: "1px solid rgba(255,94,126,0.2)", color: "#ff5e7e", fontSize: 11, marginBottom: 12 }}>
+        ⚠️ 발송 후 취소 불가
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="mcc-btn" onClick={() => setStep(4)}>← 이전</button>
+        <button className="mcc-btn danger lg" style={{ flex: 1 }} onClick={issueAlert}>🚨 발령 실행</button>
+      </div>
+    </div>}
+
+    {/* 최근 이력 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>최근 발령 이력 ({(smsLog || []).length}건)</div>
+      {(smsLog || []).slice(0, 4).map((s, i) => (<div key={i} className="mcc-list-row">
+        <span className={`mcc-chip ${CC_LEVEL_MAP[s.level || "BLUE"]}`}>{s.level || "정보"}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: "#f4f5fa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.message}</div>
+          <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 2 }}>{s.time} · {s.sentTo || 0}건</div>
+        </div>
+      </div>))}
+      {(!smsLog || smsLog.length === 0) && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>발령 이력 없음</div>}
+    </div>
+  </>);
+}
+
+// ─── 모바일 사건/신고 ───────────────────────────────────────
+function MCC_Incident({ settings, setSettings, session }) {
+  const incidents = settings.incidents || [];
+  const today = new Date().toDateString();
+  const todayIncidents = incidents.filter(i => new Date(i.ts).toDateString() === today);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [newInc, setNewInc] = useState({ type: "", location: "", desc: "", priority: "low" });
+  const types = ["응급환자", "분실아동", "폭력/싸움", "시설고장", "민원/항의", "교통사고", "기타"];
+
+  const submit = () => {
+    if (!newInc.type || !newInc.location) { alert("종류와 위치를 입력하세요."); return; }
+    const inc = { id: "inc_" + Date.now(), ...newInc, ts: Date.now(), status: "open", reporter: session?.name || "?", time: new Date().toLocaleString("ko-KR") };
+    setSettings(p => ({ ...p, incidents: [inc, ...(p.incidents || [])] }));
+    setNewInc({ type: "", location: "", desc: "", priority: "low" });
+    setShowAdd(false);
+  };
+  const updateStatus = (id, status) => setSettings(p => ({ ...p, incidents: (p.incidents || []).map(i => i.id === id ? { ...i, status } : i) }));
+  const remove = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(p => ({ ...p, incidents: (p.incidents || []).filter(i => i.id !== id) })); };
+  const filtered = filter === "all" ? incidents : filter === "today" ? todayIncidents : incidents.filter(i => i.status === filter);
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">사건 / 신고</div>
+      <div className="mcc-page-sub">현장 신고 접수 · 추적</div>
+    </div>
+
+    {/* 통계 4-카드 */}
+    <div className="mcc-stats-4">
+      {[{ k: "today", n: "오늘", c: todayIncidents.length, color: "#6b8aff" }, { k: "open", n: "처리중", c: incidents.filter(i => i.status === "open").length, color: "#ff9a3c" }, { k: "in_progress", n: "조치중", c: incidents.filter(i => i.status === "in_progress").length, color: "#f5c451" }, { k: "closed", n: "완료", c: incidents.filter(i => i.status === "closed").length, color: "#4cd99a" }].map(s => (<div key={s.k} className="mcc-stat" onClick={() => setFilter(s.k)} style={{ cursor: "pointer", border: filter === s.k ? `1.5px solid ${s.color}40` : undefined, background: filter === s.k ? `${s.color}15` : undefined }}>
+        <div className="mcc-stat-name">{s.n}</div>
+        <div className="mcc-stat-val" style={{ color: s.color }}>{s.c}</div>
+      </div>))}
+    </div>
+
+    {/* 신규 등록 / 필터 */}
+    <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
+      <button className="mcc-btn" style={{ flex: 1 }} onClick={() => setFilter("all")}>전체 보기</button>
+      <button className="mcc-btn primary" style={{ flex: 1 }} onClick={() => setShowAdd(!showAdd)}>+ 신규 등록</button>
+    </div>
+
+    {showAdd && <div className="mcc-card" style={{ borderColor: "rgba(107,138,255,0.3)" }}>
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>새 사건 등록</div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>종류</div>
+        <select className="mcc-input" value={newInc.type} onChange={e => setNewInc({ ...newInc, type: e.target.value })}>
+          <option value="">선택...</option>
+          {types.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>위치</div>
+        <input className="mcc-input" value={newInc.location} onChange={e => setNewInc({ ...newInc, location: e.target.value })} placeholder="A구역 / 정문 등" />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4 }}>긴급도</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+          {[{ k: "low", n: "낮음", c: "#4cd99a" }, { k: "mid", n: "보통", c: "#f5c451" }, { k: "high", n: "긴급", c: "#ff9a3c" }, { k: "critical", n: "치명", c: "#ff5e7e" }].map(p => (<button key={p.k} onClick={() => setNewInc({ ...newInc, priority: p.k })} style={{ padding: "8px", borderRadius: 8, border: newInc.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: newInc.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: newInc.priority === p.k ? p.c : "#b0b3c4", fontSize: 11, fontWeight: 600 }}>{p.n}</button>))}
+        </div>
+      </div>
+      <textarea className="mcc-textarea" value={newInc.desc} onChange={e => setNewInc({ ...newInc, desc: e.target.value })} placeholder="상세 내용 (선택)" rows={2} />
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button className="mcc-btn" onClick={() => setShowAdd(false)}>취소</button>
+        <button className="mcc-btn primary" style={{ flex: 1 }} onClick={submit}>등록</button>
+      </div>
+    </div>}
+
+    {/* 사건 카드 리스트 */}
+    {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>사건이 없습니다</div> :
+      filtered.map(i => {
+        const sLabel = i.status === "open" ? "처리중" : i.status === "in_progress" ? "조치중" : "완료";
+        const pColor = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+        const pLabel = { critical: "치명", high: "긴급", mid: "보통", low: "낮음" }[i.priority];
+        return (<div key={i.id} className="mcc-card">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span className={`mcc-chip ${i.status === "open" ? "orange" : i.status === "in_progress" ? "yellow" : "green"}`}><span className="dot" />{sLabel}</span>
+            <span style={{ color: pColor, fontSize: 12, fontWeight: 700 }}>● {pLabel}</span>
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#f4f5fa", marginBottom: 4 }}>{i.type}</div>
+          <div style={{ fontSize: 13, color: "#b0b3c4", marginBottom: 8 }}>📍 {i.location}</div>
+          {i.desc && <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5, marginBottom: 8, padding: 10, background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>{i.desc}</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#6c6e7d", marginBottom: 10 }}>
+            <span>👤 {i.reporter}</span>
+            <span className="mono">{i.time?.split(" ")[1] || i.time}</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {i.status !== "closed" && <button className="mcc-btn" style={{ flex: 1, fontSize: 12 }} onClick={() => updateStatus(i.id, i.status === "open" ? "in_progress" : "closed")}>{i.status === "open" ? "조치 시작" : "✓ 완료 처리"}</button>}
+            <button className="mcc-btn" style={{ color: "#ff5e7e" }} onClick={() => remove(i.id)}>🗑</button>
+          </div>
+        </div>);
+      })
+    }
+  </>);
+}
+
+// ─── 모바일 지도 상황도 ─────────────────────────────────────
+function MCC_Map({ settings, session }) {
+  const fid = session?.festivalId || "default";
+  const [mapImage] = usePersist(`${fid}_map_img_v1`, null);
+  const [mapAreas] = usePersist(`${fid}_map_areas_v1`, []);
+  const zones = settings.zones || [];
+  const congestion = settings.zoneCongestion || [];
+  const incidents = settings.incidents || [];
+
+  const getAreaColor = (zoneId) => {
+    const c = congestion.find(cc => cc.zoneId === zoneId);
+    if (!c) return "#6b8aff";
+    return c.level === "danger" ? "#ff5e7e" : c.level === "crowded" ? "#f5c451" : "#4cd99a";
+  };
+
+  return (<>
+    <div className="mcc-page-header">
+      <div className="mcc-page-title">지도 상황도</div>
+      <div className="mcc-page-sub">{zones.length}개 구역 · {incidents.filter(i => i.status !== "closed").length}건 진행</div>
+    </div>
+
+    <div className="mcc-card" style={{ padding: 0, overflow: "hidden" }}>
+      {!mapImage ? <div style={{ aspectRatio: "16/10", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#6c6e7d", gap: 10, padding: 20 }}>
+        <span style={{ fontSize: 48 }}>🗺️</span>
+        <span style={{ fontSize: 13 }}>도면이 등록되지 않았습니다</span>
+        <span style={{ fontSize: 11, textAlign: "center" }}>모바일 보기 → 🗺️ 히트맵에서 업로드하세요</span>
+      </div> :
+        <div style={{ position: "relative", width: "100%" }}>
+          <img src={mapImage} alt="map" style={{ width: "100%", display: "block" }} />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            {mapAreas.map(a => {
+              const z = zones.find(zz => zz.id === a.zoneId);
+              const color = getAreaColor(a.zoneId);
+              const points = (a.points || []).map(p => `${p.x},${p.y}`).join(" ");
+              return (<g key={a.id}>
+                <polygon points={points} fill={color} fillOpacity={0.3} stroke={color} strokeWidth="0.3" />
+                {z && (a.points || []).length > 0 && (() => { const cx = a.points.reduce((s, p) => s + p.x, 0) / a.points.length; const cy = a.points.reduce((s, p) => s + p.y, 0) / a.points.length; return <text x={cx} y={cy} textAnchor="middle" fill="#fff" fontSize="2.5" fontWeight="700" style={{ paintOrder: "stroke", stroke: "rgba(0,0,0,0.6)", strokeWidth: "0.5" }}>{z.name}</text>; })()}
+              </g>);
+            })}
+          </svg>
+          {incidents.filter(i => i.status !== "closed").map((i, idx) => {
+            const x = 10 + (idx % 6) * 14; const y = 15 + Math.floor(idx / 6) * 18;
+            const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+            return (<div key={i.id} style={{ position: "absolute", left: `${x}%`, top: `${y}%`, width: 14, height: 14, borderRadius: 7, background: c, boxShadow: `0 0 10px ${c}, 0 0 0 2px rgba(0,0,0,0.4)`, animation: "cc-pulse 2s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700 }}>!</div>);
+          })}
+        </div>
+      }
+    </div>
+
+    {/* 구역 상태 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>구역 상태</div>
+      {zones.map(z => {
+        const c = congestion.find(cc => cc.zoneId === z.id);
+        const cl = c?.level || "smooth";
+        const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
+        const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
+        return (<div key={z.id} className="mcc-list-row">
+          <span style={{ flex: 1, fontSize: 13, color: "#f4f5fa" }}>📍 {z.name}</span>
+          <span className={`mcc-chip ${lv}`}>{lbl}</span>
+        </div>);
+      })}
+      {zones.length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>구역 미등록</div>}
+    </div>
+
+    {/* 활성 사건 */}
+    <div className="mcc-card">
+      <div className="mcc-card-title" style={{ marginBottom: 10 }}>활성 사건 ({incidents.filter(i => i.status !== "closed").length}건)</div>
+      {incidents.filter(i => i.status !== "closed").slice(0, 5).map(i => {
+        const c = { critical: "#ff5e7e", high: "#ff9a3c", mid: "#f5c451", low: "#4cd99a" }[i.priority];
+        return (<div key={i.id} className="mcc-list-row">
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: c, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{i.type}</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d" }}>{i.location}</div>
+          </div>
+        </div>);
+      })}
+      {incidents.filter(i => i.status !== "closed").length === 0 && <div style={{ padding: 16, textAlign: "center", color: "#6c6e7d", fontSize: 12 }}>활성 사건 없음 ✓</div>}
+    </div>
+  </>);
+}
+
+function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
+  // 페이지 변경 시 사이드바 닫기
+  useEffect(() => { setSidebarOpen(false); }, [ccPage]);
   const overall = useMemo(() => {
     const lvs = (categories || []).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
@@ -906,6 +2291,7 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
     <div className="cc-root">
       {/* TOP BAR */}
       <div className="cc-topbar">
+        <button className="cc-mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="메뉴">☰</button>
         <div className="cc-brand">
           <div className="cc-brand-logo">S</div>
           <div>
@@ -920,12 +2306,15 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
         </div>
       </div>
 
+      <div className={`cc-sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
       <div className="cc-layout">
-        <CC_Sidebar active={ccPage} alerts={alerts} settings={settings} onNav={(id) => { setCcPage(id); if (onNav) onNav(id); }} onLogout={onLogout} festivalName={settings?.festivalName} />
+        <div className={`cc-sidebar ${sidebarOpen ? "open" : ""}`}>
+          <CC_SidebarContent active={ccPage} alerts={alerts} settings={settings} onNav={(id) => { setCcPage(id); if (onNav) onNav(id); }} onLogout={onLogout} festivalName={settings?.festivalName} />
+        </div>
 
         <div className="cc-main-col">
           {/* 상단 그리팅 */}
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18 }}>
+          <div className="cc-greeting-box" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18 }}>
             <div>
               <div style={{ fontSize: 13, color: "#6c6e7d" }}>{new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" })}</div>
               <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", marginTop: 4, color: "#f4f5fa" }}>
@@ -951,7 +2340,13 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: "#f4f5fa" }}>{topAlert.category} - {(topAlert.message || "").split("\n")[2] || "확인 필요"}</div>
                 </div>
-                <CC_Btn variant="primary">대응 시작 →</CC_Btn>
+                <CC_Btn variant="primary" onClick={() => {
+                  const cat = (categories || []).find(c => c.name === topAlert.category);
+                  if (cat) {
+                    if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+                    if (setActiveAlert) setActiveAlert(cat);
+                  } else if (setActiveAlert) setActiveAlert(topAlert);
+                }}>대응 시작 →</CC_Btn>
               </div>
             </CC_Card>}
 
@@ -971,7 +2366,7 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
             </div>}
 
             {/* 활성 경보 + 주요 구역 */}
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+            <div className="cc-grid-2col" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
               <CC_Card title="활성 경보" sub="실시간 갱신" action={<CC_Btn size="sm" variant="ghost">전체 보기</CC_Btn>}>
                 {(alerts || []).slice(0, 5).map((a, i) => (<div key={i} className="cc-list-row">
                   <CC_Chip level={CC_LEVEL_MAP[a.level]} pulse={a.level === "ORANGE" || a.level === "RED"}>●</CC_Chip>
@@ -980,7 +2375,13 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                     <div style={{ fontSize: 12, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
                   </div>
                   <span className="mono" style={{ fontSize: 12, color: "#6c6e7d" }}>{a.time}</span>
-                  <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"}>대응</CC_Btn>
+                  <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"} onClick={() => {
+                    const cat = (categories || []).find(c => c.name === a.category);
+                    if (cat) {
+                      if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+                      if (setActiveAlert) setActiveAlert(cat);
+                    } else if (setActiveAlert) setActiveAlert(a);
+                  }}>대응</CC_Btn>
                 </div>))}
                 {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보가 없습니다</div>}
               </CC_Card>
@@ -1130,7 +2531,7 @@ function CC_AlertPage({ settings, setSettings, alerts, setAlerts, smsLog, setSms
   };
 
   return (<div>
-    <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+    <div className="cc-step-bar" style={{ display: "flex", gap: 8, marginBottom: 20 }}>
       {[1, 2, 3, 4, 5].map(s => (<div key={s} onClick={() => s < step && setStep(s)} style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: step === s ? `${lvColor}20` : step > s ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${step === s ? lvColor + "60" : step > s ? "rgba(76,217,154,0.2)" : "rgba(255,255,255,0.05)"}`, color: step === s ? lvColor : step > s ? "#4cd99a" : "#6c6e7d", fontSize: 12, fontWeight: 600, cursor: s < step ? "pointer" : "default", textAlign: "center" }}>
         {step > s ? "✓ " : ""}{s}. {["", "단계", "메시지", "채널", "대상", "발령"][s]}
       </div>))}
@@ -1267,7 +2668,7 @@ function CC_IncidentPage({ settings, setSettings, session }) {
   const filtered = filter === "all" ? incidents : filter === "today" ? todayIncidents : incidents.filter(i => i.status === filter);
 
   return (<div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+    <div className="cc-stats-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
       {[{ k: "today", n: "오늘", c: todayIncidents.length, color: "#6b8aff" }, { k: "open", n: "처리중", c: incidents.filter(i => i.status === "open").length, color: "#ff9a3c" }, { k: "in_progress", n: "조치중", c: incidents.filter(i => i.status === "in_progress").length, color: "#f5c451" }, { k: "closed", n: "완료", c: incidents.filter(i => i.status === "closed").length, color: "#4cd99a" }].map(s => (<div key={s.k} onClick={() => setFilter(s.k)} style={{ padding: 16, borderRadius: 14, background: filter === s.k ? `${s.color}15` : "rgba(255,255,255,0.02)", border: `1px solid ${filter === s.k ? s.color + "40" : "rgba(255,255,255,0.06)"}`, cursor: "pointer" }}>
         <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
         <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.color, marginTop: 4 }}>{s.c}</div>
@@ -1444,7 +2845,7 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
   const lost = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "lost").length, 0);
 
   return (<div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+    <div className="cc-stats-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
       {[{ n: "전체 자산", v: totalAssets, c: "#6b8aff" }, { n: "사용 가능", v: availAssets, c: "#4cd99a" }, { n: "고장", v: broken, c: "#ff9a3c" }, { n: "분실", v: lost, c: "#ff5e7e" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
         <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
@@ -1498,7 +2899,7 @@ function CC_ReportPage({ settings, alerts, categories, session }) {
   const dangerCats = (categories || []).filter(c => { const lv = getLevel(c); return lv === "ORANGE" || lv === "RED"; }).length;
 
   return (<div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+    <div className="cc-stats-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
       {[{ n: "오늘 알림", v: totalAlerts, c: "#6b8aff" }, { n: "사건 처리", v: closedIncidents + "/" + incidents.length, c: "#4cd99a" }, { n: "위험 카테고리", v: dangerCats, c: "#ff9a3c" }, { n: "운영 시간", v: "5h 32m", c: "#a980ff" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
         <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
@@ -1591,6 +2992,316 @@ function CC_SettingsPage({ settings, setSettings, session, onMobileSwitch }) {
         <CC_Btn variant="primary" onClick={onMobileSwitch}>📱 모바일 보기로 전환</CC_Btn>
       </div>
     </CC_Card>
+  </div>);
+}
+
+// ─── 운영인력 전용: 내 지정 구역 ─────────────────────────────────
+function MyZonePage({ settings, setSettings, session, accounts }) {
+  // 내 계정 찾기
+  const myAccount = accounts?.find(a => a.id === session?.id);
+  const mySiteId = myAccount?.siteId;
+  
+  const sites = settings.workSites || [];
+  const zones = settings.zones || [];
+  const programs = settings.programs || [];
+  const incidents = settings.incidents || [];
+  const congestion = settings.zoneCongestion || [];
+  
+  const mySite = sites.find(s => s.id === mySiteId);
+  const myZone = mySite ? zones.find(z => z.id === mySite.zoneId) : null;
+  
+  // 내 근무지 동료
+  const colleagues = mySite ? (mySite.workers || []).filter(w => w.accountId !== session?.id) : [];
+  
+  // 내 구역 혼잡도
+  const myCong = myZone ? congestion.find(c => c.zoneId === myZone.id) : null;
+  const congLevel = myCong?.level || "smooth";
+  const congColor = congLevel === "danger" ? "#ff5e7e" : congLevel === "crowded" ? "#f5c451" : "#4cd99a";
+  const congLabel = congLevel === "danger" ? "위험 (밀집)" : congLevel === "crowded" ? "혼잡" : "원활";
+  
+  // 내 구역의 사건
+  const myIncidents = incidents.filter(i => i.location?.includes(myZone?.name || "")).filter(i => i.status !== "closed");
+  
+  // 진행중 프로그램 + 다음 프로그램
+  const now = useNow(30000);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const todayStr = now.toISOString().slice(0, 10);
+  
+  const myZonePrograms = programs.filter(p => p.zoneId === myZone?.id || !p.zoneId);
+  const activePg = myZonePrograms.find(p => {
+    if (p.date !== "always" && p.date !== todayStr) return false;
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(255,112,67,0.12), rgba(255,112,67,0.04))", border: "1px solid rgba(255,112,67,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #FF7043, #E64A19)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(255,112,67,0.4)" }}>📍</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>내 지정 구역</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>운영인력 · {session?.name}</div>
+          </div>
+        </div>
+      </div>
+
+      {!mySite && <div style={{ padding: "40px 20px", textAlign: "center", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,167,38,0.08), rgba(255,167,38,0.02))", border: "1px solid rgba(255,167,38,0.2)" }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
+        <div style={{ color: "#ff9a3c", fontSize: 16, fontWeight: 700, marginBottom: 6 }}>지정 근무지가 없습니다</div>
+        <div style={{ color: "#b0b3c4", fontSize: 13 }}>관리자에게 근무지 배정을 요청하세요</div>
+      </div>}
+
+      {mySite && <>
+        {/* 내 구역 정보 카드 */}
+        <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>현재 근무지</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#f4f5fa", marginTop: 4, letterSpacing: "-0.01em" }}>📍 {mySite.name || myZone?.name || "미배치"}</div>
+              {myZone && mySite.name !== myZone.name && <div style={{ fontSize: 13, color: "#b0b3c4", marginTop: 2 }}>구역: {myZone.name}</div>}
+            </div>
+            <span style={{ padding: "5px 12px", borderRadius: 999, background: `${congColor}15`, border: `1px solid ${congColor}30`, color: congColor, fontSize: 12, fontWeight: 700 }}>● {congLabel}</span>
+          </div>
+          {myCong?.memo && <div style={{ padding: 10, background: "rgba(255,255,255,0.02)", borderRadius: 10, fontSize: 13, color: "#b0b3c4", marginBottom: 10 }}>📝 {myCong.memo}</div>}
+          
+          {/* 동료 */}
+          {colleagues.length > 0 && <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>같은 근무지 동료 ({colleagues.length}명)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {colleagues.map(c => (<a key={c.id} href={c.phone ? `tel:${c.phone}` : "#"} style={{ padding: "6px 12px", borderRadius: 999, background: "rgba(107,138,255,0.08)", border: "1px solid rgba(107,138,255,0.2)", color: "#8fa6ff", fontSize: 12, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                👤 {c.name}{c.phone && " 📞"}
+              </a>))}
+            </div>
+          </div>}
+        </div>
+
+        {/* 진행중 프로그램 */}
+        {activePg && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(76,217,154,0.1), rgba(76,217,154,0.02))", border: "1px solid rgba(76,217,154,0.25)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: "#4cd99a", boxShadow: "0 0 8px #4cd99a", animation: "blink 2s infinite" }}></span>
+            <span style={{ color: "#4cd99a", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>진행중 프로그램</span>
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#f4f5fa" }}>{activePg.title}</div>
+          <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>⏰ {activePg.time} ~ {activePg.endTime} {activePg.location && `· 📍 ${activePg.location}`}</div>
+          {activePg.description && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{activePg.description}</div>}
+        </div>}
+
+        {/* 내 구역 사건/신고 */}
+        {myIncidents.length > 0 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,94,126,0.1), rgba(255,94,126,0.02))", border: "1px solid rgba(255,94,126,0.25)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ color: "#ff5e7e", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>🚨 내 구역 진행중 사건 ({myIncidents.length})</span>
+          </div>
+          {myIncidents.map(i => (<div key={i.id} style={{ padding: 10, marginBottom: 6, borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ color: "#f4f5fa", fontSize: 14, fontWeight: 600 }}>{i.type}</span>
+              <span style={{ fontSize: 11, color: "#6c6e7d", fontFamily: "JetBrains Mono, monospace" }}>{i.time?.split(" ")[1] || i.time}</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>📍 {i.location}</div>
+            {i.desc && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>{i.desc}</div>}
+          </div>))}
+        </div>}
+
+        {/* 빠른 액션 */}
+        <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 10 }}>빠른 동작</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <a href="tel:119" style={{ padding: 14, borderRadius: 12, background: "linear-gradient(180deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))", border: "1px solid rgba(255,94,126,0.3)", color: "#ff738e", fontSize: 14, fontWeight: 700, textAlign: "center", textDecoration: "none" }}>🚑 119 응급</a>
+            <a href="tel:112" style={{ padding: 14, borderRadius: 12, background: "linear-gradient(180deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05))", border: "1px solid rgba(107,138,255,0.3)", color: "#8fa6ff", fontSize: 14, fontWeight: 700, textAlign: "center", textDecoration: "none" }}>👮 112 경찰</a>
+          </div>
+        </div>
+      </>}
+    </div>
+  </div>);
+}
+
+// ─── 비상연락망 ─────────────────────────────────────────────────
+function EmergencyContactsPage({ settings, setSettings, session }) {
+  const contacts = settings.emergencyContacts || [];
+  const canEdit = ["admin", "manager", "sysadmin"].includes(session?.role);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterGroup, setFilterGroup] = useState("all");
+
+  const [form, setForm] = useState({ group: "축제운영본부", name: "", role: "", phone: "", priority: "normal", note: "" });
+
+  // 그룹 목록 (자동 추출 + 기본값)
+  const defaultGroups = ["축제운영본부", "안전관리실", "의료지원", "경찰/소방", "외부기관", "주관기관", "기타"];
+  const usedGroups = [...new Set(contacts.map(c => c.group).filter(Boolean))];
+  const allGroups = [...new Set([...defaultGroups, ...usedGroups])];
+
+  const submit = () => {
+    if (!form.name || !form.phone) { alert("이름과 연락처는 필수입니다."); return; }
+    const id = editId || ("ec_" + Date.now());
+    setSettings(prev => {
+      const list = prev.emergencyContacts || [];
+      if (editId) {
+        return { ...prev, emergencyContacts: list.map(c => c.id === editId ? { ...c, ...form } : c) };
+      }
+      return { ...prev, emergencyContacts: [...list, { id, ...form }] };
+    });
+    setForm({ group: "축제운영본부", name: "", role: "", phone: "", priority: "normal", note: "" });
+    setShowAdd(false); setEditId(null);
+  };
+
+  const startEdit = (c) => { setEditId(c.id); setForm(c); setShowAdd(true); };
+  const remove = (id) => { if (confirm("삭제하시겠습니까?")) setSettings(p => ({ ...p, emergencyContacts: (p.emergencyContacts || []).filter(c => c.id !== id) })); };
+
+  // 필터
+  const filtered = contacts.filter(c => {
+    if (filterGroup !== "all" && c.group !== filterGroup) return false;
+    if (search && !(c.name?.includes(search) || c.role?.includes(search) || c.phone?.includes(search) || c.group?.includes(search))) return false;
+    return true;
+  }).sort((a, b) => {
+    const pri = { critical: 0, high: 1, normal: 2 };
+    return (pri[a.priority] || 2) - (pri[b.priority] || 2);
+  });
+
+  // 그룹별 분류
+  const grouped = {};
+  filtered.forEach(c => {
+    const g = c.group || "기타";
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(c);
+  });
+
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(255,94,126,0.12), rgba(255,94,126,0.04))", border: "1px solid rgba(255,94,126,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #ff5e7e, #c2185b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(255,94,126,0.4)" }}>🚨</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>비상연락망</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>총 {contacts.length}명 · 우선순위순</div>
+          </div>
+          {canEdit && <button onClick={() => { setShowAdd(!showAdd); setEditId(null); setForm({ group: "축제운영본부", name: "", role: "", phone: "", priority: "normal", note: "" }); }} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.1)", color: "#ff738e", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>+ 추가</button>}
+        </div>
+      </div>
+
+      {/* 긴급 연락처 (119/112) - 항상 상단 표시 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <a href="tel:119" style={{ padding: "14px 12px", borderRadius: 14, background: "linear-gradient(135deg, rgba(255,94,126,0.18), rgba(255,94,126,0.05))", border: "1.5px solid rgba(255,94,126,0.35)", color: "#ff738e", textAlign: "center", textDecoration: "none", boxShadow: "0 4px 12px -4px rgba(255,94,126,0.3)" }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>🚑</div>
+          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>119</div>
+          <div style={{ fontSize: 10, color: "#ff8a99", marginTop: 2, fontWeight: 600 }}>응급/소방</div>
+        </a>
+        <a href="tel:112" style={{ padding: "14px 12px", borderRadius: 14, background: "linear-gradient(135deg, rgba(107,138,255,0.18), rgba(107,138,255,0.05))", border: "1.5px solid rgba(107,138,255,0.35)", color: "#8fa6ff", textAlign: "center", textDecoration: "none", boxShadow: "0 4px 12px -4px rgba(107,138,255,0.3)" }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>👮</div>
+          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>112</div>
+          <div style={{ fontSize: 10, color: "#a5b8ff", marginTop: 2, fontWeight: 600 }}>경찰</div>
+        </a>
+        <a href="tel:120" style={{ padding: "14px 12px", borderRadius: 14, background: "linear-gradient(135deg, rgba(76,217,154,0.18), rgba(76,217,154,0.05))", border: "1.5px solid rgba(76,217,154,0.35)", color: "#4cd99a", textAlign: "center", textDecoration: "none", boxShadow: "0 4px 12px -4px rgba(76,217,154,0.3)" }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>🏛️</div>
+          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>120</div>
+          <div style={{ fontSize: 10, color: "#7ee5b3", marginTop: 2, fontWeight: 600 }}>다산콜</div>
+        </a>
+      </div>
+
+      {/* 추가/수정 폼 */}
+      {showAdd && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,94,126,0.06), rgba(255,94,126,0.02))", border: "1px solid rgba(255,94,126,0.2)", borderRadius: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", marginBottom: 12 }}>{editId ? "✏️ 연락처 수정" : "+ 새 연락처"}</div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>그룹</div>
+            <select value={form.group} onChange={e => setForm({ ...form, group: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }}>
+              {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>이름 *</div>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="홍길동" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>직책/역할</div>
+              <input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="안전관리실장" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>연락처 *</div>
+            <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="010-0000-0000" inputMode="tel" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, fontFamily: "'JetBrains Mono', monospace", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>우선순위</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              {[{ k: "critical", n: "🔴 최우선", c: "#ff5e7e" }, { k: "high", n: "🟠 우선", c: "#ff9a3c" }, { k: "normal", n: "🔵 일반", c: "#6b8aff" }].map(p => (<button key={p.k} onClick={() => setForm({ ...form, priority: p.k })} style={{ padding: "10px 8px", borderRadius: 10, border: form.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: form.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: form.priority === p.k ? p.c : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{p.n}</button>))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>메모</div>
+            <textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="역할 / 담당 영역 등" rows={2} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => { setShowAdd(false); setEditId(null); }} style={{ padding: "11px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>취소</button>
+            <button onClick={submit} style={{ flex: 1, padding: "11px 16px", borderRadius: 10, border: "none", background: "linear-gradient(180deg, #ff738e, #ff4f72)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{editId ? "✓ 수정" : "+ 추가"}</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* 검색 + 필터 */}
+      {contacts.length > 0 && <>
+        <div style={{ marginBottom: 10 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 이름/직책/연락처 검색" style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+        </div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
+          <button onClick={() => setFilterGroup("all")} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 999, border: filterGroup === "all" ? "1.5px solid #ff5e7e" : "1px solid rgba(255,255,255,0.1)", background: filterGroup === "all" ? "rgba(255,94,126,0.1)" : "rgba(255,255,255,0.03)", color: filterGroup === "all" ? "#ff738e" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체 ({contacts.length})</button>
+          {usedGroups.map(g => { const cnt = contacts.filter(c => c.group === g).length; return (<button key={g} onClick={() => setFilterGroup(g)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 999, border: filterGroup === g ? "1.5px solid #ff5e7e" : "1px solid rgba(255,255,255,0.1)", background: filterGroup === g ? "rgba(255,94,126,0.1)" : "rgba(255,255,255,0.03)", color: filterGroup === g ? "#ff738e" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{g} ({cnt})</button>); })}
+        </div>
+      </>}
+
+      {/* 연락처 목록 (그룹별) */}
+      {contacts.length === 0 ? <div style={{ padding: "40px 20px", textAlign: "center", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>📞</div>
+        <div style={{ color: "#f4f5fa", fontSize: 16, fontWeight: 700, marginBottom: 6 }}>등록된 비상연락처가 없습니다</div>
+        {canEdit && <div style={{ color: "#b0b3c4", fontSize: 13 }}>위의 [+ 추가] 버튼으로 등록하세요</div>}
+      </div> :
+        Object.entries(grouped).map(([group, list]) => (<div key={group} style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 8, paddingLeft: 4 }}>{group} ({list.length})</div>
+          {list.map(c => {
+            const pColor = c.priority === "critical" ? "#ff5e7e" : c.priority === "high" ? "#ff9a3c" : "#6b8aff";
+            return (<div key={c.id} style={{ padding: 14, marginBottom: 6, borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: `1px solid ${pColor}20`, borderLeft: `3px solid ${pColor}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#f4f5fa" }}>{c.name}</span>
+                    {c.role && <span style={{ fontSize: 11, color: "#94A3B8" }}>· {c.role}</span>}
+                  </div>
+                  {c.note && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{c.note}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <a href={`tel:${c.phone}`} style={{ padding: "8px 14px", borderRadius: 10, background: `linear-gradient(180deg, ${pColor}, ${pColor}dd)`, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: "'JetBrains Mono', monospace", boxShadow: `0 4px 12px -4px ${pColor}40` }}>📞 {c.phone}</a>
+                  {canEdit && <>
+                    <button onClick={() => startEdit(c)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                    <button onClick={() => remove(c.id)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer" }}>🗑</button>
+                  </>}
+                </div>
+              </div>
+            </div>);
+          })}
+        </div>))
+      }
+
+      {/* 일괄 SMS 발송 (관리자) */}
+      {canEdit && contacts.length > 0 && <div style={{ marginTop: 14, padding: 14, background: "linear-gradient(180deg, rgba(107,138,255,0.06), rgba(107,138,255,0.02))", border: "1px solid rgba(107,138,255,0.2)", borderRadius: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#8fa6ff", marginBottom: 8 }}>📨 비상연락망 일괄 SMS</div>
+        <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>현재 표시된 {filtered.length}명에게 비상 메시지를 발송합니다.</div>
+        <button onClick={async () => {
+          const msg = prompt(`${filtered.length}명에게 발송할 비상 메시지를 입력하세요:`, `[${settings.festivalName || "축제"}] 비상연락 - 즉시 회신 요망`);
+          if (!msg) return;
+          const targets = filtered.map(c => ({ name: c.name, phone: c.phone }));
+          const r = await sendSolapi(settings, msg, targets);
+          alert(r.ok ? `✅ 발송 완료\n성공: ${r.success} / 실패: ${r.fail}` : `❌ 발송 실패: ${r.error || "알 수 없음"}`);
+        }} style={{ width: "100%", padding: "11px 16px", borderRadius: 10, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>📨 {filtered.length}명에게 일괄 발송</button>
+      </div>}
+    </div>
   </div>);
 }
 
@@ -1880,6 +3591,25 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: li.color }} /><span style={{ color: "#94A3B8", fontSize: 14 }}>실황</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#FFA726", borderTop: "2px dashed #FF9800" }} /><span style={{ color: "#94A3B8", fontSize: 14 }}>예보</span></div>
+            </div>
+          </div>}
+
+          {/* 단기 예보 그래프 (향후 3일) */}
+          {(selected.shortForecast || []).length > 0 && <div style={{ marginBottom: 16 }}>
+            <h3 style={{ color: "#42A5F5", fontSize: 13, marginBottom: 8 }}>📅 단기 예보 (향후 3일, 3시간 간격)</h3>
+            <div style={{ width: "100%", height: 200 }}>
+              <ResponsiveContainer>
+                <LineChart data={selected.shortForecast} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                  <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 11 }} interval={Math.floor(selected.shortForecast.length / 8)} />
+                  <YAxis tick={{ fill: "#556", fontSize: 13 }} width={45} />
+                  <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "단기예보"]} />
+                  <Line type="monotone" dataKey="value" stroke="#42A5F5" strokeWidth={2} dot={{ fill: "#42A5F5", r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 20, height: 2, background: "#42A5F5" }} /><span style={{ color: "#94A3B8", fontSize: 13 }}>단기예보 (기상청)</span></div>
             </div>
           </div>}
 
@@ -2264,54 +3994,70 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
       const completed = (settings.resolvedHistory || []).filter(r => r.resolvedAt?.includes(today));
       return (handling.length > 0 || completed.length > 0) ? (
         <div style={{ maxWidth: 1100, margin: "20px auto 0" }}>
-          <h3 style={{ color: "#8892b0", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>📋 금일 주요 조치사항</h3>
+          <h3 style={{ color: "#8892b0", fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📋 금일 주요 조치사항</h3>
 
-          {/* 헤더 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "6px 10px", background: "rgba(255,152,0,0.1)", borderRadius: "8px 0 0 0", border: "1px solid rgba(255,152,0,0.15)" }}>
-              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>항목</span>
-              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700 }}>지시사항</span>
-              <span style={{ color: "#FFA726", fontSize: 13, fontWeight: 700, textAlign: "right" }}>지시일자</span>
+          {/* 진행중 카드 (세로 카드형, 메모까지 한 카드로) */}
+          {handling.length > 0 && (<>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: "#FFA726", animation: "blink 2s infinite" }}/>
+              <span style={{ color: "#FFA726", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em" }}>진행 중 ({handling.length}건)</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 14 }}>→</div>
-            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "6px 10px", background: "rgba(76,175,80,0.1)", borderRadius: "0 8px 0 0", border: "1px solid rgba(76,175,80,0.15)" }}>
-              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>항목</span>
-              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>조치사항</span>
-              <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, textAlign: "right" }}>완료일자</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 10, marginBottom: 16 }}>
+              {handling.map(cat => (
+                <div key={cat.id} style={{ borderRadius: 12, border: "1.5px solid rgba(255,167,38,0.35)", background: "linear-gradient(180deg, rgba(255,167,38,0.08), rgba(255,167,38,0.02))", padding: 0, overflow: "hidden", boxShadow: "0 4px 16px -4px rgba(255,167,38,0.2)" }}>
+                  {/* 헤더 */}
+                  <div style={{ padding: "10px 14px", background: "rgba(255,167,38,0.12)", borderBottom: "1px solid rgba(255,167,38,0.2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{cat.icon}</span>
+                      <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>{cat.name}</span>
+                    </div>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,167,38,0.2)", color: "#FFA726", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>🔧 진행중</span>
+                  </div>
+                  {/* 본문 - 메모/지시사항 */}
+                  <div style={{ padding: "12px 14px" }}>
+                    <div style={{ color: "#94A3B8", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>📝 지시사항</div>
+                    <div style={{ color: "#E2E8F0", fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", marginBottom: 10 }}>{cat.actionReport?.content || "지시 내용이 없습니다"}</div>
+                    {/* 메타 정보 (담당자, 시간) */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: "1px dashed rgba(255,167,38,0.15)" }}>
+                      <span style={{ color: cat.actionReport?.assigneeName ? "#FFA726" : "#666", fontSize: 11, fontWeight: 600 }}>
+                        {cat.actionReport?.assigneeName ? `👤 ${cat.actionReport.assigneeName}` : "👤 미지정"}
+                      </span>
+                      <span style={{ color: "#94A3B8", fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}>
+                        🕐 {cat.handlingStartedAt || cat.actionReport?.createdAt || "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-
-          {/* 진행중 항목 */}
-          {handling.map(cat => (
-            <div key={cat.id} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(255,152,0,0.05)", border: "1px solid rgba(255,152,0,0.1)", borderRadius: "4px 0 0 4px" }}>
-                <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700 }}>{cat.icon}{cat.name}</span>
-                <span style={{ color: "#ddd", fontSize: 14 }}>{cat.actionReport?.content || "지시 대기"}</span>
-                <span style={{ color: "#888", fontSize: 13, textAlign: "right" }}>{cat.handlingStartedAt || "-"}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#FFA726", fontSize: 14 }}>🔧</div>
-              <div style={{ display: "flex", alignItems: "center", padding: "8px 10px", background: "rgba(255,152,0,0.03)", border: "1px solid rgba(255,152,0,0.08)", borderRadius: "0 4px 4px 0" }}>
-                <span style={{ color: "#FFA726", fontSize: 13, fontStyle: "italic" }}>조치 진행중...</span>
-              </div>
-            </div>
-          ))}
+          </>)}
 
           {/* 완료 항목 */}
-          {completed.map((r, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 16px 1fr", gap: 0, marginBottom: 4 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: "4px 0 0 4px" }}>
-                <span style={{ color: "#999", fontSize: 13 }}>{r.icon}{r.name}</span>
-                <span style={{ color: "#888", fontSize: 14 }}>{r.instruction || "-"}</span>
-                <span style={{ color: "#94A3B8", fontSize: 13, textAlign: "right" }}>{r.instructedAt || "-"}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#66BB6A", fontSize: 14 }}>✅</div>
-              <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px", gap: 4, padding: "8px 10px", background: "rgba(76,175,80,0.03)", border: "1px solid rgba(76,175,80,0.08)", borderRadius: "0 4px 4px 0" }}>
-                <span style={{ color: "#66BB6A", fontSize: 13 }}>{r.icon}{r.name}</span>
-                <span style={{ color: "#aaa", fontSize: 14 }}>{r.resolution || "완료"}</span>
-                <span style={{ color: "#94A3B8", fontSize: 13, textAlign: "right" }}>{r.resolvedAt}</span>
-              </div>
+          {completed.length > 0 && (<>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: "#66BB6A" }}/>
+              <span style={{ color: "#66BB6A", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em" }}>완료 ({completed.length}건)</span>
             </div>
-          ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 8 }}>
+              {completed.map((r, i) => (
+                <div key={i} style={{ borderRadius: 10, border: "1px solid rgba(76,175,80,0.2)", background: "rgba(76,175,80,0.04)", padding: "10px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>{r.icon}</span>
+                      <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 600 }}>{r.name}</span>
+                    </div>
+                    <span style={{ color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>✅ 완료</span>
+                  </div>
+                  {r.instruction && <div style={{ color: "#aaa", fontSize: 12, lineHeight: 1.4, marginBottom: 4 }}>📝 {r.instruction}</div>}
+                  {r.resolution && r.resolution !== "완료" && r.resolution !== r.instruction && <div style={{ color: "#94A3B8", fontSize: 12, lineHeight: 1.4 }}>↳ {r.resolution}</div>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6, paddingTop: 6, borderTop: "1px dashed rgba(76,175,80,0.15)" }}>
+                    {r.assignee && <span style={{ color: "#66BB6A", fontSize: 10, fontWeight: 600 }}>👤 {r.assignee}</span>}
+                    <span style={{ color: "#94A3B8", fontSize: 10, fontFamily: "JetBrains Mono, monospace", marginLeft: "auto" }}>{r.resolvedAt}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>)}
         </div>
       ) : null;
     })()}
@@ -2985,33 +4731,44 @@ function FestivalStatusPage({ settings, setSettings, session, accounts, setAccou
     </div>);
   };
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
-    <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <PageHeader icon="🎪" title={settings.festivalName || "축제관리"} subtitle={`운영 ${opStart}~${opEnd} · ${now.toLocaleTimeString("ko-KR")}`} accent="#FFA726" />
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 500, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(255,167,38,0.12), rgba(255,167,38,0.04))", border: "1px solid rgba(255,167,38,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #FFA726, #FF6F00)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(255,167,38,0.4)" }}>🎪</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{settings.festivalName || "축제관리"}</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>운영 {opStart}~{opEnd} · {now.toLocaleTimeString("ko-KR")}</div>
+          </div>
+        </div>
+      </div>
 
       {/* 긴급상황 배너 */}
-      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 12, background: settings.emergencyLevel >= 3 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.1)", border: `2px solid ${settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {settings.emergencyLevel > 0 && <div style={{ padding: "14px 16px", borderRadius: 14, background: settings.emergencyLevel >= 3 ? "linear-gradient(180deg, rgba(255,94,126,0.18), rgba(255,94,126,0.04))" : "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", border: `1.5px solid ${settings.emergencyLevel >= 3 ? "rgba(255,94,126,0.3)" : "rgba(255,154,60,0.3)"}`, marginBottom: 10, animation: settings.emergencyLevel >= 3 ? "blink 1.5s infinite" : "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>{["", "🔵", "🟡", "🟠", "🔴"][settings.emergencyLevel]}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ color: settings.emergencyLevel >= 3 ? "#EF5350" : "#FFA726", fontSize: 16, fontWeight: 900 }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
-            {settings.emergencyMessage && <div style={{ color: "#E2E8F0", fontSize: 14, marginTop: 4 }}>{settings.emergencyMessage}</div>}
+            <div style={{ color: settings.emergencyLevel >= 3 ? "#ff5e7e" : "#ff9a3c", fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>🚨 {["", "1단계: 관심", "2단계: 주의", "3단계: 경계", "4단계: 심각"][settings.emergencyLevel]}</div>
+            {settings.emergencyMessage && <div style={{ color: "#E2E8F0", fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>{settings.emergencyMessage}</div>}
           </div>
-          <span style={{ color: "#94A3B8", fontSize: 12 }}>{settings.emergencyAt}</span>
+          <span style={{ color: "#6c6e7d", fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>{settings.emergencyAt}</span>
         </div>
       </div>}
 
-      {/* 종합 현황 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#42A5F5", icon: "📍" },
-          { label: "근무지", value: workSites.filter(s=>s.zoneId).length, color: "#009688", icon: "🏠" },
-          { label: "근무자", value: totalWorkers, color: "#66BB6A", icon: "👷" },
-          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#EF5350" : "#556", icon: "🔔" }
+      {/* v2 종합 현황 4-카드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+        {[{ label: "구역", value: zones.filter(z=>z.name).length, color: "#6b8aff", icon: "📍" },
+          { label: "근무지", value: workSites.filter(s=>s.zoneId).length, color: "#4cd99a", icon: "🏠" },
+          { label: "근무자", value: totalWorkers, color: "#a980ff", icon: "👷" },
+          { label: "요청", value: pendingCount, color: pendingCount > 0 ? "#ff5e7e" : "#6c6e7d", icon: "🔔" }
         ].map(c => (
-          <div key={c.label} style={{ padding: "10px 6px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${c.color}33`, textAlign: "center" }}>
-            <div style={{ fontSize: 14 }}>{c.icon}</div>
-            <div style={{ color: c.color, fontSize: 22, fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
-            <div style={{ color: "#94A3B8", fontSize: 12 }}>{c.label}</div>
+          <div key={c.label} style={{ padding: "12px 8px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: `1px solid ${c.color}25`, textAlign: "center", boxShadow: "0 4px 12px -6px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 16, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ color: c.color, fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>{c.value}</div>
+            <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{c.label}</div>
           </div>
         ))}
       </div>
@@ -3025,34 +4782,34 @@ function FestivalStatusPage({ settings, setSettings, session, accounts, setAccou
         const hasZone = congestionData.length > 0;
         const hasSite = siteCongs.length > 0;
         if (!hasZone && !hasSite) return null;
-        return (<div style={{ marginBottom: 10 }}>
-          {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 4 }}>
-            <span style={{ color: "#94A3B8", fontSize: 12, lineHeight: "24px" }}>👥인파</span>
-            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#66BB6A" },
-              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#FFA726" },
-              { icon: "🔴", label: "위험", count: dangerCount, color: "#EF5350" }
+        return (<div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          {hasZone && <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center", marginBottom: hasSite ? 6 : 0 }}>
+            <span style={{ color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>👥 인파</span>
+            {[{ icon: "🟢", label: "원활", count: congestionData.filter(c => c.level === "smooth").length, color: "#4cd99a" },
+              { icon: "🟡", label: "혼잡", count: crowdedCount, color: "#f5c451" },
+              { icon: "🔴", label: "위험", count: dangerCount, color: "#ff5e7e" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 999, background: `${c.color}15`, color: c.color, fontSize: 11, fontWeight: 700, border: `1px solid ${c.color}25` }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
-          {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-            <span style={{ color: "#94A3B8", fontSize: 12, lineHeight: "24px" }}>🏠근무지</span>
-            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#66BB6A" },
-              { icon: "🟡", label: "보통", count: sCrowded, color: "#FFA726" },
-              { icon: "🔴", label: "밀집", count: sDanger, color: "#EF5350" }
+          {hasSite && <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+            <span style={{ color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>🏠 근무지</span>
+            {[{ icon: "🟢", label: "여유", count: sSmooth, color: "#4cd99a" },
+              { icon: "🟡", label: "보통", count: sCrowded, color: "#f5c451" },
+              { icon: "🔴", label: "밀집", count: sDanger, color: "#ff5e7e" }
             ].filter(c => c.count > 0).map(c => (
-              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 8, background: `${c.color}15`, color: c.color, fontSize: 12, fontWeight: 700 }}>{c.icon} {c.label} {c.count}</span>
+              <span key={c.label} style={{ padding: "4px 10px", borderRadius: 999, background: `${c.color}15`, color: c.color, fontSize: 11, fontWeight: 700, border: `1px solid ${c.color}25` }}>{c.icon} {c.label} {c.count}</span>
             ))}
           </div>}
         </div>);
       })()}
 
-      {/* 모드 전환 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
-        <button onClick={() => setMode("festival")} style={{ padding: "12px", borderRadius: 10, border: mode === "festival" ? "2px solid #2196F3" : "1px solid #333", background: mode === "festival" ? "rgba(33,150,243,0.1)" : "transparent", color: mode === "festival" ? "#42A5F5" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>🎪 축제관리</button>
-        <button onClick={() => setMode("safety")} style={{ padding: "12px", borderRadius: 10, border: mode === "safety" ? "2px solid #F44336" : "1px solid #333", background: mode === "safety" ? "rgba(244,67,54,0.1)" : "transparent", color: mode === "safety" ? "#EF5350" : "#556", fontSize: 15, fontWeight: 800, cursor: "pointer", position: "relative" }}>
+      {/* v2 모드 전환 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <button onClick={() => setMode("festival")} style={{ padding: "13px", borderRadius: 12, border: mode === "festival" ? "2px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: mode === "festival" ? "linear-gradient(180deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05))" : "rgba(255,255,255,0.02)", color: mode === "festival" ? "#8fa6ff" : "#94a3b8", fontSize: 14, fontWeight: 700, cursor: "pointer", letterSpacing: "-0.01em" }}>🎪 축제관리</button>
+        <button onClick={() => setMode("safety")} style={{ padding: "13px", borderRadius: 12, border: mode === "safety" ? "2px solid #ff5e7e" : "1px solid rgba(255,255,255,0.08)", background: mode === "safety" ? "linear-gradient(180deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))" : "rgba(255,255,255,0.02)", color: mode === "safety" ? "#ff738e" : "#94a3b8", fontSize: 14, fontWeight: 700, cursor: "pointer", position: "relative", letterSpacing: "-0.01em" }}>
           🛡️ 안전관리
-          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: "linear-gradient(135deg, #F44336, #D32F2F)", color: "#fff", boxShadow: "0 4px 12px rgba(244,67,54,0.3)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
+          {(pendingCount + dangerCount) > 0 && <span style={{ position: "absolute", top: -6, right: -6, minWidth: 20, height: 20, padding: "0 6px", borderRadius: 10, background: "linear-gradient(135deg, #ff5e7e, #ff4f72)", color: "#fff", boxShadow: "0 0 10px rgba(255,94,126,0.6)", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{pendingCount + dangerCount}</span>}
         </button>
       </div>
 
@@ -3491,37 +5248,54 @@ function ProgramPage({ settings, setSettings, session, onManage }) {
     timeGroups[key].push(pg);
   });
 
-  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
-    <div style={{ maxWidth: 500, margin: "0 auto" }}>
-      <PageHeader icon="🎭" title="축제 프로그램" subtitle={`${programs.length}개 프로그램`} accent="#AB47BC" action={["admin","manager","sysadmin"].includes(session?.role) ? <Btn variant="outline" color="#AB47BC" icon="⚙️" onClick={onManage} style={{ padding: "8px 12px", fontSize: 12 }}>관리</Btn> : null} />
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 500, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(171,71,188,0.12), rgba(171,71,188,0.04))", border: "1px solid rgba(171,71,188,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #AB47BC, #7B1FA2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(171,71,188,0.4)" }}>🎭</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>축제 프로그램</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>{programs.length}개 프로그램 · 진행 {nowGroup.length}개</div>
+          </div>
+          {["admin","manager","sysadmin"].includes(session?.role) && <button onClick={onManage} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(171,71,188,0.3)", background: "rgba(171,71,188,0.1)", color: "#E1BEE7", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>⚙️ 관리</button>}
+        </div>
+      </div>
 
-      {/* 일자 선택 */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
-        <button onClick={() => setSelDate("all")} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "all" ? "2px solid #9C27B0" : "1px solid #333", background: selDate === "all" ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === "all" ? "#E1BEE7" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>전체</button>
+      {/* v2 일자 선택 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+        <button onClick={() => setSelDate("all")} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === "all" ? "1.5px solid #AB47BC" : "1px solid rgba(255,255,255,0.1)", background: selDate === "all" ? "rgba(171,71,188,0.15)" : "rgba(255,255,255,0.03)", color: selDate === "all" ? "#E1BEE7" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>전체</button>
         {dates.map((d, i) => {
           const dt = new Date(d); const dayNames = ["일","월","화","수","목","금","토"];
           const isToday = d === todayStr;
-          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === d ? "2px solid #9C27B0" : isToday ? "1px solid #4CAF50" : "1px solid #333", background: selDate === d ? "rgba(156,39,176,0.15)" : "transparent", color: selDate === d ? "#E1BEE7" : isToday ? "#66BB6A" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ★" : ""}
+          return (<button key={d} onClick={() => setSelDate(d)} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === d ? "1.5px solid #AB47BC" : isToday ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.1)", background: selDate === d ? "rgba(171,71,188,0.15)" : isToday ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.03)", color: selDate === d ? "#E1BEE7" : isToday ? "#4cd99a" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {dt.getMonth()+1}/{dt.getDate()} ({dayNames[dt.getDay()]}){isToday ? " ●" : ""}
           </button>);
         })}
-        <button onClick={() => { setSelDate("always"); setAlwaysOpen(true); }} style={{ padding: "8px 14px", borderRadius: 20, border: selDate === "always" ? "2px solid #009688" : "1px solid #333", background: selDate === "always" ? "rgba(0,150,136,0.15)" : "transparent", color: selDate === "always" ? "#009688" : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>상시</button>
+        <button onClick={() => { setSelDate("always"); setAlwaysOpen(true); }} style={{ padding: "8px 16px", borderRadius: 999, border: selDate === "always" ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.1)", background: selDate === "always" ? "rgba(76,217,154,0.15)" : "rgba(255,255,255,0.03)", color: selDate === "always" ? "#4cd99a" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>상시</button>
       </div>
 
-      {/* 카테고리 */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
-        {Object.entries(CATS).map(([k, v]) => (
-          <button key={k} onClick={() => setSelCat(k)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: selCat === k ? `2px solid ${v.color}` : "1px solid #333", background: selCat === k ? `${v.color}15` : "transparent", color: selCat === k ? v.color : "#556", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{v.label} {k !== "all" ? dateFiltered.filter(p => p.category === k).length : dateFiltered.length}</button>
-        ))}
+      {/* v2 카테고리 필터 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginBottom: 14 }}>
+        {Object.entries(CATS).map(([k, v]) => {
+          const v2Color = k === "all" ? "#6b8aff" : k === "O" ? "#6b8aff" : k === "P" ? "#ff5e7e" : k === "E" ? "#4cd99a" : "#ff9a3c";
+          const cnt = k !== "all" ? dateFiltered.filter(p => p.category === k).length : dateFiltered.length;
+          return (<button key={k} onClick={() => setSelCat(k)} style={{ padding: "10px 4px", borderRadius: 12, border: selCat === k ? `1.5px solid ${v2Color}` : "1px solid rgba(255,255,255,0.08)", background: selCat === k ? `${v2Color}15` : "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", color: selCat === k ? v2Color : "#b0b3c4", fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center", lineHeight: 1.3 }}>
+            <div>{v.label}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", marginTop: 2, fontSize: 14, fontWeight: 700 }}>{cnt}</div>
+          </button>);
+        })}
       </div>
 
       {/* 프로그램 목록 */}
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94A3B8" }}>해당 조건의 프로그램이 없습니다.</div>}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#6c6e7d", fontSize: 13 }}>해당 조건의 프로그램이 없습니다.</div>}
 
       {/* 진행중 프로그램 */}
       {nowGroup.length > 0 && <div style={{ marginBottom: 14 }}>
-        <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 800, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ animation: "blink 2s infinite" }}>●</span> 진행중 {nowGroup.length}개
+        <div style={{ color: "#4cd99a", fontSize: 11, fontWeight: 700, marginBottom: 8, paddingLeft: 4, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", boxShadow: "0 0 8px #4cd99a", animation: "blink 2s infinite" }}></span> 진행중 {nowGroup.length}개
         </div>
         {nowGroup.map(pg => renderPgCard(pg))}
       </div>}
@@ -4181,43 +5955,105 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     URL.revokeObjectURL(url);
   };
 
-  return (<PageContainer maxWidth={900}>
-    <PageHeader icon="👥" title="근무자 관리" subtitle={`총 ${stats.total}명 · 근무중 ${stats.onDuty}명`} accent="#42A5F5" action={canEdit && stats.total > 0 ? <div style={{ display: "flex", gap: 6 }}>
-      {setAccounts && (() => {
-        const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
-        if (noAcc === 0) return null;
-        return <Btn variant="primary" color="#66BB6A" icon="🔐" onClick={() => {
-          if (!confirm(`계정이 없는 근무자 ${noAcc}명에 대해 일괄로 계정을 생성합니다.\n\n로그인 ID: 이름\n비밀번호: 1234\n\n진행할까요?`)) return;
-          const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
-          const fid = settings.festivalId || session?.festivalId || "default";
-          const newAccs = [];
-          let created = 0, skipped = 0;
-          allWorkers.forEach(w => {
-            if (w.accountId || accounts?.find(a => a.id === w.name)) { skipped++; return; }
-            const accRole = roleMap[w.role] || "manager";
-            newAccs.push({ id: w.name, password: simpleHash("1234"), name: w.name, role: accRole, festivalId: fid, festivals: [fid], workerId: w.id, siteId: w.siteId });
-            created++;
-          });
-          if (newAccs.length > 0) {
-            setAccounts(prev => [...prev, ...newAccs]);
-            // 근무자에도 accountId 연결
-            setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
-          }
-          alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
-        }} style={{ padding: "8px 12px", fontSize: 12 }}>계정생성 ({noAcc})</Btn>;
-      })()}
-      <Btn variant="secondary" icon="📥" onClick={exportCSV} style={{ padding: "8px 12px", fontSize: 12 }}>CSV</Btn>
-    </div> : null} />
-
-    {/* 통계 카드 */}
-    <Card>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, textAlign: "center" }}>
-        <div><div style={{ color: "#42A5F5", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.total}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>👤 총인원</div></div>
-        <div><div style={{ color: "#66BB6A", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.onDuty}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🟢 근무중</div></div>
-        <div><div style={{ color: "#AB47BC", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.withRadio}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>📻 무전기</div></div>
-        <div><div style={{ color: "#FFA726", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{stats.totalMeals}</div><div style={{ color: "#94A3B8", fontSize: 11 }}>🍱 식수</div></div>
+  return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "20px max(14px, env(safe-area-inset-right)) 80px max(14px, env(safe-area-inset-left))" }}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      {/* v2 페이지 헤더 */}
+      <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04))", border: "1px solid rgba(107,138,255,0.25)", borderRadius: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #6b8aff, #5a7aff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(107,138,255,0.4)" }}>👥</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>근무자 관리</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>총 {stats.total}명 · 근무중 {stats.onDuty}명</div>
+          </div>
+          {canEdit && <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+            {setAccounts && stats.total > 0 && (() => {
+              const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
+              if (noAcc === 0) return null;
+              return <button onClick={() => {
+                if (!confirm(`계정이 없는 근무자 ${noAcc}명에 대해 일괄로 계정을 생성합니다.\n\n로그인 ID: 이름\n비밀번호: 1234\n\n진행할까요?`)) return;
+                const roleMap = { "주차": "parking", "주차요원": "parking", "셔틀": "shuttle", "셔틀요원": "shuttle", "계수": "counter", "계수원": "counter", "구역": "zonemgr", "구역관리": "zonemgr", "구역관리자": "zonemgr", "무대": "stagemgr", "무대관리": "stagemgr", "무대관리자": "stagemgr", "관리자": "manager", "운영자": "manager", "운영": "manager", "지원": "manager", "안전관리": "manager", "기술": "manager" };
+                const fid = settings.festivalId || session?.festivalId || "default";
+                const newAccs = [];
+                let created = 0, skipped = 0;
+                allWorkers.forEach(w => {
+                  if (w.accountId || accounts?.find(a => a.id === w.name)) { skipped++; return; }
+                  const accRole = roleMap[w.role] || "manager";
+                  newAccs.push({ id: w.name, password: simpleHash("1234"), name: w.name, role: accRole, festivalId: fid, festivals: [fid], workerId: w.id, siteId: w.siteId });
+                  created++;
+                });
+                if (newAccs.length > 0) {
+                  setAccounts(prev => [...prev, ...newAccs]);
+                  setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
+                }
+                alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
+              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>🔐 계정({noAcc})</button>;
+            })()}
+            {/* 사용자관리 → 근무자 복구 (workers 배열이 비었거나 accounts와 동기화 안됐을 때) */}
+            {(() => {
+              const fid = settings.festivalId || session?.festivalId || "default";
+              const workerRoles = ["manager", "zonemgr", "stagemgr", "counter", "parking", "shuttle"];
+              // 현재 축제의 worker 역할 계정들
+              const candidates = (accounts || []).filter(a => 
+                workerRoles.includes(a.role) && 
+                (a.festivalId === fid || (a.festivals || []).includes(fid))
+              );
+              // 이미 근무자로 등록된 사람 제외 (이름 또는 accountId로 매칭)
+              const missing = candidates.filter(a => 
+                !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
+              );
+              if (missing.length === 0) return null;
+              const roleNameMap = { manager: "운영", zonemgr: "구역관리", stagemgr: "무대관리", counter: "계수", parking: "주차", shuttle: "셔틀" };
+              return <button onClick={() => {
+                if (!confirm(`📥 사용자관리 → 근무자 복구\n\n사용자관리에 ${missing.length}명의 계정이 있지만 근무자 목록에 없습니다.\n이들을 '미배치' 근무지로 복구합니다.\n\n복구 후 ⚙️관리에서 적절한 근무지로 이동시킬 수 있습니다.\n\n진행하시겠습니까?`)) return;
+                setSettings(prev => {
+                  const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+                  // 미배치 사이트 자동 생성
+                  let pi = ws.findIndex(s => s.id === "_pool");
+                  if (pi < 0) {
+                    ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
+                    pi = ws.length - 1;
+                  }
+                  missing.forEach(a => {
+                    const w = {
+                      id: "w_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                      name: a.name,
+                      phone: a.phone || "",
+                      role: roleNameMap[a.role] || a.role,
+                      meals: 1,
+                      mealNote: "",
+                      accountId: a.id
+                    };
+                    ws[pi].workers = [...(ws[pi].workers || []), w];
+                  });
+                  return { ...prev, workSites: ws };
+                });
+                alert(`✅ ${missing.length}명 복구 완료\n\n'미배치' 근무지에 추가되었습니다.\n⚙️관리에서 근무지로 이동시키세요.`);
+              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.4)", background: "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>📥 복구({missing.length})</button>;
+            })()}
+            {stats.total > 0 && <button onClick={exportCSV} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📥 CSV</button>}
+          </div>}
+        </div>
       </div>
-    </Card>
+
+      {/* v2 통계 카드 (4개) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+        {[
+          { label: "총인원", value: stats.total, color: "#6b8aff", icon: "👤" },
+          { label: "근무중", value: stats.onDuty, color: "#4cd99a", icon: "🟢" },
+          { label: "무전기", value: stats.withRadio, color: "#a980ff", icon: "📻" },
+          { label: "식수", value: stats.totalMeals, color: "#ff9a3c", icon: "🍱" }
+        ].map(c => (
+          <div key={c.label} style={{ padding: "12px 8px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: `1px solid ${c.color}25`, textAlign: "center", boxShadow: "0 4px 12px -6px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 14, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ color: c.color, fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>{c.value}</div>
+            <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 검색 + 추가 버튼 (기존 컴포넌트 유지) */}
 
     {/* 검색 */}
     <Card style={{ padding: 12 }}>
@@ -4253,7 +6089,30 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     </Card>}
 
     {/* 근무자 카드 목록 */}
-    {filtered.length === 0 && <EmptyState icon="👥" title={search ? "검색 결과 없음" : "등록된 근무자가 없습니다"} description={canEdit && !search ? "축제관리 또는 ⚙️관리 → 인력관리에서 등록하세요" : ""} />}
+    {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", marginTop: 12 }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>👥</div>
+      <div style={{ color: "#f4f5fa", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{search ? "검색 결과 없음" : "등록된 근무자가 없습니다"}</div>
+      {canEdit && !search && (() => {
+        const fid = settings.festivalId || session?.festivalId || "default";
+        const workerRoles = ["manager", "zonemgr", "stagemgr", "counter", "parking", "shuttle"];
+        const candidates = (accounts || []).filter(a => 
+          workerRoles.includes(a.role) && 
+          (a.festivalId === fid || (a.festivals || []).includes(fid))
+        );
+        const missing = candidates.filter(a => 
+          !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
+        );
+        if (missing.length > 0) {
+          return (<>
+            <div style={{ color: "#ff9a3c", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+              💡 사용자관리에 <b style={{ color: "#FFB74D" }}>{missing.length}명</b>의 계정이 있습니다.<br/>
+              위의 <b style={{ color: "#FFB74D" }}>📥 복구</b> 버튼을 누르면 자동으로 가져옵니다.
+            </div>
+          </>);
+        }
+        return <div style={{ color: "#6c6e7d", fontSize: 13 }}>축제관리 또는 ⚙️관리 → 인력관리에서 등록하세요</div>;
+      })()}
+    </div>}
 
     {filtered.map(w => {
       const isEditing = editId?.workerId === w.id;
@@ -4512,7 +6371,8 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
       {toast.msg}
     </div>}
     <style>{`@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
-  </PageContainer>);
+    </div>
+  </div>);
 }
 
 // ─── 2.1: 근무일지 / 교대관리 (Shifts) ─────────────────────────────
@@ -7991,6 +9851,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
         {(() => {
           const allItems = [
             { id: "dashboard", icon: "📊", label: "대시보드" },
+            { id: "myzone", icon: "📍", label: "내 구역" },
             { id: "counter", icon: "👥", label: "인파계수", feat: "crowd" },
             { id: "congestion", icon: "🚦", label: "혼잡도", feat: "congestion" },
             { id: "heatmap", icon: "🗺️", label: "히트맵", feat: "heatmap" },
@@ -8001,6 +9862,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "program", icon: "🎭", label: "프로그램" },
             { id: "stage", icon: "🎤", label: "공연관리", feat: "stage" },
             { id: "location", icon: "📍", label: "위치", feat: "location" },
+            { id: "emergency", icon: "🚨", label: "비상연락망" },
             { id: "assets", icon: "📦", label: "장비", feat: "assets" },
             { id: "shifts", icon: "📝", label: "근무일지", feat: "shifts" },
             { id: "workers", icon: "👥", label: "근무자관리", feat: "workers" },
@@ -8094,6 +9956,7 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
     const doFetch = async () => {
       let dataMap = null;
       let fcstData = null;
+      let shortFcstData = null;
       let mode = "sim";
 
       if (kma.serviceKey) {
@@ -8126,6 +9989,33 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
             });
           }
         } catch {}
+
+        // 3) 단기예보 (getVilageFcst) — 향후 3일 예보 (3시간 간격)
+        try {
+          const sp = getShortFcstParams(settings);
+          const url3 = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${encodeURIComponent(kma.serviceKey)}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${sp.bd}&base_time=${sp.bt}&nx=${sp.nx}&ny=${sp.ny}`;
+          const res3 = await fetch(url3);
+          const json3 = await res3.json();
+          const items3 = json3?.response?.body?.items?.item;
+          if (items3 && items3.length > 0) {
+            shortFcstData = {};
+            // 단기예보 카테고리 매핑: TMP(기온) → T1H, POP(강수확률), PCP(강수량) → RN1, WSD(풍속), REH(습도), SKY(하늘), PTY(강수형태)
+            items3.forEach(i => {
+              const cat = i.category;
+              const mappedCat = cat === "TMP" ? "T1H" : cat === "PCP" ? "RN1" : cat;
+              if (!shortFcstData[mappedCat]) shortFcstData[mappedCat] = [];
+              let val = parseFloat(i.fcstValue);
+              if (cat === "PCP" && (i.fcstValue === "강수없음" || i.fcstValue === "-" || isNaN(val))) val = 0;
+              if (isNaN(val)) val = 0;
+              shortFcstData[mappedCat].push({ 
+                time: `${i.fcstDate.slice(4,6)}/${i.fcstDate.slice(6)} ${i.fcstTime.slice(0,2)}:${i.fcstTime.slice(2)}`,
+                value: Math.round(val * 10) / 10,
+                fcstDate: i.fcstDate,
+                fcstTime: i.fcstTime
+              });
+            });
+          }
+        } catch (e) { console.warn("[KMA] 단기예보 실패:", e); }
       }
 
       // 실패 시 시뮬레이션
@@ -8147,7 +10037,14 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
 
       setCategories(p => p.map(c => {
         if (c.kmaCategory && dataMap[c.kmaCategory] !== undefined && !c.apiConfig?.enabled) {
-          return { ...c, currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, lastUpdated: new Date().toLocaleTimeString("ko-KR"), forecast: fcstData[c.kmaCategory] || [], dataType: "실황" };
+          return { 
+            ...c, 
+            currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, 
+            lastUpdated: new Date().toLocaleTimeString("ko-KR"), 
+            forecast: fcstData[c.kmaCategory] || [], 
+            shortForecast: (shortFcstData && shortFcstData[c.kmaCategory]) || [],
+            dataType: "실황" 
+          };
         }
         return c;
       }));
@@ -8304,15 +10201,16 @@ const DEFAULT_FESTIVALS = [
 ];
 
 const ROLES = {
-  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "축제 생성/관리 + 모든 기능" },
-  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "모든 기능 접근" },
-  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"], desc: "설정 변경 가능 (계정관리 제외)" },
-  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "heatmap", "status", "program", "inbox", "location", "assets", "shifts", "qrcode"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
-  stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat", "assets", "shifts"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
-  counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "인파 계수 + 대시보드 조회" },
-  parking: { label: "주차요원", color: "#AB47BC", pages: ["parking", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "주차장 관리 + 대시보드 조회" },
-  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "location", "shifts"], desc: "셔틀버스 위치 관리" },
-  viewer: { label: "뷰어", color: "#42A5F5", pages: ["dashboard", "chat", "status", "program"], desc: "대시보드 조회만 가능" },
+  sysadmin: { label: "시스템관리자", color: "#E91E63", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms", "emergency"], desc: "축제 생성/관리 + 모든 기능" },
+  admin: { label: "관리자", color: "#EF5350", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms", "emergency"], desc: "모든 기능 접근" },
+  manager: { label: "운영자", color: "#FFA726", pages: ["dashboard", "counter", "parking", "shuttle", "congestion", "heatmap", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms", "emergency"], desc: "설정 변경 가능 (계정관리 제외)" },
+  zonemgr: { label: "구역관리자", color: "#009688", pages: ["dashboard", "congestion", "heatmap", "status", "program", "inbox", "location", "assets", "shifts", "qrcode", "emergency"], desc: "담당 구역 혼잡도/근무자/상태 관리" },
+  stagemgr: { label: "무대관리자", color: "#AB47BC", pages: ["dashboard", "stage", "status", "program", "chat", "assets", "shifts", "emergency"], desc: "공연/무대 관리 + 아티스트/셋리스트" },
+  operations: { label: "운영인력", color: "#FF7043", pages: ["myzone", "program", "location", "emergency", "chat", "shifts"], desc: "현장 운영인력 - 지정구역/프로그램/위치/비상연락망" },
+  counter: { label: "계수원", color: "#66BB6A", pages: ["counter", "congestion", "dashboard", "chat", "status", "program", "location", "shifts", "emergency"], desc: "인파 계수 + 대시보드 조회" },
+  parking: { label: "주차요원", color: "#AB47BC", pages: ["parking", "dashboard", "chat", "status", "program", "location", "shifts", "emergency"], desc: "주차장 관리 + 대시보드 조회" },
+  shuttle: { label: "셔틀요원", color: "#00BCD4", pages: ["shuttle", "dashboard", "chat", "status", "program", "location", "shifts", "emergency"], desc: "셔틀버스 위치 관리" },
+  viewer: { label: "뷰어", color: "#42A5F5", pages: ["dashboard", "chat", "status", "program", "emergency"], desc: "대시보드 조회만 가능" },
 };
 
 // ─── Login Page ──────────────────────────────────────────────────
@@ -8386,23 +10284,54 @@ function LoginPage({ onLogin, accounts }) {
 
 // ─── Account Manager (CMS sub-page) ─────────────────────────────
 function AccountManager({ accounts, setAccounts, currentUser }) {
-  const [newAcc, setNewAcc] = useState({ id: "", pw: "", name: "", role: "counter" });
+  const [newAcc, setNewAcc] = useState({ id: "", pw: "", name: "", role: "operations" });
   const [editPw, setEditPw] = useState({});
+  // 다중 선택 + 일괄 변경
+  const [selected, setSelected] = useState(new Set());
+  const [bulkRole, setBulkRole] = useState("operations");
 
   const addAccount = () => {
     if (!newAcc.id || !newAcc.pw || !newAcc.name) return;
     if (accounts.find(a => a.id === newAcc.id)) { alert("이미 존재하는 아이디입니다."); return; }
     setAccounts([...accounts, { id: newAcc.id, password: simpleHash(newAcc.pw), name: newAcc.name, role: newAcc.role, festivalId: currentUser.festivalId, festivals: [currentUser.festivalId] }]);
-    setNewAcc({ id: "", pw: "", name: "", role: "counter" });
+    setNewAcc({ id: "", pw: "", name: "", role: "operations" });
   };
 
-  const ROLE_RANK = { sysadmin: 100, admin: 80, manager: 60, zonemgr: 50, stagemgr: 45, counter: 40, parking: 40, shuttle: 40, viewer: 20 };
+  const ROLE_RANK = { sysadmin: 100, admin: 80, manager: 60, zonemgr: 50, stagemgr: 45, counter: 40, parking: 40, shuttle: 40, operations: 35, viewer: 20 };
   const myRank = ROLE_RANK[currentUser.role] || 0;
   const canManage = (acc) => {
     if (acc.id === currentUser.id) return false; // 자기 자신 수정 불가
     const targetRank = ROLE_RANK[acc.role] || 0;
     return myRank > targetRank; // 자기보다 낮은 등급만 관리 가능
   };
+
+  // 일괄 역할 변경
+  const applyBulkRole = () => {
+    const newRank = ROLE_RANK[bulkRole] || 0;
+    if (newRank >= myRank) { alert("자신보다 높거나 같은 등급으로 변경할 수 없습니다."); return; }
+    const targetIds = [...selected].filter(id => {
+      const acc = accounts.find(a => a.id === id);
+      return acc && canManage(acc);
+    });
+    if (targetIds.length === 0) { alert("일괄 변경 가능한 계정이 없습니다."); return; }
+    if (!confirm(`선택한 ${targetIds.length}명을 [${ROLES[bulkRole]?.label}] 유형으로 일괄 변경합니다.\n진행하시겠습니까?`)) return;
+    setAccounts(accounts.map(a => targetIds.includes(a.id) ? { ...a, role: bulkRole } : a));
+    setSelected(new Set());
+    alert(`✅ ${targetIds.length}명의 유형이 [${ROLES[bulkRole]?.label}](으)로 변경되었습니다.`);
+  };
+
+  const toggleSelect = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+
+  const selectAll = () => {
+    const manageable = accounts.filter(a => canManage(a)).map(a => a.id);
+    setSelected(new Set(manageable));
+  };
+
+  const clearSelection = () => setSelected(new Set());
 
   const deleteAcc = (id) => {
     const target = accounts.find(a => a.id === id);
@@ -8431,18 +10360,42 @@ function AccountManager({ accounts, setAccounts, currentUser }) {
 
   return (
     <div>
+      {/* v2 일괄 유형 변경 패널 */}
+      <div style={{ padding: 16, marginBottom: 14, background: "linear-gradient(180deg, rgba(255,112,67,0.08), rgba(255,112,67,0.02))", border: "1px solid rgba(255,112,67,0.25)", borderRadius: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 18 }}>🎯</span>
+          <span style={{ color: "#FF7043", fontSize: 14, fontWeight: 700 }}>유형 일괄 변경</span>
+          <span style={{ color: "#94A3B8", fontSize: 12, marginLeft: "auto" }}>{selected.size}명 선택됨</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+          <button onClick={selectAll} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,112,67,0.3)", background: "rgba(255,112,67,0.1)", color: "#FF7043", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✓ 전체 선택 (수정가능 계정만)</button>
+          <button onClick={clearSelection} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕ 선택 해제</button>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 600 }}>변경할 유형:</span>
+          <select value={bulkRole} onChange={e => setBulkRole(e.target.value)} style={{ flex: 1, minWidth: 140, padding: "9px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "#0e0f17", color: "#fff", fontSize: 13, fontFamily: "inherit" }}>
+            {Object.entries(ROLES).filter(([k]) => (ROLE_RANK[k] || 0) < myRank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button onClick={applyBulkRole} disabled={selected.size === 0} style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: selected.size === 0 ? "rgba(255,255,255,0.05)" : "linear-gradient(180deg, #FF7043, #E64A19)", color: selected.size === 0 ? "#6c6e7d" : "#fff", fontSize: 13, fontWeight: 700, cursor: selected.size === 0 ? "default" : "pointer" }}>일괄 적용 ({selected.size})</button>
+        </div>
+        {ROLES[bulkRole]?.desc && <div style={{ marginTop: 8, padding: 8, fontSize: 11, color: "#FFB74D", background: "rgba(255,152,0,0.06)", borderRadius: 8, lineHeight: 1.4 }}>💡 {ROLES[bulkRole].desc}</div>}
+      </div>
+
       <Card>
-        <h3 style={{ color: "#E2E8F0", fontSize: 16, margin: "0 0 14px" }}>👤 계정 목록</h3>
+        <h3 style={{ color: "#E2E8F0", fontSize: 16, margin: "0 0 14px" }}>👤 계정 목록 ({accounts.length}명)</h3>
         {accounts.map(acc => {
           const rl = ROLES[acc.role] || ROLES.viewer;
           const editable = canManage(acc);
           const isSelf = acc.id === currentUser.id;
+          const isSelected = selected.has(acc.id);
           let isOnline = false, lastSeenLabel = "";
           try { const pr = JSON.parse(localStorage.getItem("fest_presence") || "{}")[acc.id]; if (pr) { const diff = Date.now() - pr.lastSeen; isOnline = diff < 120000; if (!isOnline) { const min = Math.floor(diff/60000); lastSeenLabel = min < 60 ? `${min}분 전` : min < 1440 ? `${Math.floor(min/60)}시간 전` : `${Math.floor(min/1440)}일 전`; } } } catch {}
           return (
-            <div key={acc.id} style={{ padding: "12px 14px", background: editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
+            <div key={acc.id} style={{ padding: "12px 14px", background: isSelected ? "rgba(255,112,67,0.08)" : editable ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.01)", borderRadius: 10, marginBottom: 8, border: isSelected ? "1.5px solid rgba(255,112,67,0.4)" : isSelf ? "1px solid rgba(33,150,243,0.3)" : "1px solid transparent", opacity: editable || isSelf ? 1 : 0.6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* 체크박스 (수정 가능한 계정만) */}
+                  {editable && <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(acc.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#FF7043" }} />}
                   <span style={{ width: 8, height: 8, borderRadius: 4, background: isOnline ? "#66BB6A" : "#556", flexShrink: 0 }} />
                   <span style={{ color: "#E2E8F0", fontWeight: 700, fontSize: 14 }}>{acc.name}</span>
                   <span style={{ color: "#94A3B8", fontSize: 14 }}>({acc.id})</span>
@@ -8775,6 +10728,19 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   // 🖥️ PC 관제센터 모드 (1024px 이상 자동 감지 + 사용자 토글 가능)
   const [forceMobile, setForceMobile] = useState(() => localStorage.getItem("_force_mobile") === "1");
+  // 🎨 새 모바일 디자인 (클로드디자인 v2) - 기본 ON
+  const [useNewMobile, setUseNewMobile] = useState(() => localStorage.getItem("_new_mobile") !== "0");
+  const toggleNewMobile = () => {
+    const next = !useNewMobile;
+    setUseNewMobile(next);
+    localStorage.setItem("_new_mobile", next ? "1" : "0");
+  };
+  // body 클래스로 글로벌 v2 톤 적용
+  useEffect(() => {
+    if (useNewMobile) document.body.classList.add("md-v2-active");
+    else document.body.classList.remove("md-v2-active");
+    return () => document.body.classList.remove("md-v2-active");
+  }, [useNewMobile]);
   const [isPC, setIsPC] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024);
   useEffect(() => {
     const onResize = () => setIsPC(window.innerWidth >= 1024);
@@ -8782,7 +10748,8 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const isManager = ["admin", "sysadmin", "manager"].includes(session?.role);
-  const useControlCenter = isPC && isManager && !forceMobile;
+  // 관리자는 모든 화면 사이즈에서 관제센터 사용 가능 (모바일은 햄버거 메뉴)
+  const useControlCenter = isManager && !forceMobile;
   const toggleMobileView = () => {
     const next = !forceMobile;
     setForceMobile(next);
@@ -8808,6 +10775,51 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const [cmsCatId, setCmsCatId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const prevLevels = useRef({}); const lastSms = useRef(0); const alertCooldown = useRef({});
+
+  // 🔒 근무자 자동 백업: 근무자 수가 변경될 때마다 백업 (최대 1분에 1번)
+  const lastWorkerBackup = useRef(0);
+  const lastWorkerCount = useRef(-1);
+  useEffect(() => {
+    const totalWorkers = (settings.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+    
+    // 첫 로드 시는 카운트만 기록
+    if (lastWorkerCount.current < 0) {
+      lastWorkerCount.current = totalWorkers;
+      return;
+    }
+    
+    const prev = lastWorkerCount.current;
+    
+    // 근무자가 50% 이상 갑자기 감소하면 경고 + 강제 백업
+    if (prev > 5 && totalWorkers < prev * 0.5) {
+      console.warn(`⚠️ [자동백업] 근무자 급감 감지: ${prev}명 → ${totalWorkers}명`);
+      console.warn(`💡 복구: window._safeflow.listBackups() → window._safeflow.restoreBackup(0)`);
+    }
+    
+    // 변경 감지 + 1분에 1번만 백업
+    const now = Date.now();
+    if (totalWorkers !== prev && now - lastWorkerBackup.current > 60000) {
+      lastWorkerBackup.current = now;
+      // localStorage에 백업 (Supabase 비용 절감)
+      try {
+        const ts = new Date().toISOString();
+        const list = JSON.parse(localStorage.getItem('_worker_backups') || '[]');
+        const backupKey = `${fid}_workers_backup_${now}`;
+        const data = { ts, workSites: settings.workSites || [], total: totalWorkers };
+        localStorage.setItem(backupKey, JSON.stringify(data));
+        list.unshift({ key: backupKey, ts, total: totalWorkers });
+        // 최근 10개만
+        if (list.length > 10) {
+          const removed = list.splice(10);
+          removed.forEach(r => { try { localStorage.removeItem(r.key); } catch {} });
+        }
+        localStorage.setItem('_worker_backups', JSON.stringify(list));
+        console.log(`📦 [자동백업] 근무자 ${totalWorkers}명 백업 완료`);
+      } catch (e) { console.warn('[자동백업] 실패:', e); }
+    }
+    
+    lastWorkerCount.current = totalWorkers;
+  }, [settings.workSites, fid]);
 
   const active = isActive(settings);
   const role = ROLES[session.role] || ROLES.viewer;
@@ -8935,6 +10947,11 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     const cooldownMs = (aSet.cooldownMin || 10) * 60 * 1000;
 
     categories.forEach(cat => {
+      // 🚫 humidity(습도)는 EXCLUDE_FROM_OVERALL에 있어 종합경보엔 빠지지만
+      //    개별 알림은 발생하므로 여기서도 제외
+      if (EXCLUDE_FROM_OVERALL.includes(cat.id)) {
+        return;
+      }
       const lv = getLevel(cat); const prev = prevLevels.current[cat.id];
       if ((lv === "ORANGE" || lv === "RED") && prev && prev !== lv) {
         // 조용한 시간: RED만 알림 (ORANGE는 스킵)
@@ -9008,6 +11025,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
   const navOrderRaw = settings.navOrder || ["dashboard", "counter", "congestion", "heatmap", "parking", "shuttle", "chat", "status", "program", "stage", "location", "assets", "shifts", "workers", "reports", "qrcode", "cms"]; const navOrder = [...navOrderRaw]; ["dashboard","counter","congestion","heatmap","parking","shuttle","chat","status","program","stage","location","assets","shifts","reports","qrcode","cms"].forEach(id => { if (!navOrder.includes(id)) navOrder.push(id); });
   const allNavs = [
     { id: "dashboard", icon: "📊", label: "대시보드" },
+    { id: "myzone", icon: "📍", label: "내 구역" },
     ft.crowd !== false && { id: "counter", icon: "👥", label: "인파계수" },
     ft.congestion !== false && { id: "congestion", icon: "🚦", label: "혼잡도" },
     { id: "status", icon: "🎪", label: "축제관리" },
@@ -9015,6 +11033,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.stage !== false && { id: "stage", icon: "🎤", label: "공연관리" },
     ft.heatmap !== false && { id: "heatmap", icon: "🗺️", label: "히트맵" },
     ft.location !== false && { id: "location", icon: "📍", label: "위치" },
+    { id: "emergency", icon: "🚨", label: "비상연락망" },
     ft.assets !== false && { id: "assets", icon: "📦", label: "장비" },
     ft.shifts !== false && { id: "shifts", icon: "📝", label: "근무일지" },
     ft.workers !== false && { id: "workers", icon: "👥", label: "근무자" },
@@ -9035,45 +11054,76 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   // 🖥️ PC 관제센터 모드 - 1024px 이상 + 관리자 + 토글 안 한 경우
   if (useControlCenter) {
-    return (<ControlCenterDashboard
-      session={session}
-      accounts={accounts}
-      settings={settings}
-      setSettings={setSettings}
-      categories={categories}
-      alerts={alerts}
-      setAlerts={setAlerts}
-      smsLog={smsLog}
-      setSmsLog={setSmsLog}
-      onLogout={onLogout}
-      onMobileSwitch={toggleMobileView}
-      setActiveAlert={setActiveAlert}
-      onNav={(id) => {
-        // 사이드바 메뉴 → 모바일 페이지 매핑 (백업용)
-        const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
-        if (map[id]) { setPage(map[id]); }
-      }}
-    />);
+    // 모바일 (768px 미만): 하단 네비 + 세로카드 구조
+    if (!isPC) {
+      return (<CCErrorBoundary>
+        <MobileControlCenter
+          session={session}
+          accounts={accounts}
+          settings={settings}
+          setSettings={setSettings}
+          categories={categories}
+          setCategories={setCategories}
+          alerts={alerts}
+          setAlerts={setAlerts}
+          smsLog={smsLog}
+          setSmsLog={setSmsLog}
+          onLogout={onLogout}
+          onMobileSwitch={toggleMobileView}
+          setActiveAlert={setActiveAlert}
+          onAction={handleAction}
+        />
+      </CCErrorBoundary>);
+    }
+    // PC/태블릿: 사이드바 구조
+    return (<CCErrorBoundary>
+      <ControlCenterDashboard
+        session={session}
+        accounts={accounts}
+        settings={settings}
+        setSettings={setSettings}
+        categories={categories}
+        setCategories={setCategories}
+        alerts={alerts}
+        setAlerts={setAlerts}
+        smsLog={smsLog}
+        setSmsLog={setSmsLog}
+        onLogout={onLogout}
+        onMobileSwitch={toggleMobileView}
+        setActiveAlert={setActiveAlert}
+        onAction={handleAction}
+        onNav={(id) => {
+          const map = { dashboard: "dashboard", monitor: "counter", alert: "chat", incident: "chat", map: "heatmap", resource: "assets", report: "reports", user: "workers", settings: "cms" };
+          if (map[id]) { setPage(map[id]); }
+        }}
+      />
+    </CCErrorBoundary>);
   }
 
   return (<div style={{ fontFamily: "'Noto Sans KR',-apple-system,sans-serif" }}>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
     <style>{`@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
+    {useNewMobile && <>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+      <style>{MD_GLOBAL_V2}</style>
+    </>}
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
 
-    {/* Top bar - user info */}
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
+    {/* Top bar - user info (새 모바일 디자인 대시보드면 숨김) */}
+    {!(useNewMobile && page === "dashboard") && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
         <span style={{ padding: "3px 8px", borderRadius: 10, background: `${role.color}22`, border: `1px solid ${role.color}44`, color: role.color, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{role.label}</span>
         <span style={{ color: "#8892b0", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {isPC && isManager && forceMobile && <button onClick={toggleMobileView} title="PC 관제센터로 전환" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.3)", background: "rgba(107,138,255,0.06)", color: "#6b8aff", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🖥️ PC관제센터</button>}
+        {isManager && forceMobile && <button onClick={toggleMobileView} title="관제센터로 전환" style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.3)", background: "rgba(107,138,255,0.06)", color: "#6b8aff", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🖥️ 관제센터</button>}
+        <button onClick={toggleNewMobile} title={useNewMobile ? "기존 디자인" : "새 디자인 v2"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(169,128,255,0.3)", background: "rgba(169,128,255,0.06)", color: "#a980ff", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>{useNewMobile ? "🎨 v2" : "🎨 v1"}</button>
         <button onClick={() => setShowSearch(true)} title="통합 검색 (Ctrl+K)" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(66,165,245,0.25)", background: "rgba(33,150,243,0.06)", color: "#42A5F5", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>🔍 <span style={{ fontSize: 11, opacity: 0.6, display: "none" }}>⌘K</span></button>
         {(session.festivals?.length > 1 || session.role === "sysadmin") && onBackToFestivalSelect && <button onClick={onBackToFestivalSelect} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#FFA726", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>🎪 축제변경</button>}
         <button onClick={onLogout} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>로그아웃</button>
       </div>
-    </div>
+    </div>}
 
     {/* 통합 검색 모달 */}
     <SearchModal open={showSearch} onClose={() => setShowSearch(false)} settings={settings} categories={categories} onNavigate={(p) => setPage(p)} />
@@ -9126,8 +11176,21 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     </nav>
 
     {/* Content */}
-    <div style={{ paddingTop: "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
-      {page === "dashboard" && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
+    <div style={{ paddingTop: useNewMobile && page === "dashboard" ? 0 : "calc(env(safe-area-inset-top) + 44px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
+      {page === "dashboard" && useNewMobile && active && <MobileNewDashboard
+        session={session}
+        settings={settings}
+        categories={categories}
+        alerts={alerts}
+        onCardClick={onCardClick}
+        onSearch={() => setShowSearch(true)}
+        onAlertClick={(a) => setActiveAlert(a)}
+        onPageChange={setPage}
+        onLogout={onLogout}
+        isManager={isManager}
+        onSwitchToOldDesign={toggleNewMobile}
+      />}
+      {page === "dashboard" && !useNewMobile && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
         // 삭제 시 해당 알림의 cooldown을 현재 시각으로 갱신 (10분 내 재생성 방지)
         const now = Date.now();
         if (idx === "all") {
@@ -9160,6 +11223,8 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       {page === "reports" && <ReportsPage settings={settings} setSettings={setSettings} session={session} categories={categories} alerts={alerts} />}
       {page === "qrcode" && <QRPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "status" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
+      {page === "myzone" && <MyZonePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
+      {page === "emergency" && <EmergencyContactsPage settings={settings} setSettings={setSettings} session={session} />}
       {page === "cms" && cmsTab === "accounts" ? (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "20px 16px" }}>
           <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 14px" }}>👤 계정 관리</h2>
