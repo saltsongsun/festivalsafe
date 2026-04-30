@@ -2519,7 +2519,9 @@ function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session
           <span style={{ color: "#6c6e7d" }}>축제명</span>
           <span style={{ color: "#f4f5fa", fontWeight: 600 }}>{settings.festivalName || "-"}</span>
           <span style={{ color: "#6c6e7d" }}>장소</span>
-          <span style={{ color: "#f4f5fa" }}>{settings.location || "-"}</span>
+          <span style={{ color: "#f4f5fa" }}>{settings.location?.name || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>좌표</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 11 }}>{settings.location?.lat ? `${settings.location.lat.toFixed(4)}, ${settings.location.lon.toFixed(4)}` : "-"}</span>
           <span style={{ color: "#6c6e7d" }}>면적</span>
           <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{(settings.venueArea || 0).toLocaleString()} ㎡</span>
           <span style={{ color: "#6c6e7d" }}>시작</span>
