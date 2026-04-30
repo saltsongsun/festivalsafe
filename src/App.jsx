@@ -2457,6 +2457,532 @@ function MCC_Map({ settings, session }) {
   </>);
 }
 
+// ─── PC 관제센터 운영 페이지 (정보-밀집형) ─────────────────────
+
+// 1) 축제 관리 - 종합 현황
+function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session, categories, alerts, setCcPage }) {
+  const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, zoneId: s.zoneId })));
+  const onDuty = allWorkers.filter(w => w.onDuty).length;
+  const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+  const allRadios = (settings.assets || []).flatMap(a => a.units || []);
+  const radiosUsed = allRadios.filter(u => u.assignedTo).length;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const todayPgs = (settings.programs || []).filter(p => p.date === "always" || p.date === todayStr);
+  const activePgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+  const upcomingPgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    return sh*60+sm > nowMin;
+  }).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  const openIncidents = (settings.incidents || []).filter(i => i.status !== "closed");
+  const startD = settings.startDate ? new Date(settings.startDate) : null;
+  const endD = settings.endDate ? new Date(settings.endDate) : null;
+  const today = new Date();
+  let dayStatus = "준비중", dayInfo = "";
+  if (startD && endD) {
+    const ds = today < startD ? Math.ceil((startD - today) / 86400000) : 0;
+    const de = today > endD ? -1 : Math.ceil((endD - today) / 86400000);
+    const totalDays = Math.ceil((endD - startD) / 86400000) + 1;
+    const dayN = Math.floor((today - startD) / 86400000) + 1;
+    if (today < startD) { dayStatus = `D-${ds}`; dayInfo = "개막 준비"; }
+    else if (today > endD) { dayStatus = "종료"; dayInfo = `${totalDays}일간 운영 완료`; }
+    else { dayStatus = `D+${dayN-1}`; dayInfo = `${dayN}/${totalDays}일차`; }
+  }
+
+  return (<div>
+    {/* KPI 8개 라인 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "축제 일정", value: dayStatus, sub: dayInfo, color: "#6b8aff", icon: "📅" },
+        { label: "구역", value: (settings.zones || []).length, sub: "운영중", color: "#a980ff", icon: "📍" },
+        { label: "근무지", value: (settings.workSites || []).filter(s => s.id !== "_pool").length, sub: "배치된", color: "#42A5F5", icon: "🏠" },
+        { label: "총 인력", value: allWorkers.length, sub: `근무 ${onDuty}`, color: "#4cd99a", icon: "👥" },
+        { label: "프로그램", value: todayPgs.length, sub: `진행 ${activePgs.length}`, color: "#FF7043", icon: "🎭" },
+        { label: "활성 경보", value: (alerts || []).length, sub: `심각 ${(alerts||[]).filter(a=>a.level==="RED").length}`, color: (alerts||[]).length>0?"#ff5e7e":"#4cd99a", icon: "🔔" },
+        { label: "사건 처리", value: openIncidents.length, sub: "진행중", color: openIncidents.length>0?"#ff9a3c":"#4cd99a", icon: "📁" },
+        { label: "무전기", value: `${radiosUsed}/${allRadios.length}`, sub: "사용중", color: "#f5c451", icon: "📻" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 10, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1, letterSpacing: "-0.02em" }}>{k.value}</div>
+        <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 4 }}>{k.sub}</div>
+      </div>))}
+    </div>
+
+    {/* 축제 정보 + 운영 시간 + 빠른 액션 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="축제 정보" sub="기본 설정">
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: "10px 12px", fontSize: 13 }}>
+          <span style={{ color: "#6c6e7d" }}>축제명</span>
+          <span style={{ color: "#f4f5fa", fontWeight: 600 }}>{settings.festivalName || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>장소</span>
+          <span style={{ color: "#f4f5fa" }}>{settings.location || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>면적</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{(settings.venueArea || 0).toLocaleString()} ㎡</span>
+          <span style={{ color: "#6c6e7d" }}>시작</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.startDate || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>종료</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.endDate || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>운영시간</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.operatingStart || "-"} ~ {settings.operatingEnd || "-"}</span>
+        </div>
+      </CC_Card>
+
+      <CC_Card title="구역 / 근무지" sub={`${(settings.zones || []).length}개 구역, ${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지`}>
+        {(settings.zones || []).slice(0, 6).map(z => {
+          const sites = (settings.workSites || []).filter(s => s.zoneId === z.id);
+          const wkrs = sites.reduce((n, s) => n + (s.workers || []).length, 0);
+          const cong = (settings.zoneCongestion || []).find(c => c.zoneId === z.id);
+          const lv = cong?.level === "danger" ? "red" : cong?.level === "crowded" ? "yellow" : "green";
+          const lbl = cong?.level === "danger" ? "위험" : cong?.level === "crowded" ? "혼잡" : "원활";
+          return (<div key={z.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+            <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {z.name}</span>
+            <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{sites.length} 지점</span>
+            <span className="mono" style={{ fontSize: 11, color: "#6b8aff" }}>{wkrs}명</span>
+            <CC_Chip level={lv}>{lbl}</CC_Chip>
+          </div>);
+        })}
+      </CC_Card>
+
+      <CC_Card title="현재 상황" sub="실시간">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {activePgs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(76,217,154,0.08)", border: "1px solid rgba(76,217,154,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", animation: "blink 1.5s infinite" }} />
+              <span style={{ fontSize: 11, color: "#4cd99a", fontWeight: 700 }}>● 진행중 {activePgs.length}개</span>
+            </div>
+            {activePgs.slice(0, 2).map(p => (<div key={p.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4 }}>· {p.title}</div>))}
+          </div>}
+          {upcomingPgs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(107,138,255,0.08)", border: "1px solid rgba(107,138,255,0.2)" }}>
+            <div style={{ fontSize: 11, color: "#6b8aff", fontWeight: 700, marginBottom: 4 }}>다음 예정</div>
+            {upcomingPgs.slice(0, 2).map(p => (<div key={p.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4, display: "flex", gap: 8 }}>
+              <span className="mono" style={{ color: "#6b8aff" }}>{p.time}</span>
+              <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</span>
+            </div>))}
+          </div>}
+          {openIncidents.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,154,60,0.08)", border: "1px solid rgba(255,154,60,0.2)" }}>
+            <div style={{ fontSize: 11, color: "#ff9a3c", fontWeight: 700, marginBottom: 4 }}>🚨 사건 처리중 {openIncidents.length}건</div>
+            {openIncidents.slice(0, 2).map(i => (<div key={i.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4 }}>· {i.type} ({i.location})</div>))}
+          </div>}
+          <CC_Btn variant="primary" onClick={() => setCcPage("incident")}>🚨 사건 등록</CC_Btn>
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 안내: 상세 설정 */}
+    <CC_Card title="설정 / 관리" sub="모바일 화면에서 더 자세히 설정 가능">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("program")}>🎭 프로그램 설정 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("stage")}>🎤 공연 설정 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("workforce")}>👷 인력 관리 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 시스템 설정 →</CC_Btn>
+      </div>
+    </CC_Card>
+  </div>);
+}
+
+// 2) 프로그램 관리 - 타임라인 + 일정표
+function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
+  const programs = settings.programs || [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const [filterDate, setFilterDate] = useState("today");
+  const [filterCategory, setFilterCategory] = useState("all");
+
+  const dates = [...new Set(programs.map(p => p.date).filter(d => d && d !== "always"))].sort();
+  const categoryList = [...new Set(programs.map(p => p.category).filter(Boolean))];
+
+  let filtered = programs;
+  if (filterDate === "today") filtered = filtered.filter(p => p.date === "always" || p.date === todayStr);
+  else if (filterDate !== "all") filtered = filtered.filter(p => p.date === filterDate);
+  if (filterCategory !== "all") filtered = filtered.filter(p => p.category === filterCategory);
+  filtered = filtered.sort((a, b) => (a.date + " " + (a.time || "")).localeCompare(b.date + " " + (b.time || "")));
+
+  // KPI
+  const todayPgs = programs.filter(p => p.date === "always" || p.date === todayStr);
+  const activePgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+  const upcomingPgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    return sh*60+sm > nowMin;
+  });
+  const endedPgs = todayPgs.filter(p => {
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin > eh*60+em || p.pgStatus === "ended";
+  });
+
+  return (<div>
+    {/* KPI 5개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "전체 프로그램", value: programs.length, color: "#6b8aff", icon: "🎭" },
+        { label: "오늘 일정", value: todayPgs.length, color: "#a980ff", icon: "📅" },
+        { label: "진행중", value: activePgs.length, color: "#4cd99a", icon: "▶" },
+        { label: "예정", value: upcomingPgs.length, color: "#f5c451", icon: "⏰" },
+        { label: "종료", value: endedPgs.length, color: "#6c6e7d", icon: "✓" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</div>
+      </div>))}
+    </div>
+
+    {/* 필터 */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600 }}>날짜:</span>
+        {[{ k: "today", l: "오늘" }, { k: "all", l: "전체" }, ...dates.map(d => ({ k: d, l: d.slice(5) }))].map(d => (
+          <button key={d.k} onClick={() => setFilterDate(d.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filterDate === d.k ? "1px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filterDate === d.k ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filterDate === d.k ? "#6b8aff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{d.l}</button>
+        ))}
+        {categoryList.length > 0 && <>
+          <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600, marginLeft: 12 }}>카테고리:</span>
+          {[{ k: "all", l: "전체" }, ...categoryList.map(c => ({ k: c, l: c }))].map(c => (
+            <button key={c.k} onClick={() => setFilterCategory(c.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filterCategory === c.k ? "1px solid #a980ff" : "1px solid rgba(255,255,255,0.08)", background: filterCategory === c.k ? "rgba(169,128,255,0.15)" : "rgba(255,255,255,0.02)", color: filterCategory === c.k ? "#a980ff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{c.l}</button>
+          ))}
+        </>}
+        <CC_Btn size="sm" variant="primary" style={{ marginLeft: "auto" }} onClick={() => setCcPage("settings")}>+ 새 프로그램</CC_Btn>
+      </div>
+    </CC_Card>
+
+    {/* 메인: 타임라인 + 상세 (2 컬럼) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="📅 프로그램 일정" sub={`${filtered.length}개 일정`}>
+        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 조건의 프로그램이 없습니다</div> : 
+          filtered.map(p => {
+            let status = "scheduled", color = "#6b8aff", label = "예정";
+            if (p.pgStatus === "ended") { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+            else if (p.date === todayStr || p.date === "always") {
+              const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+              const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+              if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "진행중"; }
+              else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+            }
+            return (<div key={p.id} style={{ padding: 12, marginBottom: 6, borderRadius: 10, background: status === "active" ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span className="mono" style={{ fontSize: 13, color: color, fontWeight: 700, minWidth: 90 }}>{p.time}~{p.endTime}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 999, background: `${color}15`, color, fontSize: 10, fontWeight: 700 }}>{status === "active" ? "● " : ""}{label}</span>
+                {p.category && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(169,128,255,0.1)", color: "#a980ff", fontSize: 10, fontWeight: 600 }}>{p.category}</span>}
+                {p.date && p.date !== "always" && <span style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto", fontFamily: "JetBrains Mono" }}>{p.date}</span>}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa", marginBottom: 4 }}>{p.title}</div>
+              {(p.location || p.zoneId) && <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 4 }}>📍 {p.location || (settings.zones || []).find(z => z.id === p.zoneId)?.name}</div>}
+              {p.description && <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>{p.description}</div>}
+            </div>);
+          })}
+        </div>
+      </CC_Card>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* 카테고리별 통계 */}
+        <CC_Card title="📊 카테고리별" sub="프로그램 분포">
+          {categoryList.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>카테고리 미분류</div> :
+          categoryList.map(c => {
+            const cnt = programs.filter(p => p.category === c).length;
+            const ratio = programs.length > 0 ? Math.round((cnt / programs.length) * 100) : 0;
+            return (<div key={c} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, color: "#f4f5fa" }}>{c}</span>
+                <span className="mono" style={{ fontSize: 12, color: "#a980ff" }}>{cnt}건 ({ratio}%)</span>
+              </div>
+              <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
+                <div style={{ width: `${ratio}%`, height: "100%", background: "#a980ff", borderRadius: 2 }} />
+              </div>
+            </div>);
+          })}
+        </CC_Card>
+
+        {/* 시간대 분포 */}
+        <CC_Card title="🕐 시간대별 일정" sub="오늘 기준">
+          {(() => {
+            const slots = ["09-12", "12-15", "15-18", "18-21", "21-24"];
+            const counts = slots.map(s => {
+              const [start, end] = s.split("-").map(Number);
+              return todayPgs.filter(p => {
+                const h = parseInt((p.time || "00:00").split(":")[0]);
+                return h >= start && h < end;
+              }).length;
+            });
+            const maxCnt = Math.max(...counts, 1);
+            return slots.map((s, i) => (<div key={s} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+              <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", minWidth: 50 }}>{s}시</span>
+              <div style={{ flex: 1, height: 16, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                <div style={{ width: `${(counts[i] / maxCnt) * 100}%`, height: "100%", background: "linear-gradient(90deg, #6b8aff, #a980ff)", borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 8 }}>
+                  {counts[i] > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{counts[i]}</span>}
+                </div>
+              </div>
+            </div>));
+          })()}
+        </CC_Card>
+      </div>
+    </div>
+  </div>);
+}
+
+// 3) 공연 관리 - 무대/아티스트
+function CC_StagePage({ settings, setSettings, session, setCcPage }) {
+  const stages = settings.stages || [];
+  const artists = settings.artists || [];
+  const setlists = settings.setlists || [];
+  const programs = settings.programs || [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const stagePrograms = programs.filter(p => p.stageId);
+  const todayStagePgs = stagePrograms.filter(p => p.date === "always" || p.date === todayStr);
+  const activeStagePgs = todayStagePgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+
+  return (<div>
+    {/* KPI */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "무대", value: stages.length, color: "#a980ff", icon: "🎤" },
+        { label: "아티스트", value: artists.length, color: "#FF7043", icon: "🎙️" },
+        { label: "셋리스트", value: setlists.length, color: "#42A5F5", icon: "🎵" },
+        { label: "오늘 공연", value: todayStagePgs.length, color: "#a980ff", icon: "🎭" },
+        { label: "진행중 공연", value: activeStagePgs.length, color: "#4cd99a", icon: "▶" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</div>
+      </div>))}
+    </div>
+
+    {/* 무대별 현황 + 아티스트 목록 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="🎤 무대별 운영 현황" sub={`${stages.length}개 무대`}>
+        {stages.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 무대가 없습니다</div> :
+        stages.map(s => {
+          const sPgs = stagePrograms.filter(p => p.stageId === s.id);
+          const sToday = sPgs.filter(p => p.date === "always" || p.date === todayStr);
+          const sActive = sToday.find(p => {
+            const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+            const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+            return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+          });
+          return (<div key={s.id} style={{ padding: 14, marginBottom: 8, borderRadius: 10, background: sActive ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${sActive ? "rgba(76,217,154,0.25)" : "rgba(255,255,255,0.06)"}`, borderLeft: `3px solid ${sActive ? "#4cd99a" : "#6b8aff"}` }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa" }}>🎤 {s.name}</span>
+              {sActive ? <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(76,217,154,0.15)", color: "#4cd99a", fontSize: 11, fontWeight: 700 }}>● 공연중</span> : <span style={{ fontSize: 11, color: "#6c6e7d" }}>대기</span>}
+            </div>
+            {sActive && <div style={{ fontSize: 12, color: "#4cd99a", marginBottom: 6 }}>♪ {sActive.title} ({sActive.time}~{sActive.endTime})</div>}
+            <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#6c6e7d" }}>
+              <span>오늘 {sToday.length}회</span>
+              <span>전체 {sPgs.length}회</span>
+              {s.capacity && <span>수용 {s.capacity}명</span>}
+            </div>
+          </div>);
+        })}
+      </CC_Card>
+
+      <CC_Card title="🎙️ 아티스트 / 셋리스트" sub={`${artists.length}팀`}>
+        {artists.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 아티스트가 없습니다</div> :
+        artists.slice(0, 8).map(a => {
+          const sl = setlists.find(s => s.artistId === a.id);
+          return (<div key={a.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa", flex: 1 }}>{a.name}</span>
+              {a.genre && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(255,112,67,0.1)", color: "#FF7043", fontSize: 10, fontWeight: 600 }}>{a.genre}</span>}
+              {sl && <span className="mono" style={{ fontSize: 11, color: "#42A5F5" }}>{(sl.songs || []).length}곡</span>}
+            </div>
+            {a.note && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>{a.note}</div>}
+          </div>);
+        })}
+      </CC_Card>
+    </div>
+
+    {/* 오늘의 공연 타임라인 */}
+    <CC_Card title="🎵 오늘의 공연 타임라인" sub={`${todayStagePgs.length}개 공연`}>
+      {todayStagePgs.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>오늘 예정된 공연이 없습니다</div> :
+      todayStagePgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
+        const stage = stages.find(s => s.id === p.stageId);
+        const artist = artists.find(a => a.id === p.artistId);
+        let status = "scheduled", color = "#6b8aff", label = "예정";
+        const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+        const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+        if (p.pgStatus === "ended") { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        else if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "공연중"; }
+        else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        return (<div key={p.id} style={{ padding: 12, marginBottom: 6, borderRadius: 10, background: status === "active" ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr auto auto", gap: 12, alignItems: "center" }}>
+            <span className="mono" style={{ fontSize: 13, color, fontWeight: 700 }}>{p.time}~{p.endTime}</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{p.title}</div>
+              <div style={{ display: "flex", gap: 10, marginTop: 2, fontSize: 11, color: "#6c6e7d" }}>
+                {stage && <span>🎤 {stage.name}</span>}
+                {artist && <span>🎙️ {artist.name}</span>}
+              </div>
+            </div>
+            <span style={{ padding: "3px 10px", borderRadius: 999, background: `${color}15`, color, fontSize: 11, fontWeight: 700 }}>{status === "active" ? "● " : ""}{label}</span>
+          </div>
+        </div>);
+      })}
+    </CC_Card>
+  </div>);
+}
+
+// 4) 인력 관리 - 근무자 종합
+function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccounts, setCcPage }) {
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, siteId: s.id, zoneId: s.zoneId })));
+  const onDuty = allWorkers.filter(w => w.onDuty);
+  const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+  const allRadios = (settings.assets || []).find(a => a.id === "radio")?.units || [];
+  const radiosUsed = allRadios.filter(u => u.assignedTo).length;
+  const noAccount = allWorkers.filter(w => !w.accountId).length;
+
+  // 역할별 분류
+  const byRole = {};
+  allWorkers.forEach(w => { const r = w.role || "기타"; if (!byRole[r]) byRole[r] = []; byRole[r].push(w); });
+
+  // 필터링
+  let filtered = allWorkers;
+  if (filter === "onduty") filtered = filtered.filter(w => w.onDuty);
+  else if (filter === "noacc") filtered = filtered.filter(w => !w.accountId);
+  else if (filter === "noradio") filtered = filtered.filter(w => !(w.radios || []).length);
+  else if (filter !== "all" && filter.startsWith("site:")) filtered = filtered.filter(w => w.siteId === filter.slice(5));
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(w => (w.name || "").toLowerCase().includes(q) || (w.phone || "").includes(q) || (w.role || "").includes(q));
+  }
+
+  const exportCSV = () => {
+    const rows = [["이름", "연락처", "역할", "근무지", "식수", "메모", "근무상태"]];
+    allWorkers.forEach(w => rows.push([w.name, w.phone || "", w.role || "", w.siteName, w.meals || 0, w.mealNote || "", w.onDuty ? "근무중" : "-"]));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `근무자_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  };
+
+  return (<div>
+    {/* KPI 6개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "총 인력", value: allWorkers.length, color: "#6b8aff", icon: "👥" },
+        { label: "근무중", value: onDuty.length, sub: `${allWorkers.length > 0 ? Math.round(onDuty.length/allWorkers.length*100) : 0}%`, color: "#4cd99a", icon: "🟢" },
+        { label: "근무지", value: (settings.workSites || []).filter(s=>s.id!=="_pool" && (s.workers||[]).length>0).length, color: "#a980ff", icon: "🏠" },
+        { label: "무전기 분배", value: `${radiosUsed}/${allRadios.length}`, color: "#f5c451", icon: "📻" },
+        { label: "총 식수", value: totalMeals, sub: "식", color: "#FF7043", icon: "🍱" },
+        { label: "계정 미발급", value: noAccount, color: noAccount > 0 ? "#ff5e7e" : "#4cd99a", icon: "🔑" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          {k.sub && <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>}
+        </div>
+      </div>))}
+    </div>
+
+    {/* 필터 + 검색 */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·연락처·역할" style={{ flex: 1, minWidth: 200, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
+        {[
+          { k: "all", l: `전체 (${allWorkers.length})` },
+          { k: "onduty", l: `근무중 (${onDuty.length})` },
+          { k: "noacc", l: `계정없음 (${noAccount})` },
+          { k: "noradio", l: `무전기없음` },
+        ].map(f => (
+          <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? "1px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filter === f.k ? "#6b8aff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
+        ))}
+        <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
+      </div>
+    </CC_Card>
+
+    {/* 메인: 인력목록 + 사이드 통계 (3 컬럼) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+      {/* 인력 목록 */}
+      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명`}>
+        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
+          filtered.map(w => (<div key={w.id} style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 10, alignItems: "center" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: w.onDuty ? "#4cd99a" : "#556" }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
+                {w.role && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
+                {w.accountId && <span style={{ fontSize: 10, color: "#42A5F5" }}>🔑</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName} {w.phone && `· ${w.phone}`}</div>
+            </div>
+            <span className="mono" style={{ fontSize: 11, color: "#FF7043" }}>🍱 {w.meals || 0}</span>
+            {(w.radios || []).length > 0 && <span className="mono" style={{ fontSize: 11, color: "#a980ff" }}>📻 {w.radios.length}</span>}
+          </div>))}
+        </div>
+      </CC_Card>
+
+      {/* 역할별 분포 */}
+      <CC_Card title="📊 역할별 분포" sub={`${Object.keys(byRole).length}개 역할`}>
+        {Object.keys(byRole).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>역할 미지정</div> :
+        Object.entries(byRole).sort((a,b)=>b[1].length-a[1].length).map(([role, ws]) => {
+          const ratio = allWorkers.length > 0 ? Math.round((ws.length / allWorkers.length) * 100) : 0;
+          return (<div key={role} style={{ padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: "#f4f5fa" }}>{role}</span>
+              <span className="mono" style={{ fontSize: 12, color: "#a980ff" }}>{ws.length}명 ({ratio}%)</span>
+            </div>
+            <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)" }}>
+              <div style={{ width: `${ratio}%`, height: "100%", background: "linear-gradient(90deg, #6b8aff, #a980ff)", borderRadius: 3 }} />
+            </div>
+          </div>);
+        })}
+      </CC_Card>
+
+      {/* 근무지별 인력 */}
+      <CC_Card title="🏠 근무지별 인력" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지`}>
+        <div style={{ maxHeight: 580, overflowY: "auto" }}>
+          {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => {
+            const ws = s.workers || [];
+            const onD = ws.filter(w => w.onDuty).length;
+            const meals = ws.reduce((sum, w) => sum + (w.meals || 0), 0);
+            const zone = (settings.zones || []).find(z => z.id === s.zoneId);
+            return (<div key={s.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }} onClick={() => setFilter(`site:${s.id}`)}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
+                <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700 }}>{onD}/{ws.length}</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, fontSize: 10, color: "#6c6e7d" }}>
+                {zone && <span>📍 {zone.name}</span>}
+                <span>🍱 {meals}</span>
+              </div>
+            </div>);
+          })}
+          {/* 미배치 풀 */}
+          {(() => {
+            const pool = (settings.workSites || []).find(s => s.id === "_pool");
+            if (!pool || (pool.workers || []).length === 0) return null;
+            return (<div style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,154,60,0.06)", border: "1px solid rgba(255,154,60,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#ff9a3c" }}>⚠️ 미배치</span>
+                <span className="mono" style={{ fontSize: 12, color: "#ff9a3c", fontWeight: 700 }}>{(pool.workers || []).length}명</span>
+              </div>
+            </div>);
+          })()}
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 안내 */}
+    <CC_Card>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>상세 편집(드래그·이동·계정 발급 등)은 모바일에서 더 편리하게 사용 가능</span>
+        </div>
+        <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 설정으로 →</CC_Btn>
+      </div>
+    </CC_Card>
+  </div>);
+}
+
 function ControlCenterDashboard({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
@@ -2764,10 +3290,10 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
           {ccPage === "alert" && <CC_AlertPage settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
           {ccPage === "incident" && <CC_IncidentPage settings={settings} setSettings={setSettings} session={session} />}
           {ccPage === "map" && <CC_MapPage settings={settings} setSettings={setSettings} session={session} />}
-          {ccPage === "festival" && <div style={{ padding: "0 0 24px" }}><FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} /></div>}
-          {ccPage === "program" && <div style={{ padding: "0 0 24px" }}><ProgramPage settings={settings} setSettings={setSettings} session={session} /></div>}
-          {ccPage === "stage" && <div style={{ padding: "0 0 24px" }}><StageMgmtPage settings={settings} setSettings={setSettings} session={session} /></div>}
-          {ccPage === "workforce" && <div style={{ padding: "0 0 24px" }}><WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} /></div>}
+          {ccPage === "festival" && <CC_FestivalPage settings={settings} setSettings={setSettings} accounts={accounts} setAccounts={setAccounts} session={session} categories={categories} alerts={alerts} setCcPage={setCcPage} />}
+          {ccPage === "program" && <CC_ProgramPage settings={settings} setSettings={setSettings} session={session} setCcPage={setCcPage} />}
+          {ccPage === "stage" && <CC_StagePage settings={settings} setSettings={setSettings} session={session} setCcPage={setCcPage} />}
+          {ccPage === "workforce" && <CC_WorkforcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} setCcPage={setCcPage} />}
           {ccPage === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
           {ccPage === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
           {ccPage === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
