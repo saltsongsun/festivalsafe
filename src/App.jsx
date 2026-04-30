@@ -1377,7 +1377,8 @@ function CategoryDetailModal({ cat, settings, onClose, onAction, session }) {
 
 function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert, onDeleteAlert }) {
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외 (개별 카드 단계만 유지)
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
@@ -1803,7 +1804,8 @@ function MobileControlCenter({ session, accounts, setAccounts, settings, setSett
   const [showMore, setShowMore] = useState(false);
 
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
@@ -2991,7 +2993,8 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
   // 페이지 변경 시 사이드바 닫기
   useEffect(() => { setSidebarOpen(false); }, [ccPage]);
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
