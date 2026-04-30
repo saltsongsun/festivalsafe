@@ -1221,7 +1221,7 @@ const MD_Metric = ({ cat, onClick }) => {
 };
 
 // ─── Mobile 클로드디자인 대시보드 ──────────────────────────────────
-function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign }) {
+function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert }) {
   const overall = useMemo(() => {
     const lvs = (categories || []).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
@@ -1275,7 +1275,17 @@ function MobileNewDashboard({ session, settings, categories, alerts, onCardClick
         <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
         <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
         <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
-        <button onClick={() => onAlertClick && onAlertClick(topAlert)} style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
+        <button onClick={() => {
+          // 카테고리 찾기 → handling 시작 + 모달 열기
+          const cat = (categories || []).find(c => c.name === topAlert.category || c.id === topAlert.catId);
+          if (cat) {
+            if (cat.actionStatus !== "handling" && onAction) onAction(cat.id, "handling");
+            if (setActiveAlert) setActiveAlert(cat);
+            else if (onCardClick) onCardClick(cat.id);
+          } else if (onAlertClick) {
+            onAlertClick(topAlert);
+          }
+        }} style={{ width: "100%", marginTop: 10, padding: "12px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
       </div>}
 
       {/* 메트릭 그리드 (2열) */}
@@ -11189,6 +11199,15 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         onLogout={onLogout}
         isManager={isManager}
         onSwitchToOldDesign={toggleNewMobile}
+        onAction={handleAction}
+        setActiveAlert={(cat) => {
+          // cat이 카테고리면 onCardClick으로 모달 열기
+          if (cat && cat.id && categories.find(c => c.id === cat.id)) {
+            onCardClick(cat.id);
+          } else {
+            setActiveAlert(cat);
+          }
+        }}
       />}
       {page === "dashboard" && !useNewMobile && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
         // 삭제 시 해당 알림의 cooldown을 현재 시각으로 갱신 (10분 내 재생성 방지)
