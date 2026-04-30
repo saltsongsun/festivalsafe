@@ -177,6 +177,102 @@
               window.dispatchEvent(new CustomEvent('supabase-sync', { detail: { key, value: r.value } }));
               console.log('✅ supabase-sync 이벤트 발행 완료');
             },
+            async recoverWorkers() {
+              // 사용자관리(accounts)에 있는 근무자 역할 계정들을 settings.workSites로 복구
+              console.log('🔧 근무자 복구 시작...');
+              try {
+                // 1. accounts 가져오기
+                const accRes = await window.storage.get('fest_accounts_v2');
+                if (!accRes) { console.error('❌ 계정 데이터 없음'); return; }
+                const accounts = JSON.parse(accRes.value);
+                console.log('📋 사용자관리 계정 수:', accounts.length);
+                
+                // 2. 현재 축제 ID
+                const sessRes = await window.storage.get('fest_session_v2');
+                let fid = 'default';
+                if (sessRes) { try { fid = JSON.parse(sessRes.value).festivalId || 'default'; } catch {} }
+                console.log('🎪 축제 ID:', fid);
+                
+                // 3. settings 가져오기
+                const setRes = await window.storage.get(fid + '_set_v10');
+                if (!setRes) { console.error('❌ 설정 데이터 없음'); return; }
+                const settings = JSON.parse(setRes.value);
+                
+                // 4. 근무자 역할 계정 필터
+                const workerRoles = ['manager', 'zonemgr', 'stagemgr', 'counter', 'parking', 'shuttle'];
+                const candidates = accounts.filter(a => 
+                  workerRoles.includes(a.role) && 
+                  (a.festivalId === fid || (a.festivals || []).includes(fid))
+                );
+                console.log('👥 근무자 역할 계정:', candidates.length, '명');
+                
+                // 5. 이미 근무자로 있는 사람 제외
+                const allWorkers = (settings.workSites || []).flatMap(s => s.workers || []);
+                const missing = candidates.filter(a => 
+                  !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
+                );
+                console.log('🆕 신규 복구 대상:', missing.length, '명');
+                
+                if (missing.length === 0) {
+                  console.log('✅ 모두 이미 등록되어 있습니다');
+                  return;
+                }
+                
+                // 6. 미배치 근무지 자동 생성
+                const ws = JSON.parse(JSON.stringify(settings.workSites || []));
+                let pi = ws.findIndex(s => s.id === '_pool');
+                if (pi < 0) {
+                  ws.push({ id: '_pool', name: '미배치', zoneId: null, status: 'standby', workers: [] });
+                  pi = ws.length - 1;
+                }
+                
+                // 7. 복구
+                const roleNameMap = { manager: '운영', zonemgr: '구역관리', stagemgr: '무대관리', counter: '계수', parking: '주차', shuttle: '셔틀' };
+                missing.forEach(a => {
+                  const w = {
+                    id: 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                    name: a.name,
+                    phone: a.phone || '',
+                    role: roleNameMap[a.role] || a.role,
+                    meals: 1,
+                    mealNote: '',
+                    accountId: a.id
+                  };
+                  ws[pi].workers = [...(ws[pi].workers || []), w];
+                });
+                
+                // 8. 저장
+                const newSettings = { ...settings, workSites: ws };
+                await window.storage.set(fid + '_set_v10', JSON.stringify(newSettings));
+                
+                console.log('✅ ' + missing.length + '명 복구 완료!');
+                console.log('📍 미배치 근무지에 추가됨');
+                console.log('🔄 페이지 새로고침 후 확인하세요');
+                console.log('💡 자동 새로고침 (3초)...');
+                setTimeout(() => location.reload(), 3000);
+              } catch (e) {
+                console.error('❌ 복구 실패:', e);
+              }
+            },
+            async listAccounts() {
+              const r = await window.storage.get('fest_accounts_v2');
+              if (!r) { console.error('❌ 계정 데이터 없음'); return; }
+              const accounts = JSON.parse(r.value);
+              console.table(accounts.map(a => ({ id: a.id, name: a.name, role: a.role, festivalId: a.festivalId })));
+              return accounts;
+            },
+            async listWorkers() {
+              const sessRes = await window.storage.get('fest_session_v2');
+              let fid = 'default';
+              if (sessRes) { try { fid = JSON.parse(sessRes.value).festivalId || 'default'; } catch {} }
+              const r = await window.storage.get(fid + '_set_v10');
+              if (!r) { console.error('❌ 설정 데이터 없음'); return; }
+              const settings = JSON.parse(r.value);
+              const workers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name || '미배치' })));
+              console.table(workers.map(w => ({ name: w.name, role: w.role, siteName: w.siteName, phone: w.phone, accountId: w.accountId })));
+              console.log('총 ' + workers.length + '명');
+              return workers;
+            },
           };
 
           console.log('[SAFEFLOW] ✅ Supabase 연결 완료');
