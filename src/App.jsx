@@ -1158,12 +1158,64 @@ const MD_Metric = ({ cat, onClick }) => {
   const isAlert = lv === "YELLOW";
   const isDanger = lv === "ORANGE";
   const isRed = lv === "RED";
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  
+  // 현황 24h 추이 데이터
+  const history = (cat.history || []).slice(-24);
+  // 예보 데이터 (초단기 6시간)
+  const forecast = (cat.forecast || []).slice(0, 6);
+  // 단기예보 (3일) — 있으면 우선 사용 안하고 초단기만
+  const nextFc = forecast[0];
+  
+  // sparkline 그리기
+  const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+  let sparklinePath = "";
+  if (sparkData.length > 1) {
+    const min = Math.min(...sparkData);
+    const max = Math.max(...sparkData);
+    const range = max - min || 1;
+    sparklinePath = sparkData.map((v, i) => {
+      const x = (i / (sparkData.length - 1)) * 100;
+      const y = 24 - ((v - min) / range) * 20;
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    }).join(" ");
+  }
+  
   return (<div className={`md-metric ${isAlert ? "alert" : ""} ${isDanger ? "danger" : ""} ${isRed ? "red-alert" : ""}`} onClick={onClick}>
     <div className="md-metric-h">
       <span className="md-metric-name"><span className="md-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
       <MD_Chip level={CC_LEVEL_MAP[lv]}>{CC_LEVEL_LABEL[lv]}</MD_Chip>
     </div>
-    <div className="md-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="md-metric-unit">{cat.unit}</span></div>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+      <div className="md-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="md-metric-unit">{cat.unit}</span></div>
+      {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+        <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+          <span style={{ fontSize: 11, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+        </div>
+      </div>}
+    </div>
+    {/* 24h 스파크라인 */}
+    {sparklinePath && <svg viewBox="0 0 100 26" preserveAspectRatio="none" style={{ width: "100%", height: 22, marginBottom: 4, display: "block" }}>
+      <defs>
+        <linearGradient id={`md-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d={`${sparklinePath} L 100 26 L 0 26 Z`} fill={`url(#md-grad-${cat.id})`} stroke="none"/>
+      <path d={sparklinePath} fill="none" stroke={lvColor} strokeWidth="1.2"/>
+    </svg>}
+    {/* 6h 예보 미니 막대 */}
+    {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 12, alignItems: "flex-end", marginBottom: 4 }}>
+      {forecast.slice(0, 6).map((f, i) => {
+        const vals = forecast.slice(0, 6).map(x => x.value);
+        const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+        const h = 2 + ((f.value - mn) / rng) * 10;
+        return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+      })}
+    </div>}
     <div className="md-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
   </div>);
 };
@@ -1316,12 +1368,55 @@ const CC_Metric = ({ cat, onClick }) => {
   const isDanger = lv === "ORANGE";
   const isRed = lv === "RED";
   const isAlert = lv === "YELLOW";
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  
+  const history = (cat.history || []).slice(-24);
+  const forecast = (cat.forecast || []).slice(0, 6);
+  const nextFc = forecast[0];
+  const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+  let sparkPath = "";
+  if (sparkData.length > 1) {
+    const min = Math.min(...sparkData); const max = Math.max(...sparkData); const rng = max - min || 1;
+    sparkPath = sparkData.map((v, i) => {
+      const x = (i / (sparkData.length - 1)) * 100;
+      const y = 28 - ((v - min) / rng) * 22;
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    }).join(" ");
+  }
+  
   return (<div className={`cc-metric ${isAlert ? "alert" : ""} ${isDanger ? "danger" : ""} ${isRed ? "red-alert" : ""}`} onClick={onClick}>
     <div className="cc-metric-h">
       <span className="cc-metric-name"><span className="cc-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
       <CC_Chip level={lvLower}>{CC_LEVEL_LABEL[lv]}</CC_Chip>
     </div>
-    <div className="cc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="cc-metric-unit">{cat.unit}</span></div>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+      <div className="cc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="cc-metric-unit">{cat.unit}</span></div>
+      {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+        <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+          <span style={{ fontSize: 12, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+        </div>
+      </div>}
+    </div>
+    {sparkPath && <svg viewBox="0 0 100 30" preserveAspectRatio="none" style={{ width: "100%", height: 28, marginBottom: 4, display: "block" }}>
+      <defs>
+        <linearGradient id={`cc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d={`${sparkPath} L 100 30 L 0 30 Z`} fill={`url(#cc-grad-${cat.id})`} stroke="none"/>
+      <path d={sparkPath} fill="none" stroke={lvColor} strokeWidth="1.4"/>
+    </svg>}
+    {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 14, alignItems: "flex-end", marginBottom: 4 }}>
+      {forecast.slice(0, 6).map((f, i) => {
+        const vals = forecast.slice(0, 6).map(x => x.value);
+        const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+        const h = 3 + ((f.value - mn) / rng) * 11;
+        return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+      })}
+    </div>}
     <div className="cc-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"} {cat.unit}</div>
   </div>);
 };
@@ -1663,12 +1758,53 @@ function MCC_Dashboard({ session, settings, categories, alerts, overall, overall
       {categories.map(cat => {
         const lv = getLevel(cat);
         const cls = lv === "YELLOW" ? "alert" : lv === "ORANGE" ? "danger" : lv === "RED" ? "red-alert" : "";
+        const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+        const history = (cat.history || []).slice(-24);
+        const forecast = (cat.forecast || []).slice(0, 6);
+        const nextFc = forecast[0];
+        const sparkData = history.length > 2 ? history.map(h => h.value || 0) : [];
+        let sparkPath = "";
+        if (sparkData.length > 1) {
+          const min = Math.min(...sparkData); const max = Math.max(...sparkData); const rng = max - min || 1;
+          sparkPath = sparkData.map((v, i) => {
+            const x = (i / (sparkData.length - 1)) * 100;
+            const y = 24 - ((v - min) / rng) * 20;
+            return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+          }).join(" ");
+        }
         return (<div key={cat.id} className={`mcc-metric ${cls}`} onClick={() => setPage("monitor")}>
           <div className="mcc-metric-h">
             <span className="mcc-metric-name"><span className="mcc-metric-icon">{cat.icon || "📊"}</span>{cat.name}</span>
             <span className={`mcc-chip ${CC_LEVEL_MAP[lv]}`}><span className="dot" />{CC_LEVEL_LABEL[lv]}</span>
           </div>
-          <div className="mcc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="mcc-metric-unit">{cat.unit}</span></div>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+            <div className="mcc-metric-val">{(cat.currentValue || 0).toLocaleString()}<span className="mcc-metric-unit">{cat.unit}</span></div>
+            {nextFc && <div style={{ textAlign: "right", lineHeight: 1.2 }}>
+              <div style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>예보</div>
+              <div style={{ display: "inline-flex", alignItems: "baseline", gap: 2, marginTop: 2 }}>
+                <span style={{ fontSize: 11, color: nextFc.value > cat.currentValue ? "#ff5e7e" : nextFc.value < cat.currentValue ? "#6b8aff" : "#6c6e7d" }}>{nextFc.value > cat.currentValue ? "↑" : nextFc.value < cat.currentValue ? "↓" : "→"}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", fontFamily: "JetBrains Mono, monospace" }}>{nextFc.value}</span>
+              </div>
+            </div>}
+          </div>
+          {sparkPath && <svg viewBox="0 0 100 26" preserveAspectRatio="none" style={{ width: "100%", height: 22, marginBottom: 4, display: "block" }}>
+            <defs>
+              <linearGradient id={`mcc-grad-${cat.id}`} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={lvColor} stopOpacity="0.3"/>
+                <stop offset="100%" stopColor={lvColor} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d={`${sparkPath} L 100 26 L 0 26 Z`} fill={`url(#mcc-grad-${cat.id})`} stroke="none"/>
+            <path d={sparkPath} fill="none" stroke={lvColor} strokeWidth="1.2"/>
+          </svg>}
+          {forecast.length > 1 && <div style={{ display: "flex", gap: 2, height: 12, alignItems: "flex-end", marginBottom: 4 }}>
+            {forecast.slice(0, 6).map((f, i) => {
+              const vals = forecast.slice(0, 6).map(x => x.value);
+              const mn = Math.min(...vals); const mx = Math.max(...vals); const rng = mx - mn || 1;
+              const h = 2 + ((f.value - mn) / rng) * 10;
+              return <div key={i} title={`${f.time}: ${f.value}${cat.unit}`} style={{ flex: 1, height: h, borderRadius: 1.5, background: lvColor, opacity: 0.2 + (i === 0 ? 0.5 : 0.08 * (6 - i)) }} />;
+            })}
+          </div>}
           <div className="mcc-metric-trend">임계: {cat.thresholds?.yellow || "-"} / {cat.thresholds?.orange || "-"}</div>
         </div>);
       })}
@@ -10811,6 +10947,11 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     const cooldownMs = (aSet.cooldownMin || 10) * 60 * 1000;
 
     categories.forEach(cat => {
+      // 🚫 humidity(습도)는 EXCLUDE_FROM_OVERALL에 있어 종합경보엔 빠지지만
+      //    개별 알림은 발생하므로 여기서도 제외
+      if (EXCLUDE_FROM_OVERALL.includes(cat.id)) {
+        return;
+      }
       const lv = getLevel(cat); const prev = prevLevels.current[cat.id];
       if ((lv === "ORANGE" || lv === "RED") && prev && prev !== lv) {
         // 조용한 시간: RED만 알림 (ORANGE는 스킵)
