@@ -1221,6 +1221,160 @@ const MD_Metric = ({ cat, onClick }) => {
 };
 
 // ─── Mobile 클로드디자인 대시보드 ──────────────────────────────────
+// ─── 카테고리 상세 모달 (v2 디자인용) ─────────────────────────
+function CategoryDetailModal({ cat, settings, onClose, onAction, session }) {
+  if (!cat) return null;
+  const lv = getLevel(cat); const li = LEVELS[lv];
+  const isWarning = lv !== "BLUE";
+  const history = (cat.history || []).slice(-24);
+  const forecast = cat.forecast || [];
+  const shortForecast = cat.shortForecast || [];
+  
+  return (<div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflow: "auto", WebkitOverflowScrolling: "touch" }} onClick={onClose}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div onClick={e => e.stopPropagation()} style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "calc(env(safe-area-inset-top) + 12px) max(14px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 80px) max(14px, env(safe-area-inset-left))", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        {/* 닫기 헤더 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, position: "sticky", top: 0, zIndex: 10, background: "linear-gradient(180deg, #07070d 80%, transparent)", padding: "8px 0" }}>
+          <button onClick={onClose} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>← 닫기</button>
+          <span style={{ color: "#6c6e7d", fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{cat.lastUpdated || "-"}</span>
+        </div>
+
+        {/* 메인 카드 */}
+        <div style={{ padding: "20px 18px", marginBottom: 14, background: `linear-gradient(135deg, ${li.color}10, rgba(255,255,255,0.02))`, border: `1.5px solid ${li.color}40`, borderRadius: 18, boxShadow: `0 0 0 1px ${li.color}10, 0 12px 40px ${li.color}20` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 50, height: 50, borderRadius: 14, background: `${li.color}25`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{cat.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ color: "#f4f5fa", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>{cat.name}</h2>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>
+                {cat.kmaCategory ? `🌤️ 기상청 ${cat.kmaCategory}` : cat.apiConfig?.enabled ? "🔌 커스텀 API" : "✏️ 수동 입력"}
+              </div>
+            </div>
+            <span style={{ padding: "5px 12px", borderRadius: 999, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{li.icon} {li.label}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 48, fontWeight: 700, color: li.color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
+            <span style={{ fontSize: 16, color: "#94A3B8" }}>{cat.unit}</span>
+          </div>
+          {cat.actionStatus && <div style={{ marginTop: 10 }}>
+            <span style={{ padding: "5px 12px", borderRadius: 999, background: cat.actionStatus === "handling" ? "rgba(255,154,60,0.15)" : "rgba(76,217,154,0.15)", border: `1px solid ${cat.actionStatus === "handling" ? "rgba(255,154,60,0.3)" : "rgba(76,217,154,0.3)"}`, color: cat.actionStatus === "handling" ? "#ff9a3c" : "#4cd99a", fontSize: 12, fontWeight: 700 }}>{cat.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>
+          </div>}
+        </div>
+
+        {/* 📊 실황 추이 그래프 */}
+        {history.length >= 2 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: li.color, boxShadow: `0 0 6px ${li.color}` }}/>
+            <span style={{ color: li.color, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📊 실황 추이 (최근 24시간)</span>
+          </div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <LineChart data={history} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 10 }} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "실황"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 10 }} />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 10 }} />}
+                {cat.thresholds?.RED?.[0] > 0 && <ReferenceLine y={cat.thresholds.RED[0]} stroke="#ff5e7e" strokeDasharray="4 4" label={{ value: "심각", fill: "#ff5e7e", fontSize: 10 }} />}
+                <Line type="monotone" dataKey="value" stroke={li.color} strokeWidth={2.5} dot={{ fill: li.color, r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 📊 데이터 부족 안내 */}
+        {history.length < 2 && cat.kmaCategory && <div style={{ padding: 20, marginBottom: 12, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div>
+          <div style={{ color: "#b0b3c4", fontSize: 13, marginBottom: 4 }}>실황 데이터 수집 중</div>
+          <div style={{ color: "#6c6e7d", fontSize: 11 }}>10분마다 자동 갱신됩니다 (현재값: {cat.currentValue}{cat.unit})</div>
+        </div>}
+
+        {/* 📋 초단기 예보 */}
+        {forecast.length > 0 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: "#ff9a3c" }}/>
+            <span style={{ color: "#ff9a3c", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📋 초단기 예보 (향후 6시간)</span>
+          </div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <LineChart data={forecast} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 10 }} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "예보"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" />}
+                <Line type="monotone" dataKey="value" stroke="#ff9a3c" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#ff9a3c", r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 📅 단기 예보 */}
+        {shortForecast.length > 0 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: "#6b8aff" }}/>
+            <span style={{ color: "#6b8aff", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📅 단기 예보 (3일, 3시간 간격)</span>
+          </div>
+          <div style={{ width: "100%", height: 200 }}>
+            <ResponsiveContainer>
+              <LineChart data={shortForecast} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 9 }} interval={Math.floor(shortForecast.length / 8)} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "단기예보"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" />}
+                <Line type="monotone" dataKey="value" stroke="#6b8aff" strokeWidth={2} dot={{ fill: "#6b8aff", r: 2 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 임계값 표 */}
+        <div style={{ padding: 14, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#b0b3c4", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>임계값</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+            {Object.entries(LEVELS).map(([lk, lvi]) => (<div key={lk} style={{ padding: "10px 6px", borderRadius: 10, background: lk === lv ? lvi.bg : "rgba(255,255,255,0.02)", border: `1px solid ${lk === lv ? lvi.border : "rgba(255,255,255,0.05)"}`, textAlign: "center" }}>
+              <div style={{ color: lvi.color, fontSize: 12, fontWeight: 700 }}>{lvi.label}</div>
+              <div style={{ color: lk === lv ? "#fff" : "#6c6e7d", fontSize: 11, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>{cat.thresholds[lk]?.[0]}~{cat.thresholds[lk]?.[1] === Infinity ? "∞" : cat.thresholds[lk]?.[1]}</div>
+            </div>))}
+          </div>
+        </div>
+
+        {/* 조치 버튼 */}
+        {isWarning && onAction && <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <button onClick={() => onAction(cat.id, "handling")} style={{
+            flex: 1, padding: "14px", borderRadius: 12,
+            border: cat.actionStatus === "handling" ? "2px solid #ff9a3c" : "1px solid rgba(255,255,255,0.08)",
+            background: cat.actionStatus === "handling" ? "rgba(255,154,60,0.15)" : "rgba(255,255,255,0.02)",
+            color: cat.actionStatus === "handling" ? "#ff9a3c" : "#b0b3c4", fontSize: 14, fontWeight: 700, cursor: "pointer"
+          }}>🔧 조치중</button>
+          <button onClick={() => onAction(cat.id, "resolved")} style={{
+            flex: 1, padding: "14px", borderRadius: 12,
+            border: cat.actionStatus === "resolved" ? "2px solid #4cd99a" : "1px solid rgba(255,255,255,0.08)",
+            background: cat.actionStatus === "resolved" ? "rgba(76,217,154,0.15)" : "rgba(255,255,255,0.02)",
+            color: cat.actionStatus === "resolved" ? "#4cd99a" : "#b0b3c4", fontSize: 14, fontWeight: 700, cursor: "pointer"
+          }}>✅ 조치완료</button>
+        </div>}
+
+        {/* 대응 체크리스트 */}
+        {(cat.actionItems || []).length > 0 && <div style={{ padding: 14, marginBottom: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#b0b3c4", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>대응 체크리스트</div>
+          {cat.actionItems.map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: i < cat.actionItems.length - 1 ? "1px dashed rgba(255,255,255,0.05)" : "none" }}>
+            <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
+            <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+          </div>))}
+        </div>}
+
+        <button onClick={onClose} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid rgba(107,138,255,0.3)", background: "linear-gradient(180deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04))", color: "#8fa6ff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← 닫기</button>
+      </div>
+    </div>
+  </div>);
+}
+
 function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert }) {
   const overall = useMemo(() => {
     const lvs = (categories || []).map(c => getLevel(c));
@@ -11073,7 +11227,17 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     return () => clearInterval(iv);
   }, [active, settings.smsEnabled]);
 
+  // v2 모바일 디자인용 카테고리 상세 모달 state
+  const [v2DetailCatId, setV2DetailCatId] = useState(null);
+  const v2DetailCat = v2DetailCatId ? categories.find(c => c.id === v2DetailCatId) : null;
+  
   const onCardClick = (catId) => {
+    // v2 모바일 디자인일 때: 카테고리 상세 모달 띄우기 (그래프 화면)
+    if (useNewMobile && !isPC) {
+      setV2DetailCatId(catId);
+      return;
+    }
+    // 기존 동작: CMS 설정으로 이동 (관리자만)
     if (!allowedPages.includes("cms")) return;
     const cat = categories.find(c => c.id === catId);
     setCmsTab(cat?.kmaCategory ? "kma" : "apiconfig");
@@ -11175,6 +11339,9 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       <style>{MD_GLOBAL_V2}</style>
     </>}
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
+    
+    {/* v2 모바일 디자인용 카테고리 상세 모달 */}
+    {v2DetailCat && <CategoryDetailModal cat={v2DetailCat} settings={settings} session={session} onAction={(catId, status) => { handleAction(catId, status); }} onClose={() => setV2DetailCatId(null)} />}
 
     {/* Top bar - user info (새 모바일 디자인 대시보드면 숨김) */}
     {!(useNewMobile && page === "dashboard") && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
