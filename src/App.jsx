@@ -2955,7 +2955,7 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
       
       return (<CC_Card title="📅 일정 캘린더" sub={`${calendarPgs.length}개 일정 · 시간 × 장소 뷰`} style={{ marginBottom: 16 }}>
         <div style={{ overflowX: "auto", overflowY: "hidden", paddingBottom: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: `60px repeat(${locations.length}, minmax(180px, 1fr))`, gap: 0, position: "relative", minWidth: 60 + locations.length * 180 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `70px repeat(${locations.length}, minmax(220px, 1fr))`, gap: 0, position: "relative", minWidth: 70 + locations.length * 220 }}>
             {/* 좌상단 빈 칸 + 장소 헤더 */}
             <div style={{ height: 44, position: "sticky", top: 0, zIndex: 4, background: "#14151f", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
             {locations.map(loc => (<div key={loc} style={{ height: 44, padding: "10px 12px", background: "linear-gradient(180deg, #1a1d2a, #14151f)", borderBottom: "1px solid rgba(255,255,255,0.08)", borderLeft: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, zIndex: 4, fontSize: 12, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={loc}>
@@ -2990,13 +2990,11 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                   return { ...p, startMin: sh * 60 + sm, endMin: eh * 60 + em };
                 }).sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
                 
-                // 2) 충돌 그룹 만들기 (시간 겹치는 이벤트들끼리 묶음)
-                // 각 이벤트에 col(컬럼 인덱스) + groupSize(그룹 내 최대 동시 이벤트 수) 부여
+                // 2) 충돌 그룹 만들기 + 컬럼 할당
                 const eventCol = {};
                 const eventGroupSize = {};
                 let i = 0;
                 while (i < events.length) {
-                  // 현재 이벤트부터 시작해서 연쇄 충돌하는 그룹 찾기
                   const group = [events[i]];
                   let groupEnd = events[i].endMin;
                   let j = i + 1;
@@ -3005,8 +3003,7 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                     if (events[j].endMin > groupEnd) groupEnd = events[j].endMin;
                     j++;
                   }
-                  // 그룹 내에서 컬럼 할당 (그리디)
-                  const colEnds = []; // colEnds[c] = c번 컬럼의 마지막 끝 시간
+                  const colEnds = [];
                   group.forEach(e => {
                     let assigned = -1;
                     for (let c = 0; c < colEnds.length; c++) {
@@ -3024,58 +3021,103 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                   i = j;
                 }
                 
-                return events.map(p => {
-                  const top = ((p.startMin - minHour * 60) / 60) * hourHeight;
-                  const height = Math.max(28, ((p.endMin - p.startMin) / 60) * hourHeight - 2);
-                  
-                  let status = "scheduled";
-                  if (p.pgStatus === "ended") status = "ended";
-                  else if (p.date === todayStr || p.date === "always") {
-                    if (nowMin >= p.startMin && nowMin <= p.endMin) status = "active";
-                    else if (nowMin > p.endMin) status = "ended";
+                // 3) 최대 표시 컬럼 = 2 (3개 이상이면 마지막에 "+N" 표시)
+                const MAX_COLS = 2;
+                
+                // 같은 시간대에 숨겨진(컬럼 2 이상) 이벤트 수 계산
+                // → 시간 슬롯별로 hidden count 계산해서 "+N개 더보기" 배지로 표시
+                const hiddenInfo = {};  // { startMin: { count, eventIds, top, height } }
+                events.forEach(e => {
+                  if ((eventCol[e.id] || 0) >= MAX_COLS) {
+                    // 이 이벤트는 가려짐. 같은 시간대의 첫 이벤트의 위치에 배지 추가
+                    const key = e.startMin;
+                    if (!hiddenInfo[key]) hiddenInfo[key] = { count: 0, ids: [], startMin: e.startMin, endMin: e.endMin };
+                    hiddenInfo[key].count += 1;
+                    hiddenInfo[key].ids.push(e.id);
+                    if (e.endMin > hiddenInfo[key].endMin) hiddenInfo[key].endMin = e.endMin;
                   }
-                  
-                  const cc = getCatColor(p.category);
-                  const isActive = status === "active";
-                  const isEnded = status === "ended";
-                  
-                  // 충돌 시 좌우 분할
-                  const col = eventCol[p.id] || 0;
-                  const groupSize = eventGroupSize[p.id] || 1;
-                  const widthPercent = 100 / groupSize;
-                  const leftPercent = col * widthPercent;
-                  
-                  return (<div key={p.id} title={`${p.time}~${p.endTime} ${p.title}${p.location ? ` · ${p.location}` : ""}${p.description ? "\n" + p.description : ""}`}
-                    style={{ 
-                      position: "absolute",
-                      left: `calc(${leftPercent}% + 2px)`,
-                      width: `calc(${widthPercent}% - 4px)`,
-                      top: top + 1,
-                      height,
-                      padding: groupSize > 1 ? "4px 6px" : "5px 8px",
-                      borderRadius: 6,
-                      background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cc.bg : cc.light,
-                      border: isActive ? `1.5px solid ${cc.bg}` : `1px solid ${cc.bg}40`,
-                      borderLeft: `3px solid ${cc.bg}`,
-                      color: isActive ? "#fff" : isEnded ? "#94A3B8" : "#f4f5fa",
-                      fontSize: groupSize > 2 ? 10 : 11,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      transition: "transform 0.15s, box-shadow 0.15s, width 0.2s, left 0.2s",
-                      opacity: isEnded ? 0.6 : 1,
-                      zIndex: isActive ? 3 : 2,
-                      boxSizing: "border-box"
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.02)"; e.currentTarget.style.boxShadow = `0 4px 12px ${cc.bg}50`; e.currentTarget.style.zIndex = "6"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: groupSize > 2 ? 9 : 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 2, opacity: 0.9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      <span>{p.time}~{p.endTime}</span>
-                      {isActive && <span style={{ width: 5, height: 5, borderRadius: 3, background: "#fff", boxShadow: "0 0 4px #fff", animation: "blink 1.2s infinite", marginLeft: 2, flexShrink: 0 }} />}
-                    </div>
-                    <div style={{ fontSize: groupSize > 2 ? 10 : 11, fontWeight: 600, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 40 ? 2 : 1, WebkitBoxOrient: "vertical" }}>{p.title}</div>
-                    {height > 56 && p.category && groupSize <= 2 && <div style={{ marginTop: 3, fontSize: 9, opacity: 0.85 }}>● {p.category}</div>}
-                  </div>);
                 });
+                
+                return (<>
+                  {events.map(p => {
+                    const top = ((p.startMin - minHour * 60) / 60) * hourHeight;
+                    const height = Math.max(28, ((p.endMin - p.startMin) / 60) * hourHeight - 2);
+                    
+                    // 컬럼 인덱스가 MAX_COLS 이상인 이벤트는 숨김 (배지로만 표시)
+                    const col = eventCol[p.id] || 0;
+                    if (col >= MAX_COLS) return null;
+                    
+                    let status = "scheduled";
+                    if (p.pgStatus === "ended") status = "ended";
+                    else if (p.date === todayStr || p.date === "always") {
+                      if (nowMin >= p.startMin && nowMin <= p.endMin) status = "active";
+                      else if (nowMin > p.endMin) status = "ended";
+                    }
+                    
+                    const cc = getCatColor(p.category);
+                    const isActive = status === "active";
+                    const isEnded = status === "ended";
+                    
+                    const groupSize = Math.min(eventGroupSize[p.id] || 1, MAX_COLS);
+                    const widthPercent = 100 / groupSize;
+                    const leftPercent = col * widthPercent;
+                    
+                    return (<div key={p.id} title={`${p.time}~${p.endTime} ${p.title}${p.location ? ` · ${p.location}` : ""}${p.description ? "\n" + p.description : ""}`}
+                      style={{ 
+                        position: "absolute",
+                        left: `calc(${leftPercent}% + 3px)`,
+                        width: `calc(${widthPercent}% - 6px)`,
+                        top: top + 1,
+                        height,
+                        padding: "6px 9px",
+                        borderRadius: 6,
+                        background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cc.bg : cc.light,
+                        border: isActive ? `1.5px solid ${cc.bg}` : `1px solid ${cc.bg}40`,
+                        borderLeft: `3px solid ${cc.bg}`,
+                        color: isActive ? "#fff" : isEnded ? "#94A3B8" : "#f4f5fa",
+                        fontSize: 12,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        transition: "transform 0.15s, box-shadow 0.15s",
+                        opacity: isEnded ? 0.6 : 1,
+                        zIndex: isActive ? 3 : 2,
+                        boxSizing: "border-box"
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 6px 20px ${cc.bg}60`; e.currentTarget.style.zIndex = "10"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
+                      <div style={{ fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {p.time}~{p.endTime}{isActive && " ●"}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 50 ? 3 : height > 30 ? 2 : 1, WebkitBoxOrient: "vertical" }}>{p.title}</div>
+                      {height > 70 && p.category && groupSize === 1 && <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85 }}>● {p.category}</div>}
+                    </div>);
+                  })}
+                  
+                  {/* "+N개 더보기" 배지 (가려진 이벤트가 있을 때) */}
+                  {Object.values(hiddenInfo).map(h => {
+                    const top = ((h.startMin - minHour * 60) / 60) * hourHeight;
+                    const tooltipText = h.ids.map(id => {
+                      const ev = events.find(e => e.id === id);
+                      return ev ? `${ev.time}~${ev.endTime} ${ev.title}` : "";
+                    }).filter(Boolean).join("\n");
+                    return (<div key={`hidden-${h.startMin}`} title={`이 시간대에 가려진 일정 ${h.count}개:\n${tooltipText}`}
+                      style={{ 
+                        position: "absolute",
+                        right: 4,
+                        top: top + 4,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,154,60,0.18)",
+                        border: "1px solid rgba(255,154,60,0.4)",
+                        color: "#ff9a3c",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        cursor: "help",
+                        zIndex: 4,
+                        whiteSpace: "nowrap"
+                      }}>+{h.count}</div>);
+                  })}
+                </>);
               })()}
             </div>))}
           </div>
