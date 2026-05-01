@@ -261,7 +261,7 @@ const DEFAULT_SETTINGS = {
   mapAreas: [],
   workerLocations: {},
   assets: [],
-  assetCategories: ["무전기", "의자", "테이블", "조명", "음향", "안전장비", "기타"],
+  assetCategories: ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"],
   workDiaries: [],          // [{id, workerId, workerName, date, shift, startTs, endTs, content, status}]
   shifts: [],               // [{id, name, startTime, endTime, color}]
   // 실시간 협업
@@ -998,6 +998,11 @@ const MD_GLOBAL_V2 = `
   body.md-v2-active * { font-family: inherit; }
   body.md-v2-active .mono, body.md-v2-active [style*="JetBrains Mono"] { font-family: 'JetBrains Mono', monospace !important; }
 
+  /* number input spinner 숨김 (전역, 모든 페이지) */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+
   /* 메인 배경: 더 깊은 검정으로 */
   body.md-v2-active div[style*="linear-gradient(180deg, #0a0d1a"] { 
     background: linear-gradient(180deg, #07070d 0%, #0e0f17 100%) !important; 
@@ -1221,9 +1226,164 @@ const MD_Metric = ({ cat, onClick }) => {
 };
 
 // ─── Mobile 클로드디자인 대시보드 ──────────────────────────────────
-function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign }) {
+// ─── 카테고리 상세 모달 (v2 디자인용) ─────────────────────────
+function CategoryDetailModal({ cat, settings, onClose, onAction, session }) {
+  if (!cat) return null;
+  const lv = getLevel(cat); const li = LEVELS[lv];
+  const isWarning = lv !== "BLUE";
+  const history = (cat.history || []).slice(-24);
+  const forecast = cat.forecast || [];
+  const shortForecast = cat.shortForecast || [];
+  
+  return (<div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflow: "auto", WebkitOverflowScrolling: "touch" }} onClick={onClose}>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <div onClick={e => e.stopPropagation()} style={{ minHeight: "100vh", background: "linear-gradient(180deg, #07070d 0%, #0e0f17 100%)", padding: "calc(env(safe-area-inset-top) + 12px) max(14px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 80px) max(14px, env(safe-area-inset-left))", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        {/* 닫기 헤더 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, position: "sticky", top: 0, zIndex: 10, background: "linear-gradient(180deg, #07070d 80%, transparent)", padding: "8px 0" }}>
+          <button onClick={onClose} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>← 닫기</button>
+          <span style={{ color: "#6c6e7d", fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{cat.lastUpdated || "-"}</span>
+        </div>
+
+        {/* 메인 카드 */}
+        <div style={{ padding: "20px 18px", marginBottom: 14, background: `linear-gradient(135deg, ${li.color}10, rgba(255,255,255,0.02))`, border: `1.5px solid ${li.color}40`, borderRadius: 18, boxShadow: `0 0 0 1px ${li.color}10, 0 12px 40px ${li.color}20` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 50, height: 50, borderRadius: 14, background: `${li.color}25`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{cat.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ color: "#f4f5fa", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>{cat.name}</h2>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>
+                {cat.kmaCategory ? `🌤️ 기상청 ${cat.kmaCategory}` : cat.apiConfig?.enabled ? "🔌 커스텀 API" : "✏️ 수동 입력"}
+              </div>
+            </div>
+            <span style={{ padding: "5px 12px", borderRadius: 999, background: li.bg, border: `1px solid ${li.border}`, color: li.color, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{li.icon} {li.label}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 48, fontWeight: 700, color: li.color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1 }}>{cat.currentValue.toLocaleString()}</span>
+            <span style={{ fontSize: 16, color: "#94A3B8" }}>{cat.unit}</span>
+          </div>
+          {cat.actionStatus && <div style={{ marginTop: 10 }}>
+            <span style={{ padding: "5px 12px", borderRadius: 999, background: cat.actionStatus === "handling" ? "rgba(255,154,60,0.15)" : "rgba(76,217,154,0.15)", border: `1px solid ${cat.actionStatus === "handling" ? "rgba(255,154,60,0.3)" : "rgba(76,217,154,0.3)"}`, color: cat.actionStatus === "handling" ? "#ff9a3c" : "#4cd99a", fontSize: 12, fontWeight: 700 }}>{cat.actionStatus === "handling" ? "🔧 조치중" : "✅ 조치완료"}</span>
+          </div>}
+        </div>
+
+        {/* 📊 실황 추이 그래프 */}
+        {history.length >= 2 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: li.color, boxShadow: `0 0 6px ${li.color}` }}/>
+            <span style={{ color: li.color, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📊 실황 추이 (최근 24시간)</span>
+          </div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <LineChart data={history} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 10 }} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "실황"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 10 }} />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 10 }} />}
+                {cat.thresholds?.RED?.[0] > 0 && <ReferenceLine y={cat.thresholds.RED[0]} stroke="#ff5e7e" strokeDasharray="4 4" label={{ value: "심각", fill: "#ff5e7e", fontSize: 10 }} />}
+                <Line type="monotone" dataKey="value" stroke={li.color} strokeWidth={2.5} dot={{ fill: li.color, r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 📊 데이터 부족 안내 */}
+        {history.length < 2 && cat.kmaCategory && <div style={{ padding: 20, marginBottom: 12, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div>
+          <div style={{ color: "#b0b3c4", fontSize: 13, marginBottom: 4 }}>실황 데이터 수집 중</div>
+          <div style={{ color: "#6c6e7d", fontSize: 11 }}>10분마다 자동 갱신됩니다 (현재값: {cat.currentValue}{cat.unit})</div>
+        </div>}
+
+        {/* 📋 초단기 예보 */}
+        {forecast.length > 0 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: "#ff9a3c" }}/>
+            <span style={{ color: "#ff9a3c", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📋 초단기 예보 (향후 6시간)</span>
+          </div>
+          <div style={{ width: "100%", height: 180 }}>
+            <ResponsiveContainer>
+              <LineChart data={forecast} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 10 }} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "예보"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" />}
+                <Line type="monotone" dataKey="value" stroke="#ff9a3c" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#ff9a3c", r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 📅 단기 예보 */}
+        {shortForecast.length > 0 && <div style={{ padding: 16, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: "#6b8aff" }}/>
+            <span style={{ color: "#6b8aff", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>📅 단기 예보 (3일, 3시간 간격)</span>
+          </div>
+          <div style={{ width: "100%", height: 200 }}>
+            <ResponsiveContainer>
+              <LineChart data={shortForecast} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 9 }} interval={Math.floor(shortForecast.length / 8)} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={40} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${Number(v).toLocaleString()} ${cat.unit}`, "단기예보"]} />
+                {cat.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" />}
+                {cat.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" />}
+                <Line type="monotone" dataKey="value" stroke="#6b8aff" strokeWidth={2} dot={{ fill: "#6b8aff", r: 2 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>}
+
+        {/* 임계값 표 */}
+        <div style={{ padding: 14, marginBottom: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #0e0f17", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#b0b3c4", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>임계값</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+            {Object.entries(LEVELS).map(([lk, lvi]) => (<div key={lk} style={{ padding: "10px 6px", borderRadius: 10, background: lk === lv ? lvi.bg : "rgba(255,255,255,0.02)", border: `1px solid ${lk === lv ? lvi.border : "rgba(255,255,255,0.05)"}`, textAlign: "center" }}>
+              <div style={{ color: lvi.color, fontSize: 12, fontWeight: 700 }}>{lvi.label}</div>
+              <div style={{ color: lk === lv ? "#fff" : "#6c6e7d", fontSize: 11, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>{cat.thresholds[lk]?.[0]}~{cat.thresholds[lk]?.[1] === Infinity ? "∞" : cat.thresholds[lk]?.[1]}</div>
+            </div>))}
+          </div>
+        </div>
+
+        {/* 조치 버튼 */}
+        {isWarning && onAction && <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <button onClick={() => onAction(cat.id, "handling")} style={{
+            flex: 1, padding: "14px", borderRadius: 12,
+            border: cat.actionStatus === "handling" ? "2px solid #ff9a3c" : "1px solid rgba(255,255,255,0.08)",
+            background: cat.actionStatus === "handling" ? "rgba(255,154,60,0.15)" : "rgba(255,255,255,0.02)",
+            color: cat.actionStatus === "handling" ? "#ff9a3c" : "#b0b3c4", fontSize: 14, fontWeight: 700, cursor: "pointer"
+          }}>🔧 조치중</button>
+          <button onClick={() => onAction(cat.id, "resolved")} style={{
+            flex: 1, padding: "14px", borderRadius: 12,
+            border: cat.actionStatus === "resolved" ? "2px solid #4cd99a" : "1px solid rgba(255,255,255,0.08)",
+            background: cat.actionStatus === "resolved" ? "rgba(76,217,154,0.15)" : "rgba(255,255,255,0.02)",
+            color: cat.actionStatus === "resolved" ? "#4cd99a" : "#b0b3c4", fontSize: 14, fontWeight: 700, cursor: "pointer"
+          }}>✅ 조치완료</button>
+        </div>}
+
+        {/* 대응 체크리스트 */}
+        {(cat.actionItems || []).length > 0 && <div style={{ padding: 14, marginBottom: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#b0b3c4", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>대응 체크리스트</div>
+          {cat.actionItems.map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: i < cat.actionItems.length - 1 ? "1px dashed rgba(255,255,255,0.05)" : "none" }}>
+            <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
+            <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+          </div>))}
+        </div>}
+
+        <button onClick={onClose} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid rgba(107,138,255,0.3)", background: "linear-gradient(180deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04))", color: "#8fa6ff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← 닫기</button>
+      </div>
+    </div>
+  </div>);
+}
+
+function MobileNewDashboard({ session, settings, categories, alerts, onCardClick, onSearch, onAlertClick, onPageChange, onLogout, isManager, onSwitchToOldDesign, onAction, setActiveAlert, onDeleteAlert }) {
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외 (개별 카드 단계만 유지)
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
@@ -1271,12 +1431,33 @@ function MobileNewDashboard({ session, settings, categories, alerts, onCardClick
       </div>
 
       {/* 최우선 알림 배너 */}
-      {topAlert && <div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`}>
-        <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
-        <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
-        <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4 }}>{(topAlert.message || "").split("\n")[2] || "임계값 도달 - 확인 필요"}</div>
-        <button onClick={() => onAlertClick && onAlertClick(topAlert)} style={{ width: "100%", marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>대응 시작 →</button>
-      </div>}
+      {topAlert && (() => {
+        const isManualAlert = topAlert.category === "수동 발령" || !topAlert.catId;
+        const linkedCat = !isManualAlert ? (categories || []).find(c => c.name === topAlert.category || c.id === topAlert.catId) : null;
+        return (<div className={`md-banner ${CC_LEVEL_MAP[topAlert.level]}`} style={{ position: "relative" }}>
+          {/* X 닫기 버튼 (우상단) */}
+          <button onClick={(e) => { e.stopPropagation(); if (onDeleteAlert) onDeleteAlert(0); }} style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#b0b3c4", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, zIndex: 2 }} title="알림 닫기">✕</button>
+          <div style={{ paddingRight: 36 }}>
+            <MD_Chip level={CC_LEVEL_MAP[topAlert.level]} pulse>● {topAlert.level} · {CC_LEVEL_LABEL[topAlert.level]}</MD_Chip>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, lineHeight: 1.3, color: "#f4f5fa" }}>{topAlert.category}</div>
+            <div style={{ fontSize: 12, color: "#b0b3c4", marginTop: 4, whiteSpace: "pre-wrap", maxHeight: 60, overflow: "hidden" }}>{(topAlert.message || "").split("\n").slice(0, 3).join(" · ") || "임계값 도달 - 확인 필요"}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={() => {
+              if (linkedCat) {
+                // 카테고리 알림 → handling 시작 + 카테고리 모달 열기
+                if (linkedCat.actionStatus !== "handling" && onAction) onAction(linkedCat.id, "handling");
+                if (onCardClick) onCardClick(linkedCat.id);
+              } else {
+                // 수동 발령 → 메시지 전체 모달 표시
+                if (setActiveAlert) setActiveAlert(topAlert);
+                else if (onAlertClick) onAlertClick(topAlert);
+              }
+            }} style={{ flex: 1, padding: "12px 14px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${overallColor}, ${overallColor}dd)`, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{isManualAlert ? "📨 메시지 보기" : "대응 시작 →"}</button>
+            {onDeleteAlert && <button onClick={(e) => { e.stopPropagation(); if (confirm(`${isManualAlert ? "이 발령을" : "이 알림을"} 삭제하시겠습니까?`)) onDeleteAlert(0); }} style={{ padding: "12px 16px", borderRadius: 10, border: "1px solid rgba(255,94,126,0.25)", background: "rgba(255,94,126,0.08)", color: "#ff5e7e", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>🗑 삭제</button>}
+          </div>
+        </div>);
+      })()}
 
       {/* 메트릭 그리드 (2열) */}
       <div className="md-grid2">
@@ -1433,8 +1614,14 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
     { id: "incident", name: "사건 / 신고", emoji: "📁" },
     { id: "map", name: "지도 상황도", emoji: "🗺️" },
   ];
+  const operationsItems = [
+    { id: "festival", name: "축제 관리", emoji: "🎪" },
+    { id: "program", name: "프로그램 관리", emoji: "🎭" },
+    { id: "stage", name: "공연 관리", emoji: "🎤" },
+    { id: "workforce", name: "인력 관리", emoji: "👷" },
+  ];
   const adminItems = [
-    { id: "resource", name: "리소스 관리", emoji: "📦" },
+    { id: "resource", name: "물자 관리", emoji: "📦" },
     { id: "report", name: "리포트", emoji: "📊" },
     { id: "user", name: "사용자 관리", emoji: "👥" },
     { id: "settings", name: "설정", emoji: "⚙️" },
@@ -1444,6 +1631,12 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map(it => (<div key={it.id} className={`cc-sb-item ${active === it.id ? "active" : ""}`} onClick={() => onNav(it.id)}>
         <span style={{ fontSize: 16 }}>{it.emoji}</span><span>{it.name}</span>{it.badge && <span className="cc-badge">{it.badge}</span>}
+      </div>))}
+    </div>
+    <div className="cc-sb-section" style={{ marginTop: 14 }}>운영</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {operationsItems.map(it => (<div key={it.id} className={`cc-sb-item ${active === it.id ? "active" : ""}`} onClick={() => onNav(it.id)}>
+        <span style={{ fontSize: 16 }}>{it.emoji}</span><span>{it.name}</span>
       </div>))}
     </div>
     <div className="cc-sb-section" style={{ marginTop: 14 }}>관리</div>
@@ -1611,12 +1804,13 @@ const MCC_STYLES = `
 `;
 
 // ─── 모바일 관제센터 (B안: 하단네비 + 세로카드) ─────────────────────
-function MobileControlCenter({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
+function MobileControlCenter({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, setActiveAlert, onAction }) {
   const [page, setPage] = useState("dashboard");
   const [showMore, setShowMore] = useState(false);
 
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
@@ -1641,7 +1835,7 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
     alert: { title: "알림 / 경보", sub: "단계별 메시지 발송" },
     incident: { title: "사건 / 신고", sub: "현장 신고 접수 및 추적" },
     map: { title: "지도 상황도", sub: "구역・핀・히트맵" },
-    resource: { title: "리소스 관리", sub: "자산 및 인력" },
+    resource: { title: "물자 관리", sub: "자산 및 인력" },
     report: { title: "리포트", sub: "일일 종합" },
     user: { title: "사용자 관리", sub: "계정 목록" },
     settings: { title: "설정", sub: "축제 정보" },
@@ -1678,6 +1872,10 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
       {page === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
       {page === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
       {page === "settings" && <CC_SettingsPage settings={settings} setSettings={setSettings} session={session} onMobileSwitch={onMobileSwitch} />}
+      {page === "festival" && <FestivalStatusPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
+      {page === "program" && <ProgramPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "stage" && <StageMgmtPage settings={settings} setSettings={setSettings} session={session} />}
+      {page === "workforce" && <WorkersPage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} />}
 
       {/* 하단 네비 (5탭) */}
       <div className="mcc-bottom-nav">
@@ -1704,8 +1902,12 @@ function MobileControlCenter({ session, accounts, settings, setSettings, categor
           <div className="mcc-sheet-title">더보기</div>
           <div className="mcc-sheet-grid">
             {[
+              { id: "festival", icon: "🎪", label: "축제 관리" },
+              { id: "program", icon: "🎭", label: "프로그램" },
+              { id: "stage", icon: "🎤", label: "공연 관리" },
+              { id: "workforce", icon: "👷", label: "인력 관리" },
               { id: "map", icon: "🗺️", label: "지도 상황도" },
-              { id: "resource", icon: "📦", label: "리소스 관리" },
+              { id: "resource", icon: "📦", label: "물자 관리" },
               { id: "report", icon: "📊", label: "리포트" },
               { id: "user", icon: "👥", label: "사용자 관리" },
               { id: "settings", icon: "⚙️", label: "설정" },
@@ -2262,13 +2464,1201 @@ function MCC_Map({ settings, session }) {
   </>);
 }
 
-function ControlCenterDashboard({ session, accounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
+// ─── PC 관제센터 운영 페이지 (정보-밀집형) ─────────────────────
+
+// 1) 축제 관리 - 종합 현황
+function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session, categories, alerts, setCcPage }) {
+  const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, zoneId: s.zoneId })));
+  const onDuty = allWorkers.filter(w => w.onDuty).length;
+  const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+  const allRadios = (settings.assets || []).flatMap(a => a.units || []);
+  const radiosUsed = allRadios.filter(u => u.assignedTo).length;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const todayPgs = (settings.programs || []).filter(p => p.date === "always" || p.date === todayStr);
+  const activePgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+  const upcomingPgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    return sh*60+sm > nowMin;
+  }).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  const openIncidents = (settings.incidents || []).filter(i => i.status !== "closed");
+  const startD = settings.startDate ? new Date(settings.startDate) : null;
+  const endD = settings.endDate ? new Date(settings.endDate) : null;
+  const today = new Date();
+  let dayStatus = "준비중", dayInfo = "";
+  if (startD && endD) {
+    const ds = today < startD ? Math.ceil((startD - today) / 86400000) : 0;
+    const de = today > endD ? -1 : Math.ceil((endD - today) / 86400000);
+    const totalDays = Math.ceil((endD - startD) / 86400000) + 1;
+    const dayN = Math.floor((today - startD) / 86400000) + 1;
+    if (today < startD) { dayStatus = `D-${ds}`; dayInfo = "개막 준비"; }
+    else if (today > endD) { dayStatus = "종료"; dayInfo = `${totalDays}일간 운영 완료`; }
+    else { dayStatus = `D+${dayN-1}`; dayInfo = `${dayN}/${totalDays}일차`; }
+  }
+
+  // 🆘 부스 상세 모달 + 사건 보고
+  const [boothId, setBoothId] = useState(null);
+  const [reportMode, setReportMode] = useState(false);
+  const [report, setReport] = useState({ type: "", priority: "medium", desc: "" });
+  const booth = boothId ? (settings.workSites || []).find(s => s.id === boothId) : null;
+  const boothIncidents = booth ? (settings.incidents || []).filter(i => i.siteId === boothId && i.status !== "closed") : [];
+  
+  // 부스 상태 계산: 사건이 있으면 incident, 진행 프로그램 있으면 active, 아니면 standby
+  const getBoothStatus = (siteId) => {
+    const incs = (settings.incidents || []).filter(i => i.siteId === siteId && i.status !== "closed");
+    if (incs.some(i => i.priority === "high")) return "danger";  // 빨강
+    if (incs.length > 0) return "warning";  // 주황
+    return "normal";  // 초록
+  };
+  
+  const submitReport = () => {
+    if (!report.type.trim()) { alert("상황 유형을 입력하세요"); return; }
+    const inc = {
+      id: "inc_" + Date.now(),
+      siteId: boothId,
+      siteName: booth?.name,
+      zoneId: booth?.zoneId,
+      type: report.type,
+      priority: report.priority,
+      desc: report.desc,
+      location: booth?.name || "",
+      reporter: session?.name || "?",
+      time: new Date().toLocaleString("ko-KR"),
+      ts: Date.now(),
+      status: "open"
+    };
+    setSettings(prev => ({ ...prev, incidents: [inc, ...(prev.incidents || [])] }));
+    setReport({ type: "", priority: "medium", desc: "" });
+    setReportMode(false);
+  };
+  
+  const closeIncident = (incId) => {
+    if (!confirm("이 상황을 대응 완료 처리하시겠습니까?")) return;
+    setSettings(prev => ({ ...prev, incidents: (prev.incidents || []).map(i => i.id === incId ? { ...i, status: "closed", closedAt: new Date().toLocaleString("ko-KR"), closedBy: session?.name || "?" } : i) }));
+  };
+  
+  const handlingIncident = (incId) => {
+    setSettings(prev => ({ ...prev, incidents: (prev.incidents || []).map(i => i.id === incId ? { ...i, status: "handling", handlingBy: session?.name || "?", handlingAt: new Date().toLocaleString("ko-KR") } : i) }));
+  };
+
+  return (<div>
+    {/* KPI 8개 라인 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "축제 일정", value: dayStatus, sub: dayInfo, color: "#6b8aff", icon: "📅" },
+        { label: "구역", value: (settings.zones || []).length, sub: "운영중", color: "#a980ff", icon: "📍" },
+        { label: "근무지", value: (settings.workSites || []).filter(s => s.id !== "_pool").length, sub: "배치된", color: "#42A5F5", icon: "🏠" },
+        { label: "총 인력", value: allWorkers.length, sub: `근무 ${onDuty}`, color: "#4cd99a", icon: "👥" },
+        { label: "프로그램", value: todayPgs.length, sub: `진행 ${activePgs.length}`, color: "#FF7043", icon: "🎭" },
+        { label: "활성 경보", value: (alerts || []).length, sub: `심각 ${(alerts||[]).filter(a=>a.level==="RED").length}`, color: (alerts||[]).length>0?"#ff5e7e":"#4cd99a", icon: "🔔" },
+        { label: "사건 처리", value: openIncidents.length, sub: "진행중", color: openIncidents.length>0?"#ff9a3c":"#4cd99a", icon: "📁" },
+        { label: "무전기", value: `${radiosUsed}/${allRadios.length}`, sub: "사용중", color: "#f5c451", icon: "📻" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 10, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1, letterSpacing: "-0.02em" }}>{k.value}</div>
+        <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 4 }}>{k.sub}</div>
+      </div>))}
+    </div>
+
+    {/* 축제 정보 + 운영 시간 + 빠른 액션 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="축제 정보" sub="기본 설정">
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: "10px 12px", fontSize: 13 }}>
+          <span style={{ color: "#6c6e7d" }}>축제명</span>
+          <span style={{ color: "#f4f5fa", fontWeight: 600 }}>{settings.festivalName || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>장소</span>
+          <span style={{ color: "#f4f5fa" }}>{settings.location?.name || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>좌표</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 11 }}>{settings.location?.lat ? `${settings.location.lat.toFixed(4)}, ${settings.location.lon.toFixed(4)}` : "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>면적</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{(settings.venueArea || 0).toLocaleString()} ㎡</span>
+          <span style={{ color: "#6c6e7d" }}>시작</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.startDate || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>종료</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.endDate || "-"}</span>
+          <span style={{ color: "#6c6e7d" }}>운영시간</span>
+          <span style={{ color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{settings.operatingStart || "-"} ~ {settings.operatingEnd || "-"}</span>
+        </div>
+      </CC_Card>
+
+      <CC_Card title="구역 요약" sub={`${(settings.zones || []).length}개 구역, ${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 부스`}>
+        {(settings.zones || []).slice(0, 6).map(z => {
+          const sites = (settings.workSites || []).filter(s => s.zoneId === z.id);
+          const wkrs = sites.reduce((n, s) => n + (s.workers || []).length, 0);
+          // 이 구역의 미해결 사건 수
+          const zoneIncidents = (settings.incidents || []).filter(i => i.zoneId === z.id && i.status !== "closed").length;
+          const cong = (settings.zoneCongestion || []).find(c => c.zoneId === z.id);
+          const lv = zoneIncidents > 0 ? "red" : cong?.level === "danger" ? "red" : cong?.level === "crowded" ? "yellow" : "green";
+          const lbl = zoneIncidents > 0 ? `🚨${zoneIncidents}` : cong?.level === "danger" ? "위험" : cong?.level === "crowded" ? "혼잡" : "원활";
+          return (<div key={z.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+            <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {z.name}</span>
+            <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{sites.length} 부스</span>
+            <span className="mono" style={{ fontSize: 11, color: "#6b8aff" }}>{wkrs}명</span>
+            <CC_Chip level={lv}>{lbl}</CC_Chip>
+          </div>);
+        })}
+      </CC_Card>
+
+      <CC_Card title="현재 상황" sub="실시간">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {activePgs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(76,217,154,0.08)", border: "1px solid rgba(76,217,154,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", animation: "blink 1.5s infinite" }} />
+              <span style={{ fontSize: 11, color: "#4cd99a", fontWeight: 700 }}>● 진행중 {activePgs.length}개</span>
+            </div>
+            {activePgs.slice(0, 2).map(p => (<div key={p.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4 }}>· {p.title}</div>))}
+          </div>}
+          {upcomingPgs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(107,138,255,0.08)", border: "1px solid rgba(107,138,255,0.2)" }}>
+            <div style={{ fontSize: 11, color: "#6b8aff", fontWeight: 700, marginBottom: 4 }}>다음 예정</div>
+            {upcomingPgs.slice(0, 2).map(p => (<div key={p.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4, display: "flex", gap: 8 }}>
+              <span className="mono" style={{ color: "#6b8aff" }}>{p.time}</span>
+              <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</span>
+            </div>))}
+          </div>}
+          {openIncidents.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,154,60,0.08)", border: "1px solid rgba(255,154,60,0.2)" }}>
+            <div style={{ fontSize: 11, color: "#ff9a3c", fontWeight: 700, marginBottom: 4 }}>🚨 사건 처리중 {openIncidents.length}건</div>
+            {openIncidents.slice(0, 2).map(i => (<div key={i.id} style={{ fontSize: 12, color: "#f4f5fa", marginTop: 4 }}>· {i.type} ({i.location})</div>))}
+          </div>}
+          <CC_Btn variant="primary" onClick={() => setCcPage("incident")}>🚨 사건 등록</CC_Btn>
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 🏪 구역별 부스 현황 - 큰 그리드 */}
+    <CC_Card title="🏪 구역별 부스 현황" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 부스 · 클릭하여 상세 보기/상황 보고`} style={{ marginBottom: 16 }}>
+      {(() => {
+        const zonesWithBooths = (settings.zones || []).map(z => ({
+          ...z,
+          booths: (settings.workSites || []).filter(s => s.zoneId === z.id && s.id !== "_pool")
+        })).filter(z => z.booths.length > 0);
+        // 미배치 구역 (zoneId 없는 부스들)
+        const orphanBooths = (settings.workSites || []).filter(s => s.id !== "_pool" && !s.zoneId);
+        if (zonesWithBooths.length === 0 && orphanBooths.length === 0) {
+          return (<div style={{ padding: "40px 20px", textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🏪</div>
+            <div style={{ fontSize: 15, color: "#b0b3c4", fontWeight: 600, marginBottom: 4 }}>등록된 부스가 없습니다</div>
+            <div style={{ fontSize: 12 }}>모바일 ⚙️관리에서 근무지를 등록하세요</div>
+          </div>);
+        }
+        return (<>
+          {zonesWithBooths.map(z => {
+            const zCong = (settings.zoneCongestion || []).find(c => c.zoneId === z.id);
+            const zLv = zCong?.level || "smooth";
+            const zColor = zLv === "danger" ? "#ff5e7e" : zLv === "crowded" ? "#f5c451" : "#4cd99a";
+            const zoneIncidents = (settings.incidents || []).filter(i => i.zoneId === z.id && i.status !== "closed").length;
+            const totalWkrs = z.booths.reduce((n, s) => n + (s.workers || []).length, 0);
+            return (<div key={z.id} style={{ marginBottom: 18 }}>
+              {/* 구역 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: "8px 14px", borderRadius: 10, background: `linear-gradient(90deg, ${zColor}15, transparent)`, borderLeft: `3px solid ${zColor}` }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#f4f5fa" }}>📍 {z.name}</span>
+                <span style={{ padding: "3px 10px", borderRadius: 999, background: `${zColor}15`, border: `1px solid ${zColor}30`, color: zColor, fontSize: 11, fontWeight: 700 }}>● {zLv === "danger" ? "위험" : zLv === "crowded" ? "혼잡" : "원활"}</span>
+                <span style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto" }}>{z.booths.length}개 부스 · 👥 {totalWkrs}명</span>
+                {zoneIncidents > 0 && <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(255,94,126,0.15)", border: "1px solid rgba(255,94,126,0.3)", color: "#ff5e7e", fontSize: 11, fontWeight: 700 }}>🚨 {zoneIncidents}건 진행</span>}
+              </div>
+              {/* 부스 그리드 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, paddingLeft: 8 }}>
+                {z.booths.map(s => {
+                  const status = getBoothStatus(s.id);
+                  const incs = (settings.incidents || []).filter(i => i.siteId === s.id && i.status !== "closed");
+                  const handlingCount = incs.filter(i => i.status === "handling").length;
+                  const openCount = incs.filter(i => i.status === "open").length;
+                  // 색상: 위험(빨강) / 대응중(주황) / 정상(초록)
+                  const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+                  const sBg = status === "danger" ? "rgba(255,94,126,0.08)" : status === "warning" ? "rgba(255,154,60,0.08)" : "rgba(76,217,154,0.04)";
+                  const sLabel = status === "danger" ? "🚨 위급" : status === "warning" ? (handlingCount > 0 ? "🛠️ 대응중" : "⚠️ 사건") : "✅ 정상";
+                  const wkrs = s.workers || [];
+                  const onD = wkrs.filter(w => w.onDuty).length;
+                  return (<div key={s.id} onClick={() => { setBoothId(s.id); setReportMode(false); }} 
+                    style={{ padding: 12, borderRadius: 12, background: sBg, border: `1.5px solid ${sColor}30`, borderLeft: `3px solid ${sColor}`, cursor: "pointer", transition: "all 0.15s", position: "relative" }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = sColor; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${sColor}30`; }}>
+                    {/* 펄스 애니메이션 (위험/대응중) */}
+                    {status !== "normal" && <span style={{ position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, background: sColor, boxShadow: `0 0 0 0 ${sColor}80`, animation: "pulse-dot 1.5s infinite" }} />}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: status !== "normal" ? 12 : 0 }}>🏪 {s.name}</span>
+                    </div>
+                    <div style={{ padding: "4px 10px", borderRadius: 999, background: `${sColor}15`, border: `1px solid ${sColor}30`, color: sColor, fontSize: 11, fontWeight: 700, display: "inline-block", marginBottom: 8 }}>{sLabel}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8", marginBottom: 6 }}>
+                      <span>👥 인력</span>
+                      <span className="mono" style={{ color: "#6b8aff", fontWeight: 600 }}>{onD}/{wkrs.length}</span>
+                    </div>
+                    {incs.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${sColor}20`, fontSize: 11, color: sColor, fontWeight: 600 }}>
+                      {incs.slice(0, 1).map(i => (<div key={i.id} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>· {i.type}</div>))}
+                      {incs.length > 1 && <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2 }}>외 {incs.length - 1}건</div>}
+                    </div>}
+                  </div>);
+                })}
+              </div>
+            </div>);
+          })}
+          {orphanBooths.length > 0 && (<div>
+            <div style={{ padding: "8px 14px", marginBottom: 10, color: "#6c6e7d", fontSize: 13, fontWeight: 700 }}>📍 미지정 구역</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, paddingLeft: 8 }}>
+              {orphanBooths.map(s => {
+                const status = getBoothStatus(s.id);
+                const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+                const wkrs = s.workers || [];
+                const onD = wkrs.filter(w => w.onDuty).length;
+                return (<div key={s.id} onClick={() => { setBoothId(s.id); setReportMode(false); }} style={{ padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1.5px solid ${sColor}30`, borderLeft: `3px solid ${sColor}`, cursor: "pointer" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", marginBottom: 6 }}>🏪 {s.name}</div>
+                  <div style={{ fontSize: 11, color: "#6b8aff" }}>👥 {onD}/{wkrs.length}</div>
+                </div>);
+              })}
+            </div>
+          </div>)}
+        </>);
+      })()}
+      <style>{`
+        @keyframes pulse-dot {
+          0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+          70% { box-shadow: 0 0 0 8px transparent; opacity: 0.5; }
+          100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+        }
+      `}</style>
+    </CC_Card>
+
+    {/* 안내: 상세 설정 */}
+    <CC_Card title="설정 / 관리" sub="모바일 화면에서 더 자세히 설정 가능">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("program")}>🎭 프로그램 설정 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("stage")}>🎤 공연 설정 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("workforce")}>👷 인력 관리 →</CC_Btn>
+        <CC_Btn variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 시스템 설정 →</CC_Btn>
+      </div>
+    </CC_Card>
+
+    {/* 🏪 부스 상세 모달 */}
+    {booth && <div onClick={() => { setBoothId(null); setReportMode(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 720, maxHeight: "90vh", overflow: "auto", background: "linear-gradient(180deg, #14151f, #0e0f17)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+        {(() => {
+          const status = getBoothStatus(booth.id);
+          const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+          const sLabel = status === "danger" ? "🚨 위급 상황" : status === "warning" ? "⚠️ 사건 발생" : "✅ 정상 운영";
+          const zone = (settings.zones || []).find(z => z.id === booth.zoneId);
+          const wkrs = booth.workers || [];
+          return (<>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#f4f5fa", marginBottom: 4 }}>🏪 {booth.name}</div>
+                {zone && <div style={{ fontSize: 12, color: "#94A3B8" }}>📍 {zone.name}</div>}
+              </div>
+              <button onClick={() => { setBoothId(null); setReportMode(false); }} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+            </div>
+            
+            {/* 상태 배너 */}
+            <div style={{ padding: 14, borderRadius: 12, background: `${sColor}10`, border: `1px solid ${sColor}30`, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 5, background: sColor, boxShadow: `0 0 8px ${sColor}` }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: sColor }}>{sLabel}</span>
+              </div>
+            </div>
+
+            {/* 진행중 사건 리스트 */}
+            {boothIncidents.length > 0 && <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>🚨 진행중 사건 ({boothIncidents.length}건)</div>
+              {boothIncidents.map(i => {
+                const isHandling = i.status === "handling";
+                const ic = i.priority === "high" ? "#ff5e7e" : i.priority === "medium" ? "#ff9a3c" : "#6b8aff";
+                return (<div key={i.id} style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${ic}25`, borderLeft: `3px solid ${ic}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa" }}>{i.priority === "high" ? "🔴" : i.priority === "medium" ? "🟠" : "🔵"} {i.type}</span>
+                    {isHandling && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(255,154,60,0.15)", color: "#ff9a3c", fontSize: 10, fontWeight: 700 }}>🛠️ 대응중</span>}
+                    <span className="mono" style={{ fontSize: 10, color: "#6c6e7d", marginLeft: "auto" }}>{i.time?.split(" ")[1] || i.time}</span>
+                  </div>
+                  {i.desc && <div style={{ fontSize: 12, color: "#b0b3c4", marginBottom: 8 }}>{i.desc}</div>}
+                  <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 8 }}>👤 보고: {i.reporter}{isHandling && ` · 🛠️ 대응: ${i.handlingBy}`}</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {!isHandling && <button onClick={() => handlingIncident(i.id)} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.3)", background: "rgba(255,154,60,0.1)", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🛠️ 대응 시작</button>}
+                    <button onClick={() => closeIncident(i.id)} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ 대응 완료</button>
+                  </div>
+                </div>);
+              })}
+            </div>}
+
+            {/* 사건 보고 폼 */}
+            {reportMode ? (
+              <div style={{ padding: 14, borderRadius: 12, background: "rgba(255,94,126,0.05)", border: "1px solid rgba(255,94,126,0.25)", marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#ff5e7e", marginBottom: 10 }}>🚨 새 상황 보고</div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>상황 유형 *</div>
+                    <input value={report.type} onChange={e => setReport({...report, type: e.target.value})} placeholder="예: 분실아동, 부상자, 시설고장, 소음신고" autoFocus style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>우선순위</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                      {[{ k: "high", l: "🔴 위급", c: "#ff5e7e" }, { k: "medium", l: "🟠 주의", c: "#ff9a3c" }, { k: "low", l: "🔵 일반", c: "#6b8aff" }].map(p => (
+                        <button key={p.k} onClick={() => setReport({...report, priority: p.k})} style={{ padding: "10px", borderRadius: 8, border: report.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: report.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: report.priority === p.k ? p.c : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{p.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>상세 설명</div>
+                    <textarea value={report.desc} onChange={e => setReport({...report, desc: e.target.value})} rows={3} placeholder="상황 상세 설명, 위치, 인상착의 등" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setReportMode(false); setReport({ type: "", priority: "medium", desc: "" }); }} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>취소</button>
+                    <button onClick={submitReport} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #ff5e7e, #e91e63)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🚨 상황 보고</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setReportMode(true)} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid rgba(255,94,126,0.3)", background: "linear-gradient(180deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))", color: "#ff5e7e", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 16 }}>🚨 새 상황 보고</button>
+            )}
+
+            {/* 근무자 목록 */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>👥 근무자 ({wkrs.length}명{wkrs.filter(w=>w.onDuty).length > 0 && ` · 근무중 ${wkrs.filter(w=>w.onDuty).length}명`})</div>
+            {wkrs.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.06)" }}>배치된 근무자가 없습니다</div> : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
+                {wkrs.map(w => (<div key={w.id} style={{ padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 3, background: w.onDuty ? "#4cd99a" : "#556" }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
+                    {w.role && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
+                  </div>
+                  {w.phone && <a href={`tel:${w.phone}`} style={{ fontSize: 11, color: "#6b8aff", fontFamily: "JetBrains Mono", textDecoration: "none" }}>📞 {w.phone}</a>}
+                </div>))}
+              </div>
+            )}
+          </>);
+        })()}
+      </div>
+    </div>}
+  </div>);
+}
+
+// 2) 프로그램 관리 - 타임라인 + 일정표
+function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
+  const programs = settings.programs || [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const [filterDate, setFilterDate] = useState("today");
+  const [filterCategory, setFilterCategory] = useState("all");
+
+  const dates = [...new Set(programs.map(p => p.date).filter(d => d && d !== "always"))].sort();
+  const categoryList = [...new Set(programs.map(p => p.category).filter(Boolean))];
+
+  let filtered = programs;
+  if (filterDate === "today") filtered = filtered.filter(p => p.date === "always" || p.date === todayStr);
+  else if (filterDate !== "all") filtered = filtered.filter(p => p.date === filterDate);
+  if (filterCategory !== "all") filtered = filtered.filter(p => p.category === filterCategory);
+  filtered = filtered.sort((a, b) => (a.date + " " + (a.time || "")).localeCompare(b.date + " " + (b.time || "")));
+
+  // KPI
+  const todayPgs = programs.filter(p => p.date === "always" || p.date === todayStr);
+  const activePgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+  const upcomingPgs = todayPgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    return sh*60+sm > nowMin;
+  });
+  const endedPgs = todayPgs.filter(p => {
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin > eh*60+em || p.pgStatus === "ended";
+  });
+
+  return (<div>
+    {/* KPI 5개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "전체 프로그램", value: programs.length, color: "#6b8aff", icon: "🎭" },
+        { label: "오늘 일정", value: todayPgs.length, color: "#a980ff", icon: "📅" },
+        { label: "진행중", value: activePgs.length, color: "#4cd99a", icon: "▶" },
+        { label: "예정", value: upcomingPgs.length, color: "#f5c451", icon: "⏰" },
+        { label: "종료", value: endedPgs.length, color: "#6c6e7d", icon: "✓" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</div>
+      </div>))}
+    </div>
+
+    {/* 필터 */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600 }}>날짜:</span>
+        {[{ k: "today", l: "오늘" }, { k: "all", l: "전체" }, ...dates.map(d => ({ k: d, l: d.slice(5) }))].map(d => (
+          <button key={d.k} onClick={() => setFilterDate(d.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filterDate === d.k ? "1px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filterDate === d.k ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filterDate === d.k ? "#6b8aff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{d.l}</button>
+        ))}
+        {categoryList.length > 0 && <>
+          <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600, marginLeft: 12 }}>카테고리:</span>
+          {[{ k: "all", l: "전체" }, ...categoryList.map(c => ({ k: c, l: c }))].map(c => (
+            <button key={c.k} onClick={() => setFilterCategory(c.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filterCategory === c.k ? "1px solid #a980ff" : "1px solid rgba(255,255,255,0.08)", background: filterCategory === c.k ? "rgba(169,128,255,0.15)" : "rgba(255,255,255,0.02)", color: filterCategory === c.k ? "#a980ff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{c.l}</button>
+          ))}
+        </>}
+        <CC_Btn size="sm" variant="primary" style={{ marginLeft: "auto" }} onClick={() => setCcPage("settings")}>+ 새 프로그램</CC_Btn>
+      </div>
+    </CC_Card>
+
+    {/* 📅 캘린더 뷰 (시간 × 장소 그리드) */}
+    {(() => {
+      // 표시할 프로그램 (필터된 + 시간 정보 있는 것만)
+      const calendarPgs = filtered.filter(p => p.time && p.endTime);
+      
+      // 장소(컬럼) 추출 - 위치 또는 구역 기준
+      const locations = [...new Set(calendarPgs.map(p => {
+        if (p.location) return p.location;
+        const z = (settings.zones || []).find(zz => zz.id === p.zoneId);
+        return z?.name || "기타";
+      }))].sort();
+      
+      if (locations.length === 0) return null;
+      
+      // 시간 범위 계산 (모든 프로그램의 최소~최대 시간)
+      let minHour = 9, maxHour = 22;
+      calendarPgs.forEach(p => {
+        const [sh] = (p.time || "00:00").split(":").map(Number);
+        const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+        if (sh < minHour) minHour = sh;
+        if (eh > maxHour || (eh === maxHour && em > 0)) maxHour = eh + (em > 0 ? 1 : 0);
+      });
+      minHour = Math.max(0, minHour - 1);
+      maxHour = Math.min(24, maxHour + 1);
+      const totalHours = maxHour - minHour;
+      const hourHeight = 60; // 1시간 = 60px
+      const gridHeight = totalHours * hourHeight;
+      
+      // 카테고리별 색상 (구글 캘린더 스타일)
+      const catColors = {
+        "S": { bg: "#1a73e8", light: "rgba(26,115,232,0.2)" },  // 파랑
+        "E": { bg: "#33b679", light: "rgba(51,182,121,0.2)" },  // 초록
+        "P": { bg: "#8e24aa", light: "rgba(142,36,170,0.2)" },  // 보라
+        "O": { bg: "#f4511e", light: "rgba(244,81,30,0.2)" },   // 주황
+      };
+      const getCatColor = (cat) => catColors[cat] || { bg: "#5f6368", light: "rgba(95,99,104,0.2)" };
+      
+      // 시간 라인 생성 (정시마다)
+      const hourLines = [];
+      for (let h = minHour; h <= maxHour; h++) {
+        hourLines.push(h);
+      }
+      
+      // 현재 시간 라인 (오늘 + 시간 범위 안일 때)
+      const todayMatch = filterDate === "today" || filterDate === todayStr;
+      const showNowLine = todayMatch && nowMin >= minHour * 60 && nowMin <= maxHour * 60;
+      const nowLineTop = showNowLine ? ((nowMin - minHour * 60) / 60) * hourHeight : 0;
+      
+      // 🎪 축제 운영 시작/종료 시간 라인
+      const opStart = settings.operatingStart || "";
+      const opEnd = settings.operatingEnd || "";
+      const parseHM = (hm) => {
+        if (!hm || !hm.includes(":")) return null;
+        const [h, m] = hm.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const opStartMin = parseHM(opStart);
+      const opEndMin = parseHM(opEnd);
+      const showOpStart = opStartMin !== null && opStartMin >= minHour * 60 && opStartMin <= maxHour * 60;
+      const showOpEnd = opEndMin !== null && opEndMin >= minHour * 60 && opEndMin <= maxHour * 60;
+      const opStartTop = showOpStart ? ((opStartMin - minHour * 60) / 60) * hourHeight : 0;
+      const opEndTop = showOpEnd ? ((opEndMin - minHour * 60) / 60) * hourHeight : 0;
+      
+      // 장소별로 프로그램 분류
+      const byLoc = {};
+      locations.forEach(loc => byLoc[loc] = []);
+      calendarPgs.forEach(p => {
+        const loc = p.location || (settings.zones || []).find(zz => zz.id === p.zoneId)?.name || "기타";
+        if (byLoc[loc]) byLoc[loc].push(p);
+      });
+      
+      return (<CC_Card title="📅 일정 캘린더" sub={`${calendarPgs.length}개 일정 · 시간 × 장소 뷰`} style={{ marginBottom: 16 }}>
+        <div style={{ overflowX: "auto", overflowY: "hidden", paddingBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `70px repeat(${locations.length}, minmax(220px, 1fr))`, gap: 0, position: "relative", minWidth: 70 + locations.length * 220 }}>
+            {/* 좌상단 빈 칸 + 장소 헤더 */}
+            <div style={{ height: 44, position: "sticky", top: 0, zIndex: 4, background: "#14151f", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
+            {locations.map(loc => (<div key={loc} style={{ height: 44, padding: "10px 12px", background: "linear-gradient(180deg, #1a1d2a, #14151f)", borderBottom: "1px solid rgba(255,255,255,0.08)", borderLeft: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, zIndex: 4, fontSize: 12, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={loc}>
+              📍 {loc}
+              <span style={{ marginLeft: 6, fontSize: 10, color: "#6c6e7d", fontWeight: 600 }}>({byLoc[loc].length})</span>
+            </div>))}
+
+            {/* 시간 라벨 컬럼 + 그리드 셀들 */}
+            <div style={{ position: "relative", height: gridHeight, background: "rgba(0,0,0,0.2)" }}>
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, fontSize: 10, color: "#6c6e7d", fontFamily: "JetBrains Mono", paddingRight: 6, textAlign: "right", transform: "translateY(-6px)" }}>{String(h).padStart(2, "0")}:00</div>))}
+            </div>
+            
+            {/* 각 장소 컬럼 */}
+            {locations.map((loc, locIdx) => (<div key={loc} style={{ position: "relative", height: gridHeight, borderLeft: "1px solid rgba(255,255,255,0.04)" }}>
+              {/* 시간 라인 (가로 그리드선) */}
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, background: h % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)" }} />))}
+              {/* 30분 라인 */}
+              {hourLines.slice(0, -1).map(h => (<div key={`half-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight + 30, height: 1, background: "rgba(255,255,255,0.015)", borderTop: "1px dashed rgba(255,255,255,0.03)" }} />))}
+              
+              {/* 🎪 축제 운영 시작 라인 (전체 컬럼에 그리고, 첫 컬럼에만 라벨) */}
+              {showOpStart && <div style={{ position: "absolute", left: 0, right: 0, top: opStartTop, height: 1, background: "#4cd99a", borderTop: "1px dashed #4cd99a", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpStart && locIdx === 0 && <div style={{ position: "absolute", left: 6, top: opStartTop - 18, padding: "2px 8px", borderRadius: 4, background: "rgba(76,217,154,0.15)", border: "1px solid rgba(76,217,154,0.4)", color: "#4cd99a", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🎪 개장 {opStart}</div>}
+              
+              {/* 🎪 축제 운영 종료 라인 */}
+              {showOpEnd && <div style={{ position: "absolute", left: 0, right: 0, top: opEndTop, height: 1, background: "#ff9a3c", borderTop: "1px dashed #ff9a3c", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpEnd && locIdx === 0 && <div style={{ position: "absolute", left: 6, top: opEndTop + 4, padding: "2px 8px", borderRadius: 4, background: "rgba(255,154,60,0.15)", border: "1px solid rgba(255,154,60,0.4)", color: "#ff9a3c", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🌙 폐장 {opEnd}</div>}
+              
+              {/* 현재 시간 라인 */}
+              {showNowLine && locIdx === 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none", boxShadow: "0 0 6px #ef535080" }}>
+                <div style={{ position: "absolute", left: -6, top: -4, width: 10, height: 10, borderRadius: 5, background: "#ef5350", boxShadow: "0 0 6px #ef535080" }} />
+              </div>}
+              {showNowLine && locIdx > 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none" }} />}
+              
+              {/* 프로그램 블록들 - 충돌 감지 + 자동 분할 배치 */}
+              {(() => {
+                // 1) 시간 정보 추가
+                const events = byLoc[loc].map(p => {
+                  const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                  const [eh, em] = (p.endTime || "00:00").split(":").map(Number);
+                  return { ...p, startMin: sh * 60 + sm, endMin: eh * 60 + em };
+                }).sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+                
+                // 2) 충돌 그룹 만들기 + 컬럼 할당
+                const eventCol = {};
+                const eventGroupSize = {};
+                let i = 0;
+                while (i < events.length) {
+                  const group = [events[i]];
+                  let groupEnd = events[i].endMin;
+                  let j = i + 1;
+                  while (j < events.length && events[j].startMin < groupEnd) {
+                    group.push(events[j]);
+                    if (events[j].endMin > groupEnd) groupEnd = events[j].endMin;
+                    j++;
+                  }
+                  const colEnds = [];
+                  group.forEach(e => {
+                    let assigned = -1;
+                    for (let c = 0; c < colEnds.length; c++) {
+                      if (colEnds[c] <= e.startMin) { assigned = c; break; }
+                    }
+                    if (assigned < 0) {
+                      assigned = colEnds.length;
+                      colEnds.push(0);
+                    }
+                    colEnds[assigned] = e.endMin;
+                    eventCol[e.id] = assigned;
+                  });
+                  const groupSize = colEnds.length;
+                  group.forEach(e => { eventGroupSize[e.id] = groupSize; });
+                  i = j;
+                }
+                
+                // 3) 최대 표시 컬럼 = 2 (3개 이상이면 마지막에 "+N" 표시)
+                const MAX_COLS = 2;
+                
+                // 같은 시간대에 숨겨진(컬럼 2 이상) 이벤트 수 계산
+                // → 시간 슬롯별로 hidden count 계산해서 "+N개 더보기" 배지로 표시
+                const hiddenInfo = {};  // { startMin: { count, eventIds, top, height } }
+                events.forEach(e => {
+                  if ((eventCol[e.id] || 0) >= MAX_COLS) {
+                    // 이 이벤트는 가려짐. 같은 시간대의 첫 이벤트의 위치에 배지 추가
+                    const key = e.startMin;
+                    if (!hiddenInfo[key]) hiddenInfo[key] = { count: 0, ids: [], startMin: e.startMin, endMin: e.endMin };
+                    hiddenInfo[key].count += 1;
+                    hiddenInfo[key].ids.push(e.id);
+                    if (e.endMin > hiddenInfo[key].endMin) hiddenInfo[key].endMin = e.endMin;
+                  }
+                });
+                
+                return (<>
+                  {events.map(p => {
+                    const top = ((p.startMin - minHour * 60) / 60) * hourHeight;
+                    const height = Math.max(28, ((p.endMin - p.startMin) / 60) * hourHeight - 2);
+                    
+                    // 컬럼 인덱스가 MAX_COLS 이상인 이벤트는 숨김 (배지로만 표시)
+                    const col = eventCol[p.id] || 0;
+                    if (col >= MAX_COLS) return null;
+                    
+                    let status = "scheduled";
+                    if (p.pgStatus === "ended") status = "ended";
+                    else if (p.date === todayStr || p.date === "always") {
+                      if (nowMin >= p.startMin && nowMin <= p.endMin) status = "active";
+                      else if (nowMin > p.endMin) status = "ended";
+                    }
+                    
+                    const cc = getCatColor(p.category);
+                    const isActive = status === "active";
+                    const isEnded = status === "ended";
+                    
+                    const groupSize = Math.min(eventGroupSize[p.id] || 1, MAX_COLS);
+                    const widthPercent = 100 / groupSize;
+                    const leftPercent = col * widthPercent;
+                    
+                    return (<div key={p.id} title={`${p.time}~${p.endTime} ${p.title}${p.location ? ` · ${p.location}` : ""}${p.description ? "\n" + p.description : ""}`}
+                      style={{ 
+                        position: "absolute",
+                        left: `calc(${leftPercent}% + 3px)`,
+                        width: `calc(${widthPercent}% - 6px)`,
+                        top: top + 1,
+                        height,
+                        padding: height < 36 ? "3px 8px" : "6px 9px",
+                        borderRadius: 6,
+                        background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cc.bg : cc.light,
+                        border: isActive ? `1.5px solid ${cc.bg}` : `1px solid ${cc.bg}40`,
+                        borderLeft: `3px solid ${cc.bg}`,
+                        color: isActive ? "#fff" : isEnded ? "#94A3B8" : "#f4f5fa",
+                        fontSize: 12,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        transition: "transform 0.15s, box-shadow 0.15s",
+                        opacity: isEnded ? 0.6 : 1,
+                        zIndex: isActive ? 3 : 2,
+                        boxSizing: "border-box"
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 6px 20px ${cc.bg}60`; e.currentTarget.style.zIndex = "10"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
+                      {height < 36 ? (
+                        // 작은 블록: 한 줄에 시간 + 제목
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ fontFamily: "JetBrains Mono", fontWeight: 700, opacity: 0.9, flexShrink: 0 }}>{p.time}~{p.endTime}</span>
+                          <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {p.time}~{p.endTime}{isActive && " ●"}
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 50 ? 3 : 2, WebkitBoxOrient: "vertical" }}>{p.title}</div>
+                          {height > 70 && p.category && groupSize === 1 && <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85 }}>● {p.category}</div>}
+                        </>
+                      )}
+                    </div>);
+                  })}
+                  
+                  {/* "+N개 더보기" 배지 (가려진 이벤트가 있을 때) */}
+                  {Object.values(hiddenInfo).map(h => {
+                    const top = ((h.startMin - minHour * 60) / 60) * hourHeight;
+                    const hiddenEvents = h.ids.map(id => events.find(e => e.id === id)).filter(Boolean);
+                    return (<div key={`hidden-${h.startMin}`} className="hidden-badge-wrap"
+                      style={{ 
+                        position: "absolute",
+                        right: 4,
+                        top: top + 4,
+                        zIndex: 7
+                      }}>
+                      <div style={{ 
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,154,60,0.18)",
+                        border: "1px solid rgba(255,154,60,0.4)",
+                        color: "#ff9a3c",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
+                      }}>+{h.count}</div>
+                      {/* 호버 시 팝오버 */}
+                      <div className="hidden-badge-pop" style={{ 
+                        position: "absolute",
+                        right: 0,
+                        top: "calc(100% + 6px)",
+                        minWidth: 240,
+                        maxWidth: 320,
+                        padding: 12,
+                        borderRadius: 10,
+                        background: "linear-gradient(180deg, #1f2030, #14151f)",
+                        border: "1px solid rgba(255,154,60,0.3)",
+                        boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+                        zIndex: 50,
+                        opacity: 0,
+                        visibility: "hidden",
+                        transform: "translateY(-4px)",
+                        transition: "opacity 0.15s, transform 0.15s, visibility 0.15s",
+                        pointerEvents: "none"
+                      }}>
+                        <div style={{ fontSize: 11, color: "#ff9a3c", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>🔍 가려진 일정 {h.count}개</div>
+                        {hiddenEvents.map(ev => {
+                          const evCC = getCatColor(ev.category);
+                          let evStatus = "scheduled";
+                          if (ev.pgStatus === "ended") evStatus = "ended";
+                          else if (ev.date === todayStr || ev.date === "always") {
+                            if (nowMin >= ev.startMin && nowMin <= ev.endMin) evStatus = "active";
+                            else if (nowMin > ev.endMin) evStatus = "ended";
+                          }
+                          return (<div key={ev.id} style={{ padding: "8px 10px", marginBottom: 4, borderRadius: 6, background: "rgba(255,255,255,0.03)", borderLeft: `3px solid ${evCC.bg}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                              <span className="mono" style={{ fontSize: 10, color: evCC.bg, fontWeight: 700 }}>{ev.time}~{ev.endTime}</span>
+                              {evStatus === "active" && <span style={{ padding: "1px 6px", borderRadius: 999, background: "rgba(76,217,154,0.15)", color: "#4cd99a", fontSize: 9, fontWeight: 700 }}>● 진행중</span>}
+                              {evStatus === "ended" && <span style={{ fontSize: 9, color: "#6c6e7d" }}>종료</span>}
+                              {ev.category && <span style={{ marginLeft: "auto", fontSize: 9, color: evCC.bg, fontWeight: 700 }}>● {ev.category}</span>}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#f4f5fa", fontWeight: 600 }}>{ev.title}</div>
+                            {ev.description && <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 3, lineHeight: 1.4 }}>{ev.description}</div>}
+                          </div>);
+                        })}
+                      </div>
+                    </div>);
+                  })}
+                  <style>{`
+                    .hidden-badge-wrap:hover .hidden-badge-pop {
+                      opacity: 1 !important;
+                      visibility: visible !important;
+                      transform: translateY(0) !important;
+                      pointer-events: auto !important;
+                    }
+                  `}</style>
+                </>);
+              })()}
+            </div>))}
+          </div>
+        </div>
+        {/* 범례 */}
+        <div style={{ display: "flex", gap: 14, marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 600 }}>범례:</span>
+          {Object.entries(catColors).map(([k, c]) => {
+            const cnt = calendarPgs.filter(p => p.category === k).length;
+            if (cnt === 0) return null;
+            return (<div key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: c.bg, borderLeft: `3px solid ${c.bg}` }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>{k} ({cnt})</span>
+            </div>);
+          })}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginLeft: "auto", flexWrap: "wrap" }}>
+            {opStart && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #4cd99a" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>🎪 개장 {opStart}</span>
+            </div>}
+            {opEnd && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #ff9a3c" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>🌙 폐장 {opEnd}</span>
+            </div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 2, background: "#ef5350" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>현재 시각</span>
+            </div>
+          </div>
+        </div>
+      </CC_Card>);
+    })()}
+
+    {/* 메인: 타임라인 + 상세 (2 컬럼) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="📅 프로그램 목록" sub={`${filtered.length}개 일정`}>
+        <div style={{ maxHeight: 600, overflowY: "auto" }}>
+          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 조건의 프로그램이 없습니다</div> : 
+          filtered.map(p => {
+            let status = "scheduled", color = "#6b8aff", label = "예정";
+            if (p.pgStatus === "ended") { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+            else if (p.date === todayStr || p.date === "always") {
+              const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+              const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+              if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "진행중"; }
+              else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+            }
+            return (<div key={p.id} style={{ padding: 12, marginBottom: 6, borderRadius: 10, background: status === "active" ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span className="mono" style={{ fontSize: 13, color: color, fontWeight: 700, minWidth: 90 }}>{p.time}~{p.endTime}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 999, background: `${color}15`, color, fontSize: 10, fontWeight: 700 }}>{status === "active" ? "● " : ""}{label}</span>
+                {p.category && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(169,128,255,0.1)", color: "#a980ff", fontSize: 10, fontWeight: 600 }}>{p.category}</span>}
+                {p.date && p.date !== "always" && <span style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto", fontFamily: "JetBrains Mono" }}>{p.date}</span>}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa", marginBottom: 4 }}>{p.title}</div>
+              {(p.location || p.zoneId) && <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 4 }}>📍 {p.location || (settings.zones || []).find(z => z.id === p.zoneId)?.name}</div>}
+              {p.description && <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>{p.description}</div>}
+            </div>);
+          })}
+        </div>
+      </CC_Card>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* 카테고리별 통계 */}
+        <CC_Card title="📊 카테고리별" sub="프로그램 분포">
+          {categoryList.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>카테고리 미분류</div> :
+          categoryList.map(c => {
+            const cnt = programs.filter(p => p.category === c).length;
+            const ratio = programs.length > 0 ? Math.round((cnt / programs.length) * 100) : 0;
+            return (<div key={c} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, color: "#f4f5fa" }}>{c}</span>
+                <span className="mono" style={{ fontSize: 12, color: "#a980ff" }}>{cnt}건 ({ratio}%)</span>
+              </div>
+              <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
+                <div style={{ width: `${ratio}%`, height: "100%", background: "#a980ff", borderRadius: 2 }} />
+              </div>
+            </div>);
+          })}
+        </CC_Card>
+
+        {/* 시간대 분포 */}
+        <CC_Card title="🕐 시간대별 일정" sub="오늘 기준">
+          {(() => {
+            const slots = ["09-12", "12-15", "15-18", "18-21", "21-24"];
+            const counts = slots.map(s => {
+              const [start, end] = s.split("-").map(Number);
+              return todayPgs.filter(p => {
+                const h = parseInt((p.time || "00:00").split(":")[0]);
+                return h >= start && h < end;
+              }).length;
+            });
+            const maxCnt = Math.max(...counts, 1);
+            return slots.map((s, i) => (<div key={s} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+              <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", minWidth: 50 }}>{s}시</span>
+              <div style={{ flex: 1, height: 16, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                <div style={{ width: `${(counts[i] / maxCnt) * 100}%`, height: "100%", background: "linear-gradient(90deg, #6b8aff, #a980ff)", borderRadius: 4, display: "flex", alignItems: "center", paddingLeft: 8 }}>
+                  {counts[i] > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{counts[i]}</span>}
+                </div>
+              </div>
+            </div>));
+          })()}
+        </CC_Card>
+      </div>
+    </div>
+  </div>);
+}
+
+// 3) 공연 관리 - 무대/아티스트
+function CC_StagePage({ settings, setSettings, session, setCcPage }) {
+  const stages = settings.stages || [];
+  const artists = settings.artists || [];
+  const setlists = settings.setlists || [];
+  const programs = settings.programs || [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const stagePrograms = programs.filter(p => p.stageId);
+  const todayStagePgs = stagePrograms.filter(p => p.date === "always" || p.date === todayStr);
+  const activeStagePgs = todayStagePgs.filter(p => {
+    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+  });
+
+  return (<div>
+    {/* KPI */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "무대", value: stages.length, color: "#a980ff", icon: "🎤" },
+        { label: "아티스트", value: artists.length, color: "#FF7043", icon: "🎙️" },
+        { label: "셋리스트", value: setlists.length, color: "#42A5F5", icon: "🎵" },
+        { label: "오늘 공연", value: todayStagePgs.length, color: "#a980ff", icon: "🎭" },
+        { label: "진행중 공연", value: activeStagePgs.length, color: "#4cd99a", icon: "▶" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</div>
+      </div>))}
+    </div>
+
+    {/* 무대별 현황 + 아티스트 목록 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="🎤 무대별 운영 현황" sub={`${stages.length}개 무대`}>
+        {stages.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 무대가 없습니다</div> :
+        stages.map(s => {
+          const sPgs = stagePrograms.filter(p => p.stageId === s.id);
+          const sToday = sPgs.filter(p => p.date === "always" || p.date === todayStr);
+          const sActive = sToday.find(p => {
+            const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+            const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+            return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+          });
+          return (<div key={s.id} style={{ padding: 14, marginBottom: 8, borderRadius: 10, background: sActive ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${sActive ? "rgba(76,217,154,0.25)" : "rgba(255,255,255,0.06)"}`, borderLeft: `3px solid ${sActive ? "#4cd99a" : "#6b8aff"}` }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa" }}>🎤 {s.name}</span>
+              {sActive ? <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(76,217,154,0.15)", color: "#4cd99a", fontSize: 11, fontWeight: 700 }}>● 공연중</span> : <span style={{ fontSize: 11, color: "#6c6e7d" }}>대기</span>}
+            </div>
+            {sActive && <div style={{ fontSize: 12, color: "#4cd99a", marginBottom: 6 }}>♪ {sActive.title} ({sActive.time}~{sActive.endTime})</div>}
+            <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#6c6e7d" }}>
+              <span>오늘 {sToday.length}회</span>
+              <span>전체 {sPgs.length}회</span>
+              {s.capacity && <span>수용 {s.capacity}명</span>}
+            </div>
+          </div>);
+        })}
+      </CC_Card>
+
+      <CC_Card title="🎙️ 아티스트 / 셋리스트" sub={`${artists.length}팀`}>
+        {artists.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 아티스트가 없습니다</div> :
+        artists.slice(0, 8).map(a => {
+          const sl = setlists.find(s => s.artistId === a.id);
+          return (<div key={a.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa", flex: 1 }}>{a.name}</span>
+              {a.genre && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(255,112,67,0.1)", color: "#FF7043", fontSize: 10, fontWeight: 600 }}>{a.genre}</span>}
+              {sl && <span className="mono" style={{ fontSize: 11, color: "#42A5F5" }}>{(sl.songs || []).length}곡</span>}
+            </div>
+            {a.note && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>{a.note}</div>}
+          </div>);
+        })}
+      </CC_Card>
+    </div>
+
+    {/* 오늘의 공연 타임라인 */}
+    <CC_Card title="🎵 오늘의 공연 타임라인" sub={`${todayStagePgs.length}개 공연`}>
+      {todayStagePgs.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>오늘 예정된 공연이 없습니다</div> :
+      todayStagePgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
+        const stage = stages.find(s => s.id === p.stageId);
+        const artist = artists.find(a => a.id === p.artistId);
+        let status = "scheduled", color = "#6b8aff", label = "예정";
+        const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+        const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+        if (p.pgStatus === "ended") { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        else if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "공연중"; }
+        else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        return (<div key={p.id} style={{ padding: 12, marginBottom: 6, borderRadius: 10, background: status === "active" ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr auto auto", gap: 12, alignItems: "center" }}>
+            <span className="mono" style={{ fontSize: 13, color, fontWeight: 700 }}>{p.time}~{p.endTime}</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f4f5fa" }}>{p.title}</div>
+              <div style={{ display: "flex", gap: 10, marginTop: 2, fontSize: 11, color: "#6c6e7d" }}>
+                {stage && <span>🎤 {stage.name}</span>}
+                {artist && <span>🎙️ {artist.name}</span>}
+              </div>
+            </div>
+            <span style={{ padding: "3px 10px", borderRadius: 999, background: `${color}15`, color, fontSize: 11, fontWeight: 700 }}>{status === "active" ? "● " : ""}{label}</span>
+          </div>
+        </div>);
+      })}
+    </CC_Card>
+  </div>);
+}
+
+// 4) 인력 관리 - 근무자 종합
+function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccounts, setCcPage }) {
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, siteId: s.id, zoneId: s.zoneId })));
+  const onDuty = allWorkers.filter(w => w.onDuty);
+  const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+  const allRadios = (settings.assets || []).find(a => a.id === "radio")?.units || [];
+  const radiosUsed = allRadios.filter(u => u.assignedTo).length;
+  const noAccount = allWorkers.filter(w => !w.accountId).length;
+
+  // 역할별 분류
+  const byRole = {};
+  allWorkers.forEach(w => { const r = w.role || "기타"; if (!byRole[r]) byRole[r] = []; byRole[r].push(w); });
+
+  // 필터링
+  let filtered = allWorkers;
+  if (filter === "onduty") filtered = filtered.filter(w => w.onDuty);
+  else if (filter === "noacc") filtered = filtered.filter(w => !w.accountId);
+  else if (filter === "noradio") filtered = filtered.filter(w => !(w.radios || []).length);
+  else if (filter !== "all" && filter.startsWith("site:")) filtered = filtered.filter(w => w.siteId === filter.slice(5));
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(w => (w.name || "").toLowerCase().includes(q) || (w.phone || "").includes(q) || (w.role || "").includes(q));
+  }
+
+  const exportCSV = () => {
+    const rows = [["이름", "연락처", "역할", "근무지", "식수", "메모", "근무상태"]];
+    allWorkers.forEach(w => rows.push([w.name, w.phone || "", w.role || "", w.siteName, w.meals || 0, w.mealNote || "", w.onDuty ? "근무중" : "-"]));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `근무자_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  };
+
+  return (<div>
+    {/* KPI 6개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "총 인력", value: allWorkers.length, color: "#6b8aff", icon: "👥" },
+        { label: "근무중", value: onDuty.length, sub: `${allWorkers.length > 0 ? Math.round(onDuty.length/allWorkers.length*100) : 0}%`, color: "#4cd99a", icon: "🟢" },
+        { label: "근무지", value: (settings.workSites || []).filter(s=>s.id!=="_pool" && (s.workers||[]).length>0).length, color: "#a980ff", icon: "🏠" },
+        { label: "무전기 분배", value: `${radiosUsed}/${allRadios.length}`, color: "#f5c451", icon: "📻" },
+        { label: "총 식수", value: totalMeals, sub: "식", color: "#FF7043", icon: "🍱" },
+        { label: "계정 미발급", value: noAccount, color: noAccount > 0 ? "#ff5e7e" : "#4cd99a", icon: "🔑" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          {k.sub && <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>}
+        </div>
+      </div>))}
+    </div>
+
+    {/* 필터 + 검색 */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·연락처·역할" style={{ flex: 1, minWidth: 200, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
+        {[
+          { k: "all", l: `전체 (${allWorkers.length})` },
+          { k: "onduty", l: `근무중 (${onDuty.length})` },
+          { k: "noacc", l: `계정없음 (${noAccount})` },
+          { k: "noradio", l: `무전기없음` },
+        ].map(f => (
+          <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? "1px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filter === f.k ? "#6b8aff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
+        ))}
+        <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
+      </div>
+    </CC_Card>
+
+    {/* 메인: 좌측 인력 풀 + 우측 근무지 그리드 (드래그앤드롭) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 16 }}>
+      {/* 좌측: 인력 목록 (드래그 소스) */}
+      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명 · 드래그하여 근무지에 배치`}>
+        <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
+          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
+          filtered.map(w => (<div key={w.id}
+            draggable
+            onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
+            onDragEnd={e => { e.currentTarget.style.opacity = "1"; }}
+            style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto auto 1fr auto auto", gap: 10, alignItems: "center", cursor: "grab", transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(107,138,255,0.06)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}>
+            <span style={{ fontSize: 13, color: "#6c6e7d", cursor: "grab" }} title="드래그하여 이동">⠿</span>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: w.onDuty ? "#4cd99a" : "#556" }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
+                {w.role && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
+                {w.accountId && <span style={{ fontSize: 10, color: "#42A5F5" }}>🔑</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName} {w.phone && `· ${w.phone}`}</div>
+            </div>
+            <span className="mono" style={{ fontSize: 11, color: "#FF7043" }}>🍱 {w.meals || 0}</span>
+            {(w.radios || []).length > 0 && <span className="mono" style={{ fontSize: 11, color: "#a980ff" }}>📻 {w.radios.length}</span>}
+          </div>))}
+        </div>
+      </CC_Card>
+
+      {/* 우측: 근무지 그리드 (드롭 영역) */}
+      <CC_Card title="🏠 근무지별 배치" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지 · 여기에 드롭`}>
+        <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
+          {/* 미배치 풀 - 상단에 강조 */}
+          {(() => {
+            const pool = (settings.workSites || []).find(s => s.id === "_pool");
+            const poolCount = (pool?.workers || []).length;
+            return (<div
+              onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(255,154,60,0.18)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.5)"; }}
+              onDragLeave={e => { e.currentTarget.style.background = "rgba(255,154,60,0.06)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.2)"; }}
+              onDrop={e => { 
+                e.preventDefault(); 
+                e.currentTarget.style.background = "rgba(255,154,60,0.06)"; 
+                e.currentTarget.style.borderColor = "rgba(255,154,60,0.2)";
+                const wid = e.dataTransfer.getData("workerId"); 
+                const from = e.dataTransfer.getData("fromSite"); 
+                if (!wid || from === "_pool") return;
+                setSettings(prev => {
+                  const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+                  const fi = ws.findIndex(s => s.id === from);
+                  let pi = ws.findIndex(s => s.id === "_pool");
+                  if (pi < 0) { ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] }); pi = ws.length - 1; }
+                  if (fi >= 0) {
+                    const w = (ws[fi].workers || []).find(ww => ww.id === wid);
+                    if (w) {
+                      ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) };
+                      ws[pi] = { ...ws[pi], workers: [...(ws[pi].workers || []), w] };
+                    }
+                  }
+                  return { ...prev, workSites: ws };
+                });
+              }}
+              style={{ padding: 12, marginBottom: 10, borderRadius: 10, background: "rgba(255,154,60,0.06)", border: "1.5px dashed rgba(255,154,60,0.2)", transition: "all 0.15s" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: poolCount > 0 ? 8 : 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>⚠️ 미배치 풀</span>
+                <span className="mono" style={{ fontSize: 12, color: "#ff9a3c", fontWeight: 700 }}>{poolCount}명</span>
+              </div>
+              {poolCount > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {(pool.workers || []).slice(0, 12).map(w => (<span key={w.id}
+                  draggable
+                  onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
+                  style={{ padding: "3px 8px", borderRadius: 999, background: "rgba(255,154,60,0.12)", border: "1px solid rgba(255,154,60,0.25)", color: "#ff9a3c", fontSize: 11, fontWeight: 600, cursor: "grab" }}>{w.name}</span>))}
+                {poolCount > 12 && <span style={{ padding: "3px 8px", color: "#6c6e7d", fontSize: 11 }}>+{poolCount - 12}</span>}
+              </div>}
+              {poolCount === 0 && <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "4px 0" }}>여기로 드래그하면 배치 해제됩니다</div>}
+            </div>);
+          })()}
+
+          {/* 근무지 그리드 (2열) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => {
+              const ws = s.workers || [];
+              const onD = ws.filter(w => w.onDuty).length;
+              const meals = ws.reduce((sum, w) => sum + (w.meals || 0), 0);
+              const zone = (settings.zones || []).find(z => z.id === s.zoneId);
+              return (<div key={s.id}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(76,217,154,0.1)"; e.currentTarget.style.borderColor = "rgba(76,217,154,0.5)"; }}
+                onDragLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
+                onDrop={e => { 
+                  e.preventDefault(); 
+                  e.currentTarget.style.background = "rgba(255,255,255,0.02)"; 
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+                  const wid = e.dataTransfer.getData("workerId"); 
+                  const from = e.dataTransfer.getData("fromSite"); 
+                  if (!wid || from === s.id) return;
+                  setSettings(prev => {
+                    const wss = JSON.parse(JSON.stringify(prev.workSites || []));
+                    const fi = wss.findIndex(x => x.id === from);
+                    const ti = wss.findIndex(x => x.id === s.id);
+                    if (fi >= 0 && ti >= 0) {
+                      const w = (wss[fi].workers || []).find(ww => ww.id === wid);
+                      if (w) {
+                        wss[fi] = { ...wss[fi], workers: wss[fi].workers.filter(ww => ww.id !== wid) };
+                        wss[ti] = { ...wss[ti], workers: [...(wss[ti].workers || []), w] };
+                      }
+                    }
+                    return { ...prev, workSites: wss };
+                  });
+                }}
+                style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1.5px dashed rgba(255,255,255,0.06)", minHeight: 100, transition: "all 0.15s" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
+                  <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700, flexShrink: 0 }}>{onD}/{ws.length}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#6c6e7d", marginBottom: 6 }}>
+                  {zone && <span>📍 {zone.name}</span>}
+                  {meals > 0 && <span>🍱 {meals}식</span>}
+                </div>
+                {ws.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "12px 0", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: 6 }}>여기에 드래그</div>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {ws.map(w => (<span key={w.id}
+                      draggable
+                      onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
+                      title={`${w.name} ${w.role || ""} ${w.phone || ""} (드래그하여 이동)`}
+                      style={{ padding: "3px 8px", borderRadius: 999, background: w.onDuty ? "rgba(76,217,154,0.12)" : "rgba(107,138,255,0.1)", border: `1px solid ${w.onDuty ? "rgba(76,217,154,0.3)" : "rgba(107,138,255,0.2)"}`, color: w.onDuty ? "#4cd99a" : "#8fa6ff", fontSize: 11, fontWeight: 600, cursor: "grab", whiteSpace: "nowrap" }}>
+                      {w.onDuty && "● "}{w.name}
+                      {w.role && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 10 }}>({w.role})</span>}
+                    </span>))}
+                  </div>
+                )}
+              </div>);
+            })}
+          </div>
+        </div>
+      </CC_Card>
+    </div>
+
+    {/* 보조: 역할별 분포 */}
+    <CC_Card title="📊 역할별 분포" sub={`${Object.keys(byRole).length}개 역할`} style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+        {Object.keys(byRole).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>역할 미지정</div> :
+        Object.entries(byRole).sort((a,b)=>b[1].length-a[1].length).map(([role, ws]) => {
+          const ratio = allWorkers.length > 0 ? Math.round((ws.length / allWorkers.length) * 100) : 0;
+          return (<div key={role}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: "#f4f5fa" }}>{role}</span>
+              <span className="mono" style={{ fontSize: 12, color: "#a980ff" }}>{ws.length}명 ({ratio}%)</span>
+            </div>
+            <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)" }}>
+              <div style={{ width: `${ratio}%`, height: "100%", background: "linear-gradient(90deg, #6b8aff, #a980ff)", borderRadius: 3 }} />
+            </div>
+          </div>);
+        })}
+      </div>
+    </CC_Card>
+
+    {/* 안내 */}
+    <CC_Card>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>인력을 근무지로 드래그하여 즉시 배치할 수 있습니다. 상세 정보 편집(이름·연락처·계정)은 모바일에서 사용 가능</span>
+        </div>
+        <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 설정으로 →</CC_Btn>
+      </div>
+    </CC_Card>
+  </div>);
+}
+
+function ControlCenterDashboard({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
   // 페이지 변경 시 사이드바 닫기
   useEffect(() => { setSidebarOpen(false); }, [ccPage]);
   const overall = useMemo(() => {
-    const lvs = (categories || []).map(c => getLevel(c));
+    // 🚫 temp/humidity는 종합 위험도 계산에서 제외
+    const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
     if (lvs.includes("RED")) return "RED";
     if (lvs.includes("ORANGE")) return "ORANGE";
     if (lvs.includes("YELLOW")) return "YELLOW";
@@ -2347,34 +3737,66 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                     if (setActiveAlert) setActiveAlert(cat);
                   } else if (setActiveAlert) setActiveAlert(topAlert);
                 }}>대응 시작 →</CC_Btn>
+                <CC_Btn variant="ghost" onClick={() => setAlerts(p => p.filter((_, i) => i !== 0))}>🗑 삭제</CC_Btn>
               </div>
             </CC_Card>}
 
-            {/* 카테고리 메트릭 */}
-            <div className="cc-g4" style={{ marginBottom: 16 }}>
-              {sortedCats.slice(0, 4).map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
+            {/* KPI 요약 - 6열로 한눈에 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}>
+              {(() => {
+                const allWorkers = (settings.workSites || []).flatMap(s => s.workers || []);
+                const onDuty = allWorkers.filter(w => w.onDuty).length;
+                const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
+                const allRadios = (settings.assets || []).flatMap(a => a.units || []).filter(u => u.assignedTo);
+                const openIncidents = (settings.incidents || []).filter(i => i.status !== "closed").length;
+                const totalPrograms = (settings.programs || []).length;
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                const activePrograms = (settings.programs || []).filter(p => {
+                  if (p.date !== "always" && p.date !== todayStr) return false;
+                  const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                  const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+                  return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+                }).length;
+                const crowd = categories.find(c => c.id === "crowd");
+                
+                const kpis = [
+                  { label: "총 근무자", value: allWorkers.length, sub: `근무중 ${onDuty}`, color: "#6b8aff", icon: "👥" },
+                  { label: "활성 경보", value: (alerts || []).length, sub: `${(alerts || []).filter(a => a.level === "RED").length} 심각`, color: (alerts || []).length > 0 ? "#ff5e7e" : "#4cd99a", icon: "🔔" },
+                  { label: "진행중 사건", value: openIncidents, sub: "처리 대기", color: openIncidents > 0 ? "#ff9a3c" : "#4cd99a", icon: "📁" },
+                  { label: "진행 프로그램", value: activePrograms, sub: `총 ${totalPrograms}건`, color: "#a980ff", icon: "🎭" },
+                  { label: "현재 인파", value: (crowd?.currentValue || 0).toLocaleString(), sub: crowd?.unit || "명", color: "#4cd99a", icon: "🏃" },
+                  { label: "무전기 사용", value: allRadios.length, sub: "분배중", color: "#f5c451", icon: "📻" },
+                ];
+                return kpis.map(k => (<div key={k.label} style={{ padding: "14px 16px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 16 }}>{k.icon}</span>
+                    <span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</span>
+                    <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>
+                  </div>
+                </div>));
+              })()}
             </div>
-            {sortedCats.length > 4 && <div className="cc-g4" style={{ marginBottom: 16 }}>
-              {sortedCats.slice(4, 7).map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
-              <CC_Card style={{ background: "#14151f" }}>
-                <div className="cc-card-sub">활성 경보</div>
-                <div style={{ fontSize: 32, fontWeight: 700, fontFamily: "JetBrains Mono", marginTop: 4, marginBottom: 6, color: "#f4f5fa" }}>{(alerts || []).length} <span style={{ fontSize: 13, color: "#6c6e7d", fontFamily: "inherit" }}>건</span></div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {["RED","ORANGE","YELLOW"].map(lv => { const cnt = (alerts || []).filter(a => a.level === lv).length; if (!cnt) return null; return <CC_Chip key={lv} level={CC_LEVEL_MAP[lv]}>●{cnt}</CC_Chip>; })}
-                </div>
-              </CC_Card>
-            </div>}
 
-            {/* 활성 경보 + 주요 구역 */}
-            <div className="cc-grid-2col" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-              <CC_Card title="활성 경보" sub="실시간 갱신" action={<CC_Btn size="sm" variant="ghost">전체 보기</CC_Btn>}>
+            {/* 카테고리 메트릭 - 6열로 더 컴팩트 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {sortedCats.map(cat => (<CC_Metric key={cat.id} cat={cat} onClick={() => setCcPage("monitor")} />))}
+            </div>
+
+            {/* 메인 그리드: 활성경보 + 사건 + 구역 + 프로그램 + 자산 (5열) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.5fr 1fr", gap: 16, marginBottom: 16 }}>
+              {/* 활성 경보 */}
+              <CC_Card title="활성 경보" sub={`${(alerts || []).length}건 · 실시간`} action={(alerts || []).length > 0 ? <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("alert")}>전체 →</CC_Btn> : null}>
                 {(alerts || []).slice(0, 5).map((a, i) => (<div key={i} className="cc-list-row">
                   <CC_Chip level={CC_LEVEL_MAP[a.level]} pulse={a.level === "ORANGE" || a.level === "RED"}>●</CC_Chip>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#f4f5fa" }}>{a.category}</div>
-                    <div style={{ fontSize: 12, color: "#6c6e7d", marginTop: 2 }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.category}</div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(a.message || "").split("\n")[2] || "임계값 도달"}</div>
                   </div>
-                  <span className="mono" style={{ fontSize: 12, color: "#6c6e7d" }}>{a.time}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", flexShrink: 0 }}>{a.time?.split(" ")[1] || a.time}</span>
                   <CC_Btn size="sm" variant={a.level === "ORANGE" || a.level === "RED" ? "primary" : "ghost"} onClick={() => {
                     const cat = (categories || []).find(c => c.name === a.category);
                     if (cat) {
@@ -2383,22 +3805,230 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
                     } else if (setActiveAlert) setActiveAlert(a);
                   }}>대응</CC_Btn>
                 </div>))}
-                {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>현재 활성 경보가 없습니다</div>}
+                {(!alerts || alerts.length === 0) && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>✅ 현재 활성 경보가 없습니다</div>}
               </CC_Card>
+
+              {/* 진행중 사건 */}
+              <CC_Card title="사건 / 신고" sub={`${(settings.incidents || []).filter(i => i.status !== "closed").length}건 진행중`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("incident")}>전체 →</CC_Btn>}>
+                {(settings.incidents || []).filter(i => i.status !== "closed").slice(0, 5).map(i => (<div key={i.id} className="cc-list-row">
+                  <span style={{ fontSize: 16 }}>{i.priority === "high" ? "🔴" : i.priority === "medium" ? "🟠" : "🔵"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa" }}>{i.type}</div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {i.location} · {i.desc}</div>
+                  </div>
+                  <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", flexShrink: 0 }}>{i.time?.split(" ")[1] || i.time}</span>
+                </div>))}
+                {(settings.incidents || []).filter(i => i.status !== "closed").length === 0 && <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>✅ 진행중 사건 없음</div>}
+              </CC_Card>
+
+              {/* 구역별 혼잡도 */}
               <CC_Card title="구역별 혼잡도" sub={`${(settings.zones || []).length}개 구역`}>
-                {(settings.zones || []).slice(0, 6).map(z => {
+                {(settings.zones || []).slice(0, 7).map(z => {
                   const c = (settings.zoneCongestion || []).find(cc => cc.zoneId === z.id);
                   const cl = c?.level || "smooth";
                   const lv = cl === "danger" ? "red" : cl === "crowded" ? "yellow" : "green";
                   const lbl = cl === "danger" ? "위험" : cl === "crowded" ? "혼잡" : "원활";
-                  return (<div key={z.id} className="cc-list-row" style={{ padding: "10px 0" }}>
-                    <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1 }}>📍 {z.name}</span>
+                  return (<div key={z.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                    <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {z.name}</span>
                     <CC_Chip level={lv}>{lbl}</CC_Chip>
                   </div>);
                 })}
                 {(settings.zones || []).length === 0 && <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>구역 미등록</div>}
               </CC_Card>
             </div>
+
+            {/* 보조 그리드: 프로그램 + 인력 + 자산 + SMS (4열) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1.5fr", gap: 16, marginBottom: 16 }}>
+              {/* 진행 프로그램 */}
+              <CC_Card title="진행 / 다음 프로그램" sub={`총 ${(settings.programs || []).length}건`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("program")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                  const todays = (settings.programs || []).filter(p => p.date === "always" || p.date === todayStr);
+                  const active = todays.filter(p => {
+                    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                    const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+                    return nowMin >= sh*60+sm && nowMin <= eh*60+em && p.pgStatus !== "ended";
+                  });
+                  const upcoming = todays.filter(p => {
+                    const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                    return sh*60+sm > nowMin;
+                  }).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+                  if (active.length === 0 && upcoming.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>오늘 예정된 프로그램이 없습니다</div>;
+                  return (<>
+                    {active.slice(0, 2).map(p => (<div key={p.id} style={{ padding: 10, marginBottom: 6, borderRadius: 8, background: "rgba(76,217,154,0.08)", border: "1px solid rgba(76,217,154,0.2)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a", animation: "blink 1.5s infinite" }} />
+                        <span style={{ fontSize: 11, color: "#4cd99a", fontWeight: 700 }}>● 진행중</span>
+                        <span className="mono" style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto" }}>{p.time}~{p.endTime}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#f4f5fa" }}>{p.title}</div>
+                      {p.location && <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>📍 {p.location}</div>}
+                    </div>))}
+                    {upcoming.slice(0, 3).map(p => (<div key={p.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                      <span className="mono" style={{ fontSize: 12, color: "#6b8aff", minWidth: 44 }}>{p.time}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</div>
+                        {p.location && <div style={{ fontSize: 10, color: "#6c6e7d" }}>📍 {p.location}</div>}
+                      </div>
+                    </div>))}
+                  </>);
+                })()}
+              </CC_Card>
+
+              {/* 인력 현황 */}
+              <CC_Card title="인력 현황" sub="근무지별" action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("workforce")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const sites = (settings.workSites || []).filter(s => s.id !== "_pool" && (s.workers || []).length > 0);
+                  if (sites.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>근무자 미배치</div>;
+                  return sites.slice(0, 5).map(s => {
+                    const ws = s.workers || [];
+                    const onDuty = ws.filter(w => w.onDuty).length;
+                    return (<div key={s.id} className="cc-list-row" style={{ padding: "8px 0" }}>
+                      <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
+                      <span className="mono" style={{ fontSize: 12, color: "#6b8aff", flexShrink: 0 }}>{onDuty}/{ws.length}</span>
+                    </div>);
+                  });
+                })()}
+              </CC_Card>
+
+              {/* 자산 현황 */}
+              <CC_Card title="자산 현황" sub="분배 / 보유" action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("resource")}>관리 →</CC_Btn>}>
+                {(() => {
+                  const assets = settings.assets || [];
+                  if (assets.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>자산 미등록</div>;
+                  return assets.slice(0, 5).map(a => {
+                    const total = (a.units || []).length;
+                    const assigned = (a.units || []).filter(u => u.assignedTo).length;
+                    const ratio = total > 0 ? Math.round((assigned / total) * 100) : 0;
+                    const color = ratio > 80 ? "#ff5e7e" : ratio > 50 ? "#ff9a3c" : "#4cd99a";
+                    return (<div key={a.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.icon || "📦"} {a.name}</span>
+                        <span className="mono" style={{ fontSize: 11, color: color, flexShrink: 0 }}>{assigned}/{total}</span>
+                      </div>
+                      <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                        <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+                      </div>
+                    </div>);
+                  });
+                })()}
+              </CC_Card>
+
+              {/* 최근 SMS 발송 */}
+              <CC_Card title="최근 SMS" sub={`${(smsLog || []).length}건 누적`}>
+                {(() => {
+                  const recent = (smsLog || []).slice(0, 5);
+                  if (recent.length === 0) return <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>발송 내역 없음</div>;
+                  return recent.map((s, i) => (<div key={i} className="cc-list-row" style={{ padding: "8px 0" }}>
+                    <span style={{ fontSize: 14 }}>📨</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.message || s.text || "(메시지)"}</div>
+                      <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 2 }}>{s.recipients?.length || s.targets?.length || 0}명 · {s.time}</div>
+                    </div>
+                  </div>));
+                })()}
+              </CC_Card>
+            </div>
+
+            {/* 🚨 비상연락망 (긴급 호출) */}
+            <CC_Card title="🚨 비상연락망" sub={`${(settings.emergencyContacts || []).length}명 등록 · 클릭하여 즉시 통화`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("emergency")}>관리 →</CC_Btn>} style={{ marginBottom: 16 }}>
+              {/* 119/112/120 항상 표시 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+                <a href="tel:119" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))", border: "1.5px solid rgba(255,94,126,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(255,94,126,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🚑</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#ff8a99", fontWeight: 600, marginBottom: 2 }}>응급 / 소방</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#ff5e7e", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>119</div>
+                  </div>
+                </a>
+                <a href="tel:112" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05))", border: "1.5px solid rgba(107,138,255,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(107,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👮</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#a5b8ff", fontWeight: 600, marginBottom: 2 }}>경찰</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#6b8aff", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>112</div>
+                  </div>
+                </a>
+                <a href="tel:120" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(76,217,154,0.15), rgba(76,217,154,0.05))", border: "1.5px solid rgba(76,217,154,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(76,217,154,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🏛️</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#7ee5b3", fontWeight: 600, marginBottom: 2 }}>다산콜</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#4cd99a", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>120</div>
+                  </div>
+                </a>
+              </div>
+
+              {/* 등록된 비상연락처 (우선순위 순) */}
+              {(() => {
+                const contacts = settings.emergencyContacts || [];
+                if (contacts.length === 0) {
+                  return (<div style={{ padding: "20px 16px", textAlign: "center", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 4 }}>등록된 비상연락처가 없습니다</div>
+                    <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("emergency")}>+ 비상연락망 등록 →</CC_Btn>
+                  </div>);
+                }
+                // 우선순위 정렬
+                const sorted = [...contacts].sort((a, b) => {
+                  const pri = { critical: 0, high: 1, normal: 2 };
+                  return (pri[a.priority] || 2) - (pri[b.priority] || 2);
+                });
+                // 그룹별 분류
+                const grouped = {};
+                sorted.forEach(c => {
+                  const g = c.group || "기타";
+                  if (!grouped[g]) grouped[g] = [];
+                  grouped[g].push(c);
+                });
+                return (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {Object.entries(grouped).map(([group, list]) => (<div key={group} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 8 }}>{group} ({list.length})</div>
+                    {list.slice(0, 4).map(c => {
+                      const pColor = c.priority === "critical" ? "#ff5e7e" : c.priority === "high" ? "#ff9a3c" : "#6b8aff";
+                      return (<a key={c.id} href={`tel:${c.phone}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 4, borderRadius: 8, background: "rgba(0,0,0,0.2)", border: `1px solid ${pColor}20`, borderLeft: `3px solid ${pColor}`, textDecoration: "none", transition: "background 0.15s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = `${pColor}10`}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.2)"}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {c.priority === "critical" && "🔴 "}{c.priority === "high" && "🟠 "}{c.name}
+                          </div>
+                          {c.role && <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.role}</div>}
+                        </div>
+                        <span className="mono" style={{ fontSize: 11, color: pColor, fontWeight: 700, flexShrink: 0 }}>📞 {c.phone}</span>
+                      </a>);
+                    })}
+                    {list.length > 4 && <div style={{ fontSize: 10, color: "#6c6e7d", textAlign: "center", marginTop: 4 }}>+{list.length - 4}명 더 보기</div>}
+                  </div>))}
+                </div>);
+              })()}
+            </CC_Card>
+
+            {/* 시간대별 인파 추이 그래프 */}
+            {(() => {
+              const crowd = categories.find(c => c.id === "crowd");
+              const history = (crowd?.history || []).slice(-24);
+              if (history.length < 2) return null;
+              return (<CC_Card title="시간대별 인파 추이" sub={`최근 ${history.length}회 측정 · 30분 간격`} style={{ marginBottom: 16 }}>
+                <div style={{ width: "100%", height: 200 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={history} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                      <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={50} />
+                      <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()}명`, "체류"]} />
+                      {crowd.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={crowd.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 11 }} />}
+                      {crowd.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={crowd.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 11 }} />}
+                      <Line type="monotone" dataKey="value" stroke="#6b8aff" strokeWidth={2.5} dot={{ fill: "#6b8aff", r: 3 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CC_Card>);
+            })()}
           </>}
 
           {/* MONITOR 탭 */}
@@ -2406,6 +4036,10 @@ function ControlCenterDashboard({ session, accounts, settings, setSettings, cate
           {ccPage === "alert" && <CC_AlertPage settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
           {ccPage === "incident" && <CC_IncidentPage settings={settings} setSettings={setSettings} session={session} />}
           {ccPage === "map" && <CC_MapPage settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "festival" && <CC_FestivalPage settings={settings} setSettings={setSettings} accounts={accounts} setAccounts={setAccounts} session={session} categories={categories} alerts={alerts} setCcPage={setCcPage} />}
+          {ccPage === "program" && <CC_ProgramPage settings={settings} setSettings={setSettings} session={session} setCcPage={setCcPage} />}
+          {ccPage === "stage" && <CC_StagePage settings={settings} setSettings={setSettings} session={session} setCcPage={setCcPage} />}
+          {ccPage === "workforce" && <CC_WorkforcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} setAccounts={setAccounts} setCcPage={setCcPage} />}
           {ccPage === "resource" && <CC_ResourcePage settings={settings} setSettings={setSettings} session={session} accounts={accounts} />}
           {ccPage === "report" && <CC_ReportPage settings={settings} alerts={alerts} categories={categories} session={session} />}
           {ccPage === "user" && <CC_UserPage settings={settings} setSettings={setSettings} accounts={accounts} session={session} onMobileSwitch={onMobileSwitch} />}
@@ -2834,56 +4468,269 @@ function CC_MapPage({ settings, setSettings, session }) {
   </div>);
 }
 
-// ─── PC: 06. 리소스 관리 ───────────────────────────────────
+// ─── PC: 06. 물자 관리 ───────────────────────────────────
 function CC_ResourcePage({ settings, setSettings, session, accounts }) {
   const assets = settings.assets || [];
+  const cats = settings.assetCategories || ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"];
   const workSites = settings.workSites || [];
   const allWorkers = workSites.flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name })));
   const totalAssets = assets.reduce((s, a) => s + (a.total || 0), 0);
   const availAssets = assets.reduce((s, a) => s + (a.qty || 0), 0);
+  const assignedAssets = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "assigned").length, 0);
   const broken = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "broken").length, 0);
   const lost = assets.reduce((s, a) => s + (a.units || []).filter(u => u.status === "lost").length, 0);
+  const lowStock = assets.filter(a => a.total > 0 && (a.qty || 0) / a.total < 0.3).length;
+  const canEdit = ["admin","manager","sysadmin","zonemgr"].includes(session?.role);
+
+  // 카테고리별 통계
+  const byCategory = {};
+  cats.forEach(c => { byCategory[c] = { count: 0, total: 0, qty: 0 }; });
+  assets.forEach(a => {
+    const c = a.category || "기타";
+    if (!byCategory[c]) byCategory[c] = { count: 0, total: 0, qty: 0 };
+    byCategory[c].count += 1;
+    byCategory[c].total += (a.total || 0);
+    byCategory[c].qty += (a.qty || 0);
+  });
+
+  // 빠른 추가 폼
+  const [addOpen, setAddOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ name: "", category: "무전기", total: 1, qty: 1, location: "" });
+  const [filter, setFilter] = useState("all");
+
+  const addQuick = () => {
+    if (!newItem.name.trim()) { alert("물자명을 입력하세요"); return; }
+    const id = "asset_" + Date.now();
+    setSettings(prev => ({ ...prev, assets: [...(prev.assets || []), { ...newItem, id, status: "available", trackUnits: false, units: [] }] }));
+    setNewItem({ name: "", category: newItem.category, total: 1, qty: 1, location: "" });
+    setAddOpen(false);
+  };
+
+  const deleteAsset = (id) => {
+    if (!confirm("이 물자를 삭제하시겠습니까?")) return;
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).filter(a => a.id !== id) }));
+  };
+
+  const updateAsset = (id, field, val) => {
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => a.id === id ? { ...a, [field]: val } : a) }));
+  };
+
+  const filtered = filter === "all" ? assets : assets.filter(a => a.category === filter);
+
+  // 카테고리 아이콘 매핑
+  const catIcon = { "무전기": "📻", "생수": "💧", "리플렛": "📄", "멀티탭": "🔌", "응급키트": "🩹", "조끼": "🦺", "안전모": "⛑️", "안전장비": "🦺", "의자": "🪑", "테이블": "🪟", "조명": "💡", "음향": "🔊", "기타": "📦" };
 
   return (<div>
-    <div className="cc-stats-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
-      {[{ n: "전체 자산", v: totalAssets, c: "#6b8aff" }, { n: "사용 가능", v: availAssets, c: "#4cd99a" }, { n: "고장", v: broken, c: "#ff9a3c" }, { n: "분실", v: lost, c: "#ff5e7e" }].map(s => (<div key={s.n} style={{ padding: 16, borderRadius: 14, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{s.n}</div>
-        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "JetBrains Mono", color: s.c, marginTop: 4 }}>{s.v}</div>
+    {/* KPI 6개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+      {[
+        { label: "전체 물자", value: assets.length, sub: "품목", color: "#6b8aff", icon: "📦" },
+        { label: "총 수량", value: totalAssets, sub: "개", color: "#42A5F5", icon: "🔢" },
+        { label: "사용 가능", value: availAssets, sub: `${totalAssets > 0 ? Math.round(availAssets/totalAssets*100) : 0}%`, color: "#4cd99a", icon: "✅" },
+        { label: "사용중", value: assignedAssets, sub: "할당됨", color: "#a980ff", icon: "🔄" },
+        { label: "고장/분실", value: broken + lost, sub: `${broken}/${lost}`, color: (broken+lost)>0?"#ff5e7e":"#4cd99a", icon: "⚠️" },
+        { label: "재고 부족", value: lowStock, sub: "30% 미만", color: lowStock>0?"#ff9a3c":"#4cd99a", icon: "📉" },
+      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>
+        </div>
       </div>))}
     </div>
 
-    <CC_Card title="자산 목록" sub={`${assets.length}개 분류`}>
-      {assets.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 자산이 없습니다 (모바일에서 등록)</div> :
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>자산</th>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>분류</th>
-              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>가용</th>
-              <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>총수량</th>
-              <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map(a => { const ratio = a.total ? a.qty / a.total : 0; const lv = ratio < 0.3 ? "red" : ratio < 0.6 ? "yellow" : "green"; return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              <td style={{ padding: "12px 8px", color: "#f4f5fa", fontWeight: 600 }}>{a.name}</td>
-              <td style={{ padding: "12px 8px", color: "#b0b3c4" }}>{a.category}</td>
-              <td style={{ padding: "12px 8px", textAlign: "right", color: "#f4f5fa", fontFamily: "JetBrains Mono" }}>{a.qty || 0}</td>
-              <td style={{ padding: "12px 8px", textAlign: "right", color: "#b0b3c4", fontFamily: "JetBrains Mono" }}>{a.total || 0}</td>
-              <td style={{ padding: "12px 8px" }}><CC_Chip level={lv}>{Math.round(ratio * 100)}%</CC_Chip></td>
-            </tr>); })}
-          </tbody>
-        </table>
-      }
+    {/* 빠른 추가 폼 */}
+    {canEdit && <CC_Card style={{ marginBottom: 16 }}>
+      {!addOpen ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>📦</span>
+            <span style={{ fontSize: 14, color: "#94A3B8" }}>새 물자를 빠르게 추가하거나 카테고리별로 일괄 추가할 수 있습니다</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* 빠른 추가 (카테고리별 프리셋) */}
+            {[
+              { cat: "무전기", icon: "📻", name: "무전기", default: 10 },
+              { cat: "생수", icon: "💧", name: "생수 500ml", default: 100 },
+              { cat: "리플렛", icon: "📄", name: "안내 리플렛", default: 500 },
+              { cat: "멀티탭", icon: "🔌", name: "멀티탭", default: 5 },
+              { cat: "응급키트", icon: "🩹", name: "응급키트", default: 3 },
+              { cat: "조끼", icon: "🦺", name: "안전조끼", default: 20 },
+            ].map(p => (
+              <CC_Btn key={p.cat} size="sm" variant="ghost" onClick={() => {
+                setNewItem({ name: p.name, category: p.cat, total: p.default, qty: p.default, location: "" });
+                setAddOpen(true);
+              }}>{p.icon} {p.cat}</CC_Btn>
+            ))}
+            <CC_Btn size="sm" variant="primary" onClick={() => setAddOpen(true)}>+ 직접 추가</CC_Btn>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <style>{`
+            .quick-add-num::-webkit-inner-spin-button,
+            .quick-add-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+            .quick-add-num { -moz-appearance: textfield; }
+          `}</style>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1.4fr 1fr 1fr 1.6fr", gap: 10, alignItems: "end" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>물자명 *</div>
+              <input value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})} placeholder="예: 무전기 LTE" autoFocus onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>카테고리</div>
+              <select value={newItem.category} onChange={e=>setNewItem({...newItem, category: e.target.value})} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#14151f", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }}>
+                {cats.map(c => <option key={c} value={c}>{catIcon[c] || "📦"} {c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>총수량</div>
+              <input className="quick-add-num" type="number" min="1" value={newItem.total} onChange={e=>{ const v = parseInt(e.target.value || "1"); setNewItem({...newItem, total: v, qty: v}); }} onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box", textAlign: "center" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>가용</div>
+              <input className="quick-add-num" type="number" min="0" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty: parseInt(e.target.value || "0")})} onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box", textAlign: "center" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>보관 위치</div>
+              <input value={newItem.location} onChange={e=>setNewItem({...newItem, location: e.target.value})} placeholder="예: 본부, 창고 A (선택)" onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+          </div>
+          {/* 액션 버튼 (별도 줄에 충분한 너비) */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+            <button onClick={() => { setAddOpen(false); setNewItem({ name: "", category: cats[0], total: 1, qty: 1, location: "" }); }} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>취소</button>
+            <button onClick={addQuick} style={{ padding: "10px 28px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(107,138,255,0.3)" }}>✓ 추가하기</button>
+          </div>
+        </div>
+      )}
+    </CC_Card>}
+
+    {/* 카테고리 필터 칩 (가로 스크롤) */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600, marginRight: 4 }}>카테고리:</span>
+        <button onClick={() => setFilter("all")} style={{ padding: "8px 14px", borderRadius: 999, border: filter === "all" ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filter === "all" ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filter === "all" ? "#6b8aff" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>📦 전체 ({assets.length})</button>
+        {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].count-a[1].count).map(([cat, v]) => {
+          const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
+          const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
+          return (<button key={cat} onClick={() => setFilter(cat)} style={{ padding: "8px 14px", borderRadius: 999, border: filter === cat ? `1.5px solid ${color}` : "1px solid rgba(255,255,255,0.08)", background: filter === cat ? `${color}15` : "rgba(255,255,255,0.02)", color: filter === cat ? color : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {catIcon[cat] || "📦"} {cat} ({v.count})
+          </button>);
+        })}
+      </div>
     </CC_Card>
 
-    <CC_Card title="근무자 현황" sub={`총 ${allWorkers.length}명`} style={{ marginTop: 16 }}>
-      {workSites.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 근무자가 없습니다</div> :
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-          {workSites.map(s => (<div key={s.id} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 6 }}>📍 {s.name || "미배치"}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "JetBrains Mono", color: "#6b8aff" }}>{(s.workers || []).length}<span style={{ fontSize: 12, color: "#6c6e7d", marginLeft: 4 }}>명</span></div>
-          </div>))}
+    {/* 메인: 타일 그리드 (카드 형태) */}
+    <CC_Card title={`📦 물자 목록 ${filter !== "all" ? `(${filter})` : ""}`} sub={`${filtered.length}개 품목 · ${filtered.reduce((s,a)=>s+(a.total||0),0)}개 총수량`} style={{ marginBottom: 16 }}>
+      {filtered.length === 0 ? (
+        <div style={{ padding: "60px 20px", textAlign: "center", border: "2px dashed rgba(255,255,255,0.06)", borderRadius: 14, background: "rgba(255,255,255,0.01)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📦</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#b0b3c4", marginBottom: 6 }}>{filter === "all" ? "등록된 물자가 없습니다" : `${filter} 카테고리에 등록된 물자가 없습니다`}</div>
+          <div style={{ fontSize: 12, color: "#6c6e7d" }}>위의 빠른 추가 버튼이나 [+ 직접 추가]로 등록하세요</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+          {filtered.map(a => {
+            const ratio = a.total ? a.qty / a.total : 0;
+            const pct = Math.round(ratio * 100);
+            const color = ratio < 0.3 ? "#ff5e7e" : ratio < 0.6 ? "#ff9a3c" : "#4cd99a";
+            const icon = catIcon[a.category] || "📦";
+            return (<div key={a.id} style={{ padding: 16, borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}`, position: "relative", transition: "transform 0.15s, border-color 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${color}50`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${color}25`; }}>
+              {/* 헤더 */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                  <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{a.category}</div>
+                </div>
+                {canEdit && <button onClick={() => deleteAsset(a.id)} title="삭제" style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer", flexShrink: 0 }}>🗑</button>}
+              </div>
+
+              {/* 큰 숫자 + 게이지 */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span style={{ fontSize: 30, fontWeight: 700, color, fontFamily: "JetBrains Mono", letterSpacing: "-0.02em", lineHeight: 1 }}>{a.qty || 0}</span>
+                    <span style={{ fontSize: 14, color: "#6c6e7d", fontFamily: "JetBrains Mono" }}>/ {a.total || 0}</span>
+                  </div>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, background: `${color}15`, border: `1px solid ${color}30`, color, fontSize: 11, fontWeight: 700 }}>{pct}%</span>
+                </div>
+                <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 3, transition: "width 0.3s" }} />
+                </div>
+              </div>
+
+              {/* 인라인 편집 (관리자만) */}
+              {canEdit ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>가용</div>
+                    <input type="number" min="0" max={a.total} value={a.qty || 0} onChange={e => updateAsset(a.id, "qty", parseInt(e.target.value || "0"))} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 12, boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>총수량</div>
+                    <input type="number" min="1" value={a.total || 0} onChange={e => updateAsset(a.id, "total", parseInt(e.target.value || "1"))} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontFamily: "JetBrains Mono", fontSize: 12, boxSizing: "border-box" }} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* 위치 */}
+              {canEdit ? (
+                <div>
+                  <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>📍 보관 위치</div>
+                  <input value={a.location || ""} onChange={e => updateAsset(a.id, "location", e.target.value)} placeholder="위치 입력 (예: 본부, 창고 A)" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 12, boxSizing: "border-box" }} />
+                </div>
+              ) : (a.location && <div style={{ fontSize: 11, color: "#94A3B8" }}>📍 {a.location}</div>)}
+
+              {/* 빠른 ± 버튼 (관리자) */}
+              {canEdit && <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
+                <button onClick={() => updateAsset(a.id, "qty", Math.max(0, (a.qty || 0) - 1))} disabled={(a.qty || 0) === 0} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: (a.qty || 0) === 0 ? "#444" : "#ff8a99", fontSize: 12, fontWeight: 700, cursor: (a.qty || 0) === 0 ? "default" : "pointer" }}>-1</button>
+                <button onClick={() => updateAsset(a.id, "qty", Math.min(a.total, (a.qty || 0) + 1))} disabled={(a.qty || 0) >= (a.total || 0)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid rgba(76,217,154,0.2)", background: "rgba(76,217,154,0.05)", color: (a.qty || 0) >= (a.total || 0) ? "#444" : "#7ee5b3", fontSize: 12, fontWeight: 700, cursor: (a.qty || 0) >= (a.total || 0) ? "default" : "pointer" }}>+1</button>
+                <button onClick={() => { if (confirm(`${a.name} 전체 반납 처리?`)) updateAsset(a.id, "qty", a.total || 0); }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.2)", background: "rgba(107,138,255,0.05)", color: "#8fa6ff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↺ 전체</button>
+              </div>}
+            </div>);
+          })}
+        </div>
+      )}
+    </CC_Card>
+
+    {/* 카테고리별 요약 (작은 카드) */}
+    {Object.values(byCategory).filter(v=>v.count>0).length > 0 && <CC_Card title="📊 카테고리별 요약" sub="가용률 한눈에" style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+        {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].total-a[1].total).map(([cat, v]) => {
+          const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
+          const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
+          return (<div key={cat} onClick={() => setFilter(cat)} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${filter === cat ? color : "rgba(255,255,255,0.05)"}`, cursor: "pointer", transition: "border-color 0.15s" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa" }}>{catIcon[cat] || "📦"} {cat}</span>
+              <span className="mono" style={{ fontSize: 11, color, fontWeight: 700 }}>{ratio}%</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6 }}>{v.qty}/{v.total} · {v.count} 품목</div>
+            <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
+              <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+            </div>
+          </div>);
+        })}
+      </div>
+    </CC_Card>}
+
+    {/* 근무지별 분배 현황 */}
+    <CC_Card title="🏠 근무지별 분배 현황" sub={`${workSites.filter(s=>s.id!=="_pool").length}개 근무지`} style={{ marginBottom: 16 }}>
+      {workSites.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 근무지가 없습니다</div> :
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+          {workSites.filter(s => s.id !== "_pool").map(s => {
+            const ws = s.workers || [];
+            const radiosHere = assets.filter(a => a.category === "무전기").reduce((sum, a) => sum + (a.units || []).filter(u => ws.find(w => w.id === u.assignedTo)).length, 0);
+            return (<div key={s.id} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>🏠 {s.name}</div>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#94A3B8" }}>
+                <span>👥 {ws.length}명</span>
+                {radiosHere > 0 && <span>📻 {radiosHere}</span>}
+              </div>
+            </div>);
+          })}
         </div>
       }
     </CC_Card>
@@ -3574,6 +5421,36 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
             </div>
           </div>}
 
+          {/* 📊 실황 그래프 (인파 외 카테고리: 풍속/강수/기온 등) */}
+          {selected.id !== "crowd" && (selected.history || []).length >= 2 && <div style={{ marginBottom: 16 }}>
+            <h3 style={{ color: li.color, fontSize: 13, marginBottom: 8 }}>📊 실황 추이 (최근 24시간)</h3>
+            <div style={{ width: "100%", height: 180 }}>
+              <ResponsiveContainer>
+                <LineChart data={(selected.history || []).slice(-24)} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                  <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 13 }} />
+                  <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
+                  <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "실황"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" label={{ value: "주의", fill: "#FFC107", fontSize: 12 }} />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" label={{ value: "경계", fill: "#FFA726", fontSize: 12 }} />}
+                  {selected.thresholds?.RED?.[0] > 0 && <ReferenceLine y={selected.thresholds.RED[0]} stroke="#EF5350" strokeDasharray="4 4" label={{ value: "심각", fill: "#EF5350", fontSize: 12 }} />}
+                  <Line type="monotone" dataKey="value" stroke={li.color} strokeWidth={2.5} dot={{ fill: li.color, r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4, fontSize: 12, color: "#94A3B8" }}>
+              <span>● 실시간 측정값</span>
+              <span>점선: 임계값</span>
+            </div>
+          </div>}
+
+          {/* 📊 실황 데이터 부족 안내 (history 너무 짧을 때) */}
+          {selected.id !== "crowd" && (selected.history || []).length < 2 && selected.kmaCategory && <div style={{ marginBottom: 16, padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+            <div style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>실황 데이터 수집 중</div>
+            <div style={{ color: "#6c6e7d", fontSize: 11 }}>10분마다 자동 갱신됩니다 (현재값: {selected.currentValue}{selected.unit})</div>
+          </div>}
+
           {/* 초단기 예보 그래프 */}
           {(selected.forecast || []).length > 0 && <div style={{ marginBottom: 16 }}>
             <h3 style={{ color: "#FFA726", fontSize: 13, marginBottom: 8 }}>📋 초단기 예보 (향후 6시간)</h3>
@@ -3584,6 +5461,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 13 }} />
                   <YAxis tick={{ fill: "#556", fontSize: 14 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "예보"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" />}
                   <Line type="monotone" dataKey="value" stroke="#FFA726" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: "#FFA726", r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -3604,6 +5483,8 @@ function Dashboard({ categories: rawCategories, settings, onCardClick, onRefresh
                   <XAxis dataKey="time" tick={{ fill: "#556", fontSize: 11 }} interval={Math.floor(selected.shortForecast.length / 8)} />
                   <YAxis tick={{ fill: "#556", fontSize: 13 }} width={45} />
                   <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${Number(v).toLocaleString()} ${selected.unit}`, "단기예보"]} />
+                  {selected.thresholds?.YELLOW?.[0] > 0 && <ReferenceLine y={selected.thresholds.YELLOW[0]} stroke="#FFC107" strokeDasharray="4 4" />}
+                  {selected.thresholds?.ORANGE?.[0] > 0 && <ReferenceLine y={selected.thresholds.ORANGE[0]} stroke="#FFA726" strokeDasharray="4 4" />}
                   <Line type="monotone" dataKey="value" stroke="#42A5F5" strokeWidth={2} dot={{ fill: "#42A5F5", r: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -5961,13 +7842,16 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif" }}>
       {/* v2 페이지 헤더 */}
       <div style={{ padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(107,138,255,0.12), rgba(107,138,255,0.04))", border: "1px solid rgba(107,138,255,0.25)", borderRadius: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #6b8aff, #5a7aff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(107,138,255,0.4)" }}>👥</div>
+        {/* 1행: 로고 + 제목 + 통계 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: canEdit ? 12 : 0 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "linear-gradient(135deg, #6b8aff, #5a7aff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 12px rgba(107,138,255,0.4)", flexShrink: 0 }}>👥</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em" }}>근무자 관리</div>
-            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2 }}>총 {stats.total}명 · 근무중 {stats.onDuty}명</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa", letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>근무자 관리</div>
+            <div style={{ fontSize: 11, color: "#b0b3c4", marginTop: 2, whiteSpace: "nowrap" }}>총 {stats.total}명 · 근무중 {stats.onDuty}명</div>
           </div>
-          {canEdit && <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+        </div>
+        {/* 2행: 액션 버튼들 (가로 스크롤 가능) */}
+        {canEdit && <div style={{ display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", paddingBottom: 2 }}>
             {setAccounts && stats.total > 0 && (() => {
               const noAcc = allWorkers.filter(w => !w.accountId && !accounts?.find(a => a.id === w.name)).length;
               if (noAcc === 0) return null;
@@ -5988,18 +7872,16 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
                   setSettings(prev => ({ ...prev, workSites: prev.workSites.map(s => ({ ...s, workers: (s.workers || []).map(w => { const acc = newAccs.find(a => a.workerId === w.id); return acc ? { ...w, accountId: acc.id } : w; }) })) }));
                 }
                 alert(`✅ 일괄 계정 생성 완료\n\n생성: ${created}개\n건너뜀: ${skipped}개 (이미 존재)\n\n비밀번호: 1234\n첫 로그인 후 변경 안내하세요.`);
-              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>🔐 계정({noAcc})</button>;
+              }} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>🔐 계정({noAcc})</button>;
             })()}
-            {/* 사용자관리 → 근무자 복구 (workers 배열이 비었거나 accounts와 동기화 안됐을 때) */}
+            {/* 사용자관리 → 근무자 복구 */}
             {(() => {
               const fid = settings.festivalId || session?.festivalId || "default";
               const workerRoles = ["manager", "zonemgr", "stagemgr", "counter", "parking", "shuttle"];
-              // 현재 축제의 worker 역할 계정들
               const candidates = (accounts || []).filter(a => 
                 workerRoles.includes(a.role) && 
                 (a.festivalId === fid || (a.festivals || []).includes(fid))
               );
-              // 이미 근무자로 등록된 사람 제외 (이름 또는 accountId로 매칭)
               const missing = candidates.filter(a => 
                 !allWorkers.find(w => w.accountId === a.id || w.name === a.name)
               );
@@ -6009,7 +7891,6 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
                 if (!confirm(`📥 사용자관리 → 근무자 복구\n\n사용자관리에 ${missing.length}명의 계정이 있지만 근무자 목록에 없습니다.\n이들을 '미배치' 근무지로 복구합니다.\n\n복구 후 ⚙️관리에서 적절한 근무지로 이동시킬 수 있습니다.\n\n진행하시겠습니까?`)) return;
                 setSettings(prev => {
                   const ws = JSON.parse(JSON.stringify(prev.workSites || []));
-                  // 미배치 사이트 자동 생성
                   let pi = ws.findIndex(s => s.id === "_pool");
                   if (pi < 0) {
                     ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
@@ -6030,11 +7911,10 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
                   return { ...prev, workSites: ws };
                 });
                 alert(`✅ ${missing.length}명 복구 완료\n\n'미배치' 근무지에 추가되었습니다.\n⚙️관리에서 근무지로 이동시키세요.`);
-              }} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.4)", background: "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>📥 복구({missing.length})</button>;
+              }} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.4)", background: "linear-gradient(180deg, rgba(255,154,60,0.15), rgba(255,154,60,0.04))", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>📥 복구({missing.length})</button>;
             })()}
-            {stats.total > 0 && <button onClick={exportCSV} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📥 CSV</button>}
-          </div>}
-        </div>
+            {stats.total > 0 && <button onClick={exportCSV} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>📥 CSV</button>}
+        </div>}
       </div>
 
       {/* v2 통계 카드 (4개) */}
@@ -7244,7 +9124,7 @@ function LocationPage({ settings, setSettings, session }) {
 // ─── 2.0: Asset Management (장비/물품) ─────────────────────────────
 function AssetsPage({ settings, setSettings, session }) {
   const assets = settings.assets || [];
-  const cats = settings.assetCategories || ["무전기", "의자", "테이블", "조명", "음향", "안전장비", "기타"];
+  const cats = settings.assetCategories || ["무전기", "생수", "리플렛", "멀티탭", "응급키트", "조끼", "안전모", "안전장비", "의자", "테이블", "조명", "음향", "기타"];
   const [filter, setFilter] = useState("all");
   const [editId, setEditId] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -7356,7 +9236,7 @@ function AssetsPage({ settings, setSettings, session }) {
 
   return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", padding: "20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left))" }}>
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <PageHeader icon="📦" title="장비/물품 관리" subtitle="자산 인벤토리 + 무전기 할당" accent="#42A5F5" />
+      <PageHeader icon="📦" title="물자 관리" subtitle="무전기·생수·리플렛·멀티탭 등 자산 인벤토리" accent="#42A5F5" />
 
       {/* 통계 */}
       <Card>
@@ -7376,7 +9256,25 @@ function AssetsPage({ settings, setSettings, session }) {
         ); })}
       </div>
 
-      {canEdit && !addMode && !editId && <button onClick={() => setAddMode(true)} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(33,150,243,0.4)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>+ 새 장비/물품 등록</button>}
+      {canEdit && !addMode && !editId && <>
+        {/* 빠른 추가 프리셋 */}
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 8, paddingBottom: 4 }}>
+          {[
+            { cat: "무전기", icon: "📻", name: "무전기", default: 10 },
+            { cat: "생수", icon: "💧", name: "생수 500ml", default: 100 },
+            { cat: "리플렛", icon: "📄", name: "안내 리플렛", default: 500 },
+            { cat: "멀티탭", icon: "🔌", name: "멀티탭", default: 5 },
+            { cat: "응급키트", icon: "🩹", name: "응급키트", default: 3 },
+            { cat: "조끼", icon: "🦺", name: "안전조끼", default: 20 },
+          ].map(p => (
+            <button key={p.cat} onClick={() => {
+              setNewAsset({ name: p.name, category: p.cat, total: p.default, qty: p.default, location: "", status: "available", trackUnits: false, units: [] });
+              setAddMode(true);
+            }} style={{ padding: "8px 12px", borderRadius: 999, border: "1px solid rgba(33,150,243,0.25)", background: "rgba(33,150,243,0.08)", color: "#42A5F5", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>{p.icon} {p.cat}</button>
+          ))}
+        </div>
+        <button onClick={() => setAddMode(true)} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed rgba(33,150,243,0.4)", background: "rgba(33,150,243,0.05)", color: "#42A5F5", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>+ 직접 등록</button>
+      </>}
       {addMode && <Form asset={newAsset} onSave={saveAsset} onCancel={() => setAddMode(false)} />}
 
       {/* 자산 목록 */}
@@ -8677,13 +10575,13 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                   </div>
                 ) : (
                   <div key={w.id} draggable onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
-                    style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", cursor: "grab", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700 }}>{w.name}</span>
-                    {w.type && <span style={{ color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
-                    {w.role && <span style={{ color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                    {w.accountId && <span style={{ color: "#42A5F5", fontSize: 12 }}>🔑</span>}
-                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>✏️</button>
-                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>✕</button>
+                    style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ color: "#E2E8F0", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{w.name}</span>
+                    {w.type && <span style={{ color: "#E1BEE7", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.type}</span>}
+                    {w.role && <span style={{ color: "#009688", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.role}</span>}
+                    {w.accountId && <span style={{ color: "#42A5F5", fontSize: 12, flexShrink: 0 }}>🔑</span>}
+                    <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: "_pool", workerId: w.id }); }} style={{ padding: "3px 8px", border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "#8892b0", fontSize: 12, cursor: "pointer", borderRadius: 4, flexShrink: 0 }}>✏️</button>
+                    <button onClick={() => { const ws = [...(settings.workSites || [])]; const pi = ws.findIndex(s => s.id === "_pool"); if (pi >= 0) { ws[pi] = { ...ws[pi], workers: ws[pi].workers.filter(ww => ww.id !== w.id) }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "2px 4px", border: "none", background: "none", color: "#EF5350", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✕</button>
                   </div>
                 );
               })}
@@ -8741,14 +10639,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                     </div>
                   ) : (
                     <div key={w.id} draggable onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", site.id); }}
-                      style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid rgba(255,255,255,0.04)" }}>
-                      <span style={{ fontSize: 14, color: "#94A3B8" }}>⠿</span>
-                      <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700 }}>{w.name}</span>
-                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 12 }}>{w.type}</span>}
-                      {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12 }}>{w.role}</span>}
-                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12 }}>🔑{w.accountId}</span>}
-                      {w.phone && <span style={{ color: "#94A3B8", fontSize: 12 }}>{w.phone}</span>}
-                      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                      style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)", marginBottom: 4, cursor: "grab", border: "1px solid rgba(255,255,255,0.04)", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 14, color: "#94A3B8", flexShrink: 0 }}>⠿</span>
+                      <span style={{ color: "#E2E8F0", fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{w.name}</span>
+                      {w.type && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(156,39,176,0.1)", color: "#E1BEE7", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.type}</span>}
+                      {w.role && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.role}</span>}
+                      {w.accountId && <span style={{ padding: "3px 8px", borderRadius: 4, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>🔑{w.accountId}</span>}
+                      {w.phone && <span style={{ color: "#94A3B8", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{w.phone}</span>}
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexShrink: 0 }}>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 > 0) { [wks[wi2-1], wks[wi2]] = [wks[wi2], wks[wi2-1]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▲</button>
                         <button onClick={(e) => { e.stopPropagation(); const ws = [...(settings.workSites || [])]; const si2 = ws.findIndex(s => s.id === site.id); if (si2 < 0) return; const wks = [...(ws[si2].workers || [])]; const wi2 = wks.findIndex(ww => ww.id === w.id); if (wi2 < wks.length - 1) { [wks[wi2], wks[wi2+1]] = [wks[wi2+1], wks[wi2]]; ws[si2] = { ...ws[si2], workers: wks }; setSettings(prev => ({ ...prev, workSites: ws })); } }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>▼</button>
                         <button onClick={(e) => { e.stopPropagation(); setEditWorker({ siteId: site.id, workerId: w.id }); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#8892b0", fontSize: 13, cursor: "pointer" }}>✏️</button>
@@ -9786,7 +11684,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { k: "shuttle", icon: "🚌", label: "셔틀버스" },
             { k: "program", icon: "🎭", label: "축제 프로그램" },
             { k: "stage", icon: "🎤", label: "공연관리" },
-            { k: "assets", icon: "📦", label: "장비/물품 관리 (2.0)" },
+            { k: "assets", icon: "📦", label: "물자 관리 (2.0)" },
             { k: "timeline", icon: "📋", label: "상황일지" },
           ]},
           { group: "👤 인력/위치", items: [
@@ -9863,7 +11761,7 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
             { id: "stage", icon: "🎤", label: "공연관리", feat: "stage" },
             { id: "location", icon: "📍", label: "위치", feat: "location" },
             { id: "emergency", icon: "🚨", label: "비상연락망" },
-            { id: "assets", icon: "📦", label: "장비", feat: "assets" },
+            { id: "assets", icon: "📦", label: "물자", feat: "assets" },
             { id: "shifts", icon: "📝", label: "근무일지", feat: "shifts" },
             { id: "workers", icon: "👥", label: "근무자관리", feat: "workers" },
             { id: "reports", icon: "📄", label: "보고서", feat: "reports" },
@@ -10037,12 +11935,24 @@ function useKmaFetcher(categories, setCategories, settings, setSettings, active,
 
       setCategories(p => p.map(c => {
         if (c.kmaCategory && dataMap[c.kmaCategory] !== undefined && !c.apiConfig?.enabled) {
+          const newValue = Math.round(dataMap[c.kmaCategory] * 10) / 10;
+          const timeStr = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+          // history 누적: 마지막 시각이 같으면 업데이트, 다르면 추가, 최대 48개 (8시간 이상 - 10분 간격)
+          const prevHistory = c.history || [];
+          let newHistory = [...prevHistory];
+          if (newHistory.length > 0 && newHistory[newHistory.length - 1].time === timeStr) {
+            newHistory[newHistory.length - 1] = { time: timeStr, value: newValue };
+          } else {
+            newHistory.push({ time: timeStr, value: newValue });
+          }
+          if (newHistory.length > 48) newHistory = newHistory.slice(-48);
           return { 
             ...c, 
-            currentValue: Math.round(dataMap[c.kmaCategory] * 10) / 10, 
+            currentValue: newValue, 
             lastUpdated: new Date().toLocaleTimeString("ko-KR"), 
             forecast: fcstData[c.kmaCategory] || [], 
             shortForecast: (shortFcstData && shortFcstData[c.kmaCategory]) || [],
+            history: newHistory,
             dataType: "실황" 
           };
         }
@@ -10079,9 +11989,19 @@ function useAirQualityFetcher(categories, setCategories, settings, setSettings, 
           const pm10 = parseFloat(item.pm10Value) || 0;
           const pm25 = parseFloat(item.pm25Value) || 0;
           const time = new Date().toLocaleTimeString("ko-KR");
+          const timeStr = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+          const updateHist = (prevHist, newVal) => {
+            let h = [...(prevHist || [])];
+            if (h.length > 0 && h[h.length - 1].time === timeStr) {
+              h[h.length - 1] = { time: timeStr, value: newVal };
+            } else {
+              h.push({ time: timeStr, value: newVal });
+            }
+            return h.length > 48 ? h.slice(-48) : h;
+          };
           setCategories(p => p.map(c => {
-            if (c.id === "pm10") return { ...c, currentValue: pm10, lastUpdated: time, dataType: "실황" };
-            if (c.id === "pm25") return { ...c, currentValue: pm25, lastUpdated: time, dataType: "실황" };
+            if (c.id === "pm10") return { ...c, currentValue: pm10, lastUpdated: time, history: updateHist(c.history, pm10), dataType: "실황" };
+            if (c.id === "pm25") return { ...c, currentValue: pm25, lastUpdated: time, history: updateHist(c.history, pm25), dataType: "실황" };
             return c;
           }));
           setSettings(prev => ({ ...prev, airQuality: { ...prev.airQuality, lastFetch: new Date().toLocaleString("ko-KR") } }));
@@ -11007,7 +12927,17 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     return () => clearInterval(iv);
   }, [active, settings.smsEnabled]);
 
+  // v2 모바일 디자인용 카테고리 상세 모달 state
+  const [v2DetailCatId, setV2DetailCatId] = useState(null);
+  const v2DetailCat = v2DetailCatId ? categories.find(c => c.id === v2DetailCatId) : null;
+  
   const onCardClick = (catId) => {
+    // v2 모바일 디자인일 때: 카테고리 상세 모달 띄우기 (그래프 화면)
+    if (useNewMobile && !isPC) {
+      setV2DetailCatId(catId);
+      return;
+    }
+    // 기존 동작: CMS 설정으로 이동 (관리자만)
     if (!allowedPages.includes("cms")) return;
     const cat = categories.find(c => c.id === catId);
     setCmsTab(cat?.kmaCategory ? "kma" : "apiconfig");
@@ -11034,7 +12964,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
     ft.heatmap !== false && { id: "heatmap", icon: "🗺️", label: "히트맵" },
     ft.location !== false && { id: "location", icon: "📍", label: "위치" },
     { id: "emergency", icon: "🚨", label: "비상연락망" },
-    ft.assets !== false && { id: "assets", icon: "📦", label: "장비" },
+    ft.assets !== false && { id: "assets", icon: "📦", label: "물자" },
     ft.shifts !== false && { id: "shifts", icon: "📝", label: "근무일지" },
     ft.workers !== false && { id: "workers", icon: "👥", label: "근무자" },
     ft.reports !== false && { id: "reports", icon: "📄", label: "보고서" },
@@ -11060,6 +12990,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         <MobileControlCenter
           session={session}
           accounts={accounts}
+          setAccounts={setAccounts}
           settings={settings}
           setSettings={setSettings}
           categories={categories}
@@ -11080,6 +13011,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       <ControlCenterDashboard
         session={session}
         accounts={accounts}
+        setAccounts={setAccounts}
         settings={settings}
         setSettings={setSettings}
         categories={categories}
@@ -11109,6 +13041,9 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
       <style>{MD_GLOBAL_V2}</style>
     </>}
     <AlertToast alert={activeAlert} onClose={() => setActiveAlert(null)} />
+    
+    {/* v2 모바일 디자인용 카테고리 상세 모달 */}
+    {v2DetailCat && <CategoryDetailModal cat={v2DetailCat} settings={settings} session={session} onAction={(catId, status) => { handleAction(catId, status); }} onClose={() => setV2DetailCatId(null)} />}
 
     {/* Top bar - user info (새 모바일 디자인 대시보드면 숨김) */}
     {!(useNewMobile && page === "dashboard") && <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1001, background: "rgba(10,10,26,0.95)", borderBottom: "1px solid rgba(255,255,255,0.04)", padding: "calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px)", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(10px)" }}>
@@ -11189,6 +13124,29 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
         onLogout={onLogout}
         isManager={isManager}
         onSwitchToOldDesign={toggleNewMobile}
+        onAction={handleAction}
+        setActiveAlert={(cat) => {
+          // cat이 카테고리면 onCardClick으로 모달 열기
+          if (cat && cat.id && categories.find(c => c.id === cat.id)) {
+            onCardClick(cat.id);
+          } else {
+            setActiveAlert(cat);
+          }
+        }}
+        onDeleteAlert={(idx) => {
+          const now = Date.now();
+          if (idx === "all") {
+            categories.forEach(c => { ["ORANGE", "RED"].forEach(lv => { alertCooldown.current[`${c.id}_${lv}`] = now; }); });
+            setAlerts([]);
+          } else {
+            const target = alerts[idx];
+            if (target) {
+              const cat = categories.find(c => c.name === target.category);
+              if (cat) alertCooldown.current[`${cat.id}_${target.level}`] = now;
+            }
+            setAlerts(p => p.filter((_, i) => i !== idx));
+          }
+        }}
       />}
       {page === "dashboard" && !useNewMobile && (active ? <Dashboard categories={categories} settings={settings} onCardClick={onCardClick} onRefresh={handleRefresh} alerts={alerts} onAction={handleAction} onActionReport={handleActionReport} onDeleteAlert={(idx) => {
         // 삭제 시 해당 알림의 cooldown을 현재 시각으로 갱신 (10분 내 재생성 방지)
