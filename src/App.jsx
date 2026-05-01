@@ -998,6 +998,11 @@ const MD_GLOBAL_V2 = `
   body.md-v2-active * { font-family: inherit; }
   body.md-v2-active .mono, body.md-v2-active [style*="JetBrains Mono"] { font-family: 'JetBrains Mono', monospace !important; }
 
+  /* number input spinner 숨김 (전역, 모든 페이지) */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+
   /* 메인 배경: 더 깊은 검정으로 */
   body.md-v2-active div[style*="linear-gradient(180deg, #0a0d1a"] { 
     background: linear-gradient(180deg, #07070d 0%, #0e0f17 100%) !important; 
@@ -3910,16 +3915,39 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
         </div>
       ) : (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1.2fr auto auto", gap: 8, alignItems: "center" }}>
-            <input value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})} placeholder="물자명 (예: 무전기 LTE)" autoFocus style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
-            <select value={newItem.category} onChange={e=>setNewItem({...newItem, category: e.target.value})} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#14151f", color: "#f4f5fa", fontSize: 13 }}>
-              {cats.map(c => <option key={c} value={c}>{catIcon[c] || "📦"} {c}</option>)}
-            </select>
-            <input type="number" min="1" value={newItem.total} onChange={e=>{ const v = parseInt(e.target.value || "1"); setNewItem({...newItem, total: v, qty: v}); }} placeholder="총수량" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono" }} />
-            <input type="number" min="0" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty: parseInt(e.target.value || "0")})} placeholder="가용" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono" }} />
-            <input value={newItem.location} onChange={e=>setNewItem({...newItem, location: e.target.value})} placeholder="보관 위치 (선택)" style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
-            <CC_Btn size="sm" variant="primary" onClick={addQuick}>✓ 추가</CC_Btn>
-            <CC_Btn size="sm" variant="ghost" onClick={() => { setAddOpen(false); setNewItem({ name: "", category: cats[0], total: 1, qty: 1, location: "" }); }}>✕</CC_Btn>
+          <style>{`
+            .quick-add-num::-webkit-inner-spin-button,
+            .quick-add-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+            .quick-add-num { -moz-appearance: textfield; }
+          `}</style>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1.4fr 1fr 1fr 1.6fr", gap: 10, alignItems: "end" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>물자명 *</div>
+              <input value={newItem.name} onChange={e=>setNewItem({...newItem, name: e.target.value})} placeholder="예: 무전기 LTE" autoFocus onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>카테고리</div>
+              <select value={newItem.category} onChange={e=>setNewItem({...newItem, category: e.target.value})} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "#14151f", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }}>
+                {cats.map(c => <option key={c} value={c}>{catIcon[c] || "📦"} {c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>총수량</div>
+              <input className="quick-add-num" type="number" min="1" value={newItem.total} onChange={e=>{ const v = parseInt(e.target.value || "1"); setNewItem({...newItem, total: v, qty: v}); }} onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box", textAlign: "center" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>가용</div>
+              <input className="quick-add-num" type="number" min="0" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty: parseInt(e.target.value || "0")})} onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box", textAlign: "center" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>보관 위치</div>
+              <input value={newItem.location} onChange={e=>setNewItem({...newItem, location: e.target.value})} placeholder="예: 본부, 창고 A (선택)" onKeyDown={e => { if (e.key === "Enter") addQuick(); }} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+          </div>
+          {/* 액션 버튼 (별도 줄에 충분한 너비) */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+            <button onClick={() => { setAddOpen(false); setNewItem({ name: "", category: cats[0], total: 1, qty: 1, location: "" }); }} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>취소</button>
+            <button onClick={addQuick} style={{ padding: "10px 28px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(107,138,255,0.3)" }}>✓ 추가하기</button>
           </div>
         </div>
       )}
