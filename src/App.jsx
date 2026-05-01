@@ -2500,6 +2500,51 @@ function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session
     else { dayStatus = `D+${dayN-1}`; dayInfo = `${dayN}/${totalDays}일차`; }
   }
 
+  // 🆘 부스 상세 모달 + 사건 보고
+  const [boothId, setBoothId] = useState(null);
+  const [reportMode, setReportMode] = useState(false);
+  const [report, setReport] = useState({ type: "", priority: "medium", desc: "" });
+  const booth = boothId ? (settings.workSites || []).find(s => s.id === boothId) : null;
+  const boothIncidents = booth ? (settings.incidents || []).filter(i => i.siteId === boothId && i.status !== "closed") : [];
+  
+  // 부스 상태 계산: 사건이 있으면 incident, 진행 프로그램 있으면 active, 아니면 standby
+  const getBoothStatus = (siteId) => {
+    const incs = (settings.incidents || []).filter(i => i.siteId === siteId && i.status !== "closed");
+    if (incs.some(i => i.priority === "high")) return "danger";  // 빨강
+    if (incs.length > 0) return "warning";  // 주황
+    return "normal";  // 초록
+  };
+  
+  const submitReport = () => {
+    if (!report.type.trim()) { alert("상황 유형을 입력하세요"); return; }
+    const inc = {
+      id: "inc_" + Date.now(),
+      siteId: boothId,
+      siteName: booth?.name,
+      zoneId: booth?.zoneId,
+      type: report.type,
+      priority: report.priority,
+      desc: report.desc,
+      location: booth?.name || "",
+      reporter: session?.name || "?",
+      time: new Date().toLocaleString("ko-KR"),
+      ts: Date.now(),
+      status: "open"
+    };
+    setSettings(prev => ({ ...prev, incidents: [inc, ...(prev.incidents || [])] }));
+    setReport({ type: "", priority: "medium", desc: "" });
+    setReportMode(false);
+  };
+  
+  const closeIncident = (incId) => {
+    if (!confirm("이 상황을 대응 완료 처리하시겠습니까?")) return;
+    setSettings(prev => ({ ...prev, incidents: (prev.incidents || []).map(i => i.id === incId ? { ...i, status: "closed", closedAt: new Date().toLocaleString("ko-KR"), closedBy: session?.name || "?" } : i) }));
+  };
+  
+  const handlingIncident = (incId) => {
+    setSettings(prev => ({ ...prev, incidents: (prev.incidents || []).map(i => i.id === incId ? { ...i, status: "handling", handlingBy: session?.name || "?", handlingAt: new Date().toLocaleString("ko-KR") } : i) }));
+  };
+
   return (<div>
     {/* KPI 8개 라인 */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 16 }}>
@@ -2540,16 +2585,18 @@ function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session
         </div>
       </CC_Card>
 
-      <CC_Card title="구역 / 근무지" sub={`${(settings.zones || []).length}개 구역, ${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지`}>
+      <CC_Card title="구역 요약" sub={`${(settings.zones || []).length}개 구역, ${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 부스`}>
         {(settings.zones || []).slice(0, 6).map(z => {
           const sites = (settings.workSites || []).filter(s => s.zoneId === z.id);
           const wkrs = sites.reduce((n, s) => n + (s.workers || []).length, 0);
+          // 이 구역의 미해결 사건 수
+          const zoneIncidents = (settings.incidents || []).filter(i => i.zoneId === z.id && i.status !== "closed").length;
           const cong = (settings.zoneCongestion || []).find(c => c.zoneId === z.id);
-          const lv = cong?.level === "danger" ? "red" : cong?.level === "crowded" ? "yellow" : "green";
-          const lbl = cong?.level === "danger" ? "위험" : cong?.level === "crowded" ? "혼잡" : "원활";
+          const lv = zoneIncidents > 0 ? "red" : cong?.level === "danger" ? "red" : cong?.level === "crowded" ? "yellow" : "green";
+          const lbl = zoneIncidents > 0 ? `🚨${zoneIncidents}` : cong?.level === "danger" ? "위험" : cong?.level === "crowded" ? "혼잡" : "원활";
           return (<div key={z.id} className="cc-list-row" style={{ padding: "8px 0" }}>
             <span style={{ fontSize: 13, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {z.name}</span>
-            <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{sites.length} 지점</span>
+            <span className="mono" style={{ fontSize: 11, color: "#6c6e7d" }}>{sites.length} 부스</span>
             <span className="mono" style={{ fontSize: 11, color: "#6b8aff" }}>{wkrs}명</span>
             <CC_Chip level={lv}>{lbl}</CC_Chip>
           </div>);
@@ -2581,6 +2628,99 @@ function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session
       </CC_Card>
     </div>
 
+    {/* 🏪 구역별 부스 현황 - 큰 그리드 */}
+    <CC_Card title="🏪 구역별 부스 현황" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 부스 · 클릭하여 상세 보기/상황 보고`} style={{ marginBottom: 16 }}>
+      {(() => {
+        const zonesWithBooths = (settings.zones || []).map(z => ({
+          ...z,
+          booths: (settings.workSites || []).filter(s => s.zoneId === z.id && s.id !== "_pool")
+        })).filter(z => z.booths.length > 0);
+        // 미배치 구역 (zoneId 없는 부스들)
+        const orphanBooths = (settings.workSites || []).filter(s => s.id !== "_pool" && !s.zoneId);
+        if (zonesWithBooths.length === 0 && orphanBooths.length === 0) {
+          return (<div style={{ padding: "40px 20px", textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🏪</div>
+            <div style={{ fontSize: 15, color: "#b0b3c4", fontWeight: 600, marginBottom: 4 }}>등록된 부스가 없습니다</div>
+            <div style={{ fontSize: 12 }}>모바일 ⚙️관리에서 근무지를 등록하세요</div>
+          </div>);
+        }
+        return (<>
+          {zonesWithBooths.map(z => {
+            const zCong = (settings.zoneCongestion || []).find(c => c.zoneId === z.id);
+            const zLv = zCong?.level || "smooth";
+            const zColor = zLv === "danger" ? "#ff5e7e" : zLv === "crowded" ? "#f5c451" : "#4cd99a";
+            const zoneIncidents = (settings.incidents || []).filter(i => i.zoneId === z.id && i.status !== "closed").length;
+            const totalWkrs = z.booths.reduce((n, s) => n + (s.workers || []).length, 0);
+            return (<div key={z.id} style={{ marginBottom: 18 }}>
+              {/* 구역 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: "8px 14px", borderRadius: 10, background: `linear-gradient(90deg, ${zColor}15, transparent)`, borderLeft: `3px solid ${zColor}` }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#f4f5fa" }}>📍 {z.name}</span>
+                <span style={{ padding: "3px 10px", borderRadius: 999, background: `${zColor}15`, border: `1px solid ${zColor}30`, color: zColor, fontSize: 11, fontWeight: 700 }}>● {zLv === "danger" ? "위험" : zLv === "crowded" ? "혼잡" : "원활"}</span>
+                <span style={{ fontSize: 11, color: "#6c6e7d", marginLeft: "auto" }}>{z.booths.length}개 부스 · 👥 {totalWkrs}명</span>
+                {zoneIncidents > 0 && <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(255,94,126,0.15)", border: "1px solid rgba(255,94,126,0.3)", color: "#ff5e7e", fontSize: 11, fontWeight: 700 }}>🚨 {zoneIncidents}건 진행</span>}
+              </div>
+              {/* 부스 그리드 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, paddingLeft: 8 }}>
+                {z.booths.map(s => {
+                  const status = getBoothStatus(s.id);
+                  const incs = (settings.incidents || []).filter(i => i.siteId === s.id && i.status !== "closed");
+                  const handlingCount = incs.filter(i => i.status === "handling").length;
+                  const openCount = incs.filter(i => i.status === "open").length;
+                  // 색상: 위험(빨강) / 대응중(주황) / 정상(초록)
+                  const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+                  const sBg = status === "danger" ? "rgba(255,94,126,0.08)" : status === "warning" ? "rgba(255,154,60,0.08)" : "rgba(76,217,154,0.04)";
+                  const sLabel = status === "danger" ? "🚨 위급" : status === "warning" ? (handlingCount > 0 ? "🛠️ 대응중" : "⚠️ 사건") : "✅ 정상";
+                  const wkrs = s.workers || [];
+                  const onD = wkrs.filter(w => w.onDuty).length;
+                  return (<div key={s.id} onClick={() => { setBoothId(s.id); setReportMode(false); }} 
+                    style={{ padding: 12, borderRadius: 12, background: sBg, border: `1.5px solid ${sColor}30`, borderLeft: `3px solid ${sColor}`, cursor: "pointer", transition: "all 0.15s", position: "relative" }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = sColor; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${sColor}30`; }}>
+                    {/* 펄스 애니메이션 (위험/대응중) */}
+                    {status !== "normal" && <span style={{ position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, background: sColor, boxShadow: `0 0 0 0 ${sColor}80`, animation: "pulse-dot 1.5s infinite" }} />}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: status !== "normal" ? 12 : 0 }}>🏪 {s.name}</span>
+                    </div>
+                    <div style={{ padding: "4px 10px", borderRadius: 999, background: `${sColor}15`, border: `1px solid ${sColor}30`, color: sColor, fontSize: 11, fontWeight: 700, display: "inline-block", marginBottom: 8 }}>{sLabel}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8", marginBottom: 6 }}>
+                      <span>👥 인력</span>
+                      <span className="mono" style={{ color: "#6b8aff", fontWeight: 600 }}>{onD}/{wkrs.length}</span>
+                    </div>
+                    {incs.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${sColor}20`, fontSize: 11, color: sColor, fontWeight: 600 }}>
+                      {incs.slice(0, 1).map(i => (<div key={i.id} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>· {i.type}</div>))}
+                      {incs.length > 1 && <div style={{ color: "#6c6e7d", fontSize: 10, marginTop: 2 }}>외 {incs.length - 1}건</div>}
+                    </div>}
+                  </div>);
+                })}
+              </div>
+            </div>);
+          })}
+          {orphanBooths.length > 0 && (<div>
+            <div style={{ padding: "8px 14px", marginBottom: 10, color: "#6c6e7d", fontSize: 13, fontWeight: 700 }}>📍 미지정 구역</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, paddingLeft: 8 }}>
+              {orphanBooths.map(s => {
+                const status = getBoothStatus(s.id);
+                const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+                const wkrs = s.workers || [];
+                const onD = wkrs.filter(w => w.onDuty).length;
+                return (<div key={s.id} onClick={() => { setBoothId(s.id); setReportMode(false); }} style={{ padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1.5px solid ${sColor}30`, borderLeft: `3px solid ${sColor}`, cursor: "pointer" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", marginBottom: 6 }}>🏪 {s.name}</div>
+                  <div style={{ fontSize: 11, color: "#6b8aff" }}>👥 {onD}/{wkrs.length}</div>
+                </div>);
+              })}
+            </div>
+          </div>)}
+        </>);
+      })()}
+      <style>{`
+        @keyframes pulse-dot {
+          0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+          70% { box-shadow: 0 0 0 8px transparent; opacity: 0.5; }
+          100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+        }
+      `}</style>
+    </CC_Card>
+
     {/* 안내: 상세 설정 */}
     <CC_Card title="설정 / 관리" sub="모바일 화면에서 더 자세히 설정 가능">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -2590,6 +2730,105 @@ function CC_FestivalPage({ settings, setSettings, accounts, setAccounts, session
         <CC_Btn variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 시스템 설정 →</CC_Btn>
       </div>
     </CC_Card>
+
+    {/* 🏪 부스 상세 모달 */}
+    {booth && <div onClick={() => { setBoothId(null); setReportMode(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 720, maxHeight: "90vh", overflow: "auto", background: "linear-gradient(180deg, #14151f, #0e0f17)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+        {(() => {
+          const status = getBoothStatus(booth.id);
+          const sColor = status === "danger" ? "#ff5e7e" : status === "warning" ? "#ff9a3c" : "#4cd99a";
+          const sLabel = status === "danger" ? "🚨 위급 상황" : status === "warning" ? "⚠️ 사건 발생" : "✅ 정상 운영";
+          const zone = (settings.zones || []).find(z => z.id === booth.zoneId);
+          const wkrs = booth.workers || [];
+          return (<>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#f4f5fa", marginBottom: 4 }}>🏪 {booth.name}</div>
+                {zone && <div style={{ fontSize: 12, color: "#94A3B8" }}>📍 {zone.name}</div>}
+              </div>
+              <button onClick={() => { setBoothId(null); setReportMode(false); }} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+            </div>
+            
+            {/* 상태 배너 */}
+            <div style={{ padding: 14, borderRadius: 12, background: `${sColor}10`, border: `1px solid ${sColor}30`, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 5, background: sColor, boxShadow: `0 0 8px ${sColor}` }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: sColor }}>{sLabel}</span>
+              </div>
+            </div>
+
+            {/* 진행중 사건 리스트 */}
+            {boothIncidents.length > 0 && <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>🚨 진행중 사건 ({boothIncidents.length}건)</div>
+              {boothIncidents.map(i => {
+                const isHandling = i.status === "handling";
+                const ic = i.priority === "high" ? "#ff5e7e" : i.priority === "medium" ? "#ff9a3c" : "#6b8aff";
+                return (<div key={i.id} style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${ic}25`, borderLeft: `3px solid ${ic}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa" }}>{i.priority === "high" ? "🔴" : i.priority === "medium" ? "🟠" : "🔵"} {i.type}</span>
+                    {isHandling && <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(255,154,60,0.15)", color: "#ff9a3c", fontSize: 10, fontWeight: 700 }}>🛠️ 대응중</span>}
+                    <span className="mono" style={{ fontSize: 10, color: "#6c6e7d", marginLeft: "auto" }}>{i.time?.split(" ")[1] || i.time}</span>
+                  </div>
+                  {i.desc && <div style={{ fontSize: 12, color: "#b0b3c4", marginBottom: 8 }}>{i.desc}</div>}
+                  <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 8 }}>👤 보고: {i.reporter}{isHandling && ` · 🛠️ 대응: ${i.handlingBy}`}</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {!isHandling && <button onClick={() => handlingIncident(i.id)} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.3)", background: "rgba(255,154,60,0.1)", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🛠️ 대응 시작</button>}
+                    <button onClick={() => closeIncident(i.id)} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ 대응 완료</button>
+                  </div>
+                </div>);
+              })}
+            </div>}
+
+            {/* 사건 보고 폼 */}
+            {reportMode ? (
+              <div style={{ padding: 14, borderRadius: 12, background: "rgba(255,94,126,0.05)", border: "1px solid rgba(255,94,126,0.25)", marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#ff5e7e", marginBottom: 10 }}>🚨 새 상황 보고</div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>상황 유형 *</div>
+                    <input value={report.type} onChange={e => setReport({...report, type: e.target.value})} placeholder="예: 분실아동, 부상자, 시설고장, 소음신고" autoFocus style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>우선순위</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                      {[{ k: "high", l: "🔴 위급", c: "#ff5e7e" }, { k: "medium", l: "🟠 주의", c: "#ff9a3c" }, { k: "low", l: "🔵 일반", c: "#6b8aff" }].map(p => (
+                        <button key={p.k} onClick={() => setReport({...report, priority: p.k})} style={{ padding: "10px", borderRadius: 8, border: report.priority === p.k ? `1.5px solid ${p.c}` : "1px solid rgba(255,255,255,0.1)", background: report.priority === p.k ? `${p.c}15` : "rgba(255,255,255,0.02)", color: report.priority === p.k ? p.c : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{p.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>상세 설명</div>
+                    <textarea value={report.desc} onChange={e => setReport({...report, desc: e.target.value})} rows={3} placeholder="상황 상세 설명, 위치, 인상착의 등" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setReportMode(false); setReport({ type: "", priority: "medium", desc: "" }); }} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>취소</button>
+                    <button onClick={submitReport} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #ff5e7e, #e91e63)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🚨 상황 보고</button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setReportMode(true)} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid rgba(255,94,126,0.3)", background: "linear-gradient(180deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))", color: "#ff5e7e", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 16 }}>🚨 새 상황 보고</button>
+            )}
+
+            {/* 근무자 목록 */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", marginBottom: 8 }}>👥 근무자 ({wkrs.length}명{wkrs.filter(w=>w.onDuty).length > 0 && ` · 근무중 ${wkrs.filter(w=>w.onDuty).length}명`})</div>
+            {wkrs.length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.06)" }}>배치된 근무자가 없습니다</div> : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
+                {wkrs.map(w => (<div key={w.id} style={{ padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 3, background: w.onDuty ? "#4cd99a" : "#556" }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
+                    {w.role && <span style={{ padding: "1px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
+                  </div>
+                  {w.phone && <a href={`tel:${w.phone}`} style={{ fontSize: 11, color: "#6b8aff", fontFamily: "JetBrains Mono", textDecoration: "none" }}>📞 {w.phone}</a>}
+                </div>))}
+              </div>
+            )}
+          </>);
+        })()}
+      </div>
+    </div>}
   </div>);
 }
 
