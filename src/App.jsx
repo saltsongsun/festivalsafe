@@ -3350,13 +3350,13 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
   const programs = settings.programs || [];
   const todayStr = new Date().toISOString().slice(0, 10);
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  // 공연 필터: stageId 있거나 / 카테고리가 S(공연) 또는 P(공식) / 공연무대 키워드 위치
+  // 공연 필터: 무대에 등록된 공연만 (stageId 있거나 / S 카테고리 / 무대명 location)
+  // ⚠️ P(공식프로그램)은 제외 - 그건 프로그램관리 페이지에서 다룸
   const stageNames = stages.map(s => s.name).filter(Boolean);
   const stagePrograms = programs.filter(p => {
-    if (p.stageId) return true;
-    if (p.category === "S" || p.category === "P") return true;
-    if (p.location && stageNames.some(sn => p.location.includes(sn))) return true;
-    if (p.location && (p.location.includes("무대") || p.location.includes("공연장"))) return true;
+    if (p.stageId) return true;  // 무대 지정된 것
+    if (p.category === "S") return true;  // 공연 카테고리만 (P는 제외)
+    if (p.location && stageNames.some(sn => p.location.includes(sn))) return true;  // 무대명에 등록된 location
     return false;
   });
   
@@ -4350,7 +4350,16 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
 
 // ─── PC: 02. 실시간 모니터링 ───────────────────────────────────
 function CC_MonitorPage({ categories, settings, setSettings, session }) {
-  const [selCatId, setSelCatId] = useState(categories?.[0]?.id);
+  const [selCatId, setSelCatId] = useState(null);
+  // categories가 늦게 로드되어도 첫 카테고리 자동 선택
+  useEffect(() => {
+    if (!selCatId && categories && categories.length > 0) {
+      setSelCatId(categories[0].id);
+    } else if (selCatId && categories && !categories.find(c => c.id === selCatId)) {
+      // 선택한 카테고리가 사라진 경우 (삭제됨)
+      setSelCatId(categories[0]?.id || null);
+    }
+  }, [categories, selCatId]);
   const cat = (categories || []).find(c => c.id === selCatId) || categories?.[0];
   if (!cat) return <CC_Card title="실시간 모니터링">데이터가 없습니다</CC_Card>;
   const lv = getLevel(cat);
@@ -4368,9 +4377,30 @@ function CC_MonitorPage({ categories, settings, setSettings, session }) {
       {(categories || []).map(c => {
         const cv = getLevel(c);
         const cvColor = { BLUE: "#6b8aff", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[cv];
-        return (<button key={c.id} onClick={() => setSelCatId(c.id)} style={{ padding: "10px 16px", borderRadius: 999, border: selCatId === c.id ? `1.5px solid ${cvColor}` : "1px solid rgba(255,255,255,0.1)", background: selCatId === c.id ? `${cvColor}20` : "rgba(255,255,255,0.03)", color: selCatId === c.id ? cvColor : "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+        const isSelected = selCatId === c.id;
+        return (<button 
+          key={c.id} 
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelCatId(c.id); }}
+          style={{ 
+            padding: "10px 16px", 
+            borderRadius: 999, 
+            border: isSelected ? `1.5px solid ${cvColor}` : "1px solid rgba(255,255,255,0.1)", 
+            background: isSelected ? `${cvColor}25` : "rgba(255,255,255,0.03)", 
+            color: isSelected ? cvColor : "#b0b3c4", 
+            fontSize: 13, 
+            fontWeight: 600, 
+            cursor: "pointer", 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 6,
+            transition: "all 0.15s",
+            outline: "none"
+          }}
+          onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#f4f5fa"; } }}
+          onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = "#b0b3c4"; } }}>
           {c.icon || "📊"} {c.name}
-          {(cv === "ORANGE" || cv === "RED") && <span style={{ width: 6, height: 6, borderRadius: 3, background: cvColor }} />}
+          {(cv === "ORANGE" || cv === "RED") && <span style={{ width: 6, height: 6, borderRadius: 3, background: cvColor, animation: "blink 1.5s infinite" }} />}
         </button>);
       })}
     </div>
