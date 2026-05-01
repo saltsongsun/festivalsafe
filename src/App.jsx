@@ -412,6 +412,7 @@ function usePersist(key, init) {
   // 🔒 Supabase 로드 완료 전엔 절대 저장 안 함 (옛날 로컬 데이터로 클라우드 덮어쓰기 방지)
   const supabaseLoaded = useRef(false);
   const userInteracted = useRef(false); // 사용자가 직접 변경한 경우만 true
+  const lastEditTime = useRef(0); // 마지막 편집 시각 (realtime 보호용)
 
   useEffect(() => { valRef.current = val; }, [val]);
 
@@ -467,10 +468,18 @@ function usePersist(key, init) {
     return () => { cancelled = true; };
   }, [key]);
 
-  // Realtime 이벤트 (자기 저장 3초간 무시)
+  // Realtime 이벤트 (자기 저장 3초간 무시 + 편집 직후 5초 보호)
   useEffect(() => {
     const handler = (e) => {
       if (selfSave.current) return;
+      
+      // 🛡️ 편집 직후 보호: 사용자가 5초 내에 만진 데이터는 realtime 거부
+      const sinceLastEdit = Date.now() - (lastEditTime.current || 0);
+      if (sinceLastEdit < 5000) {
+        console.warn(`[usePersist] 🛡️ 편집 직후 보호: ${sinceLastEdit}ms 전 편집됨, realtime 거부:`, key.slice(0, 50));
+        return;
+      }
+      
       if (e.detail?.key === key && e.detail?.value) {
         const j = typeof e.detail.value === "string" ? e.detail.value : JSON.stringify(e.detail.value);
         if (j !== lastJson.current) {
@@ -484,7 +493,6 @@ function usePersist(key, init) {
               
               if (myWorkers > 5 && incomingWorkers < myWorkers * 0.5) {
                 console.warn(`[usePersist] 🛡️ Realtime 보호: 근무자 급감 거부 (${myWorkers} → ${incomingWorkers}). 다른 기기의 옛 데이터로 추정`);
-                // 무시하고 내 데이터를 다시 저장 (자기 보정)
                 if (window.storage && supabaseLoaded.current) {
                   const myJson = JSON.stringify(valRef.current);
                   selfSave.current = true;
@@ -493,6 +501,31 @@ function usePersist(key, init) {
                   });
                 }
                 return;
+              }
+              
+              // 🛡️ 프로그램 데이터 보호: programs/incidents/assets가 갑자기 줄면 무시
+              const checks = [
+                { field: "programs", min: 3 },
+                { field: "incidents", min: 1 },
+                { field: "assets", min: 2 },
+                { field: "stages", min: 1 },
+                { field: "artists", min: 1 },
+                { field: "emergencyContacts", min: 1 },
+              ];
+              for (const c of checks) {
+                const myCount = (valRef.current[c.field] || []).length;
+                const incomingCount = (p[c.field] || []).length;
+                if (myCount >= c.min && incomingCount < myCount * 0.5) {
+                  console.warn(`[usePersist] 🛡️ Realtime 보호: ${c.field} 급감 거부 (${myCount} → ${incomingCount})`);
+                  if (window.storage && supabaseLoaded.current) {
+                    const myJson = JSON.stringify(valRef.current);
+                    selfSave.current = true;
+                    window.storage.set(key, myJson).finally(() => {
+                      setTimeout(() => { selfSave.current = false; }, 3000);
+                    });
+                  }
+                  return;
+                }
               }
             }
             
@@ -516,6 +549,7 @@ function usePersist(key, init) {
     const json = JSON.stringify(next);
     lastJson.current = json;
     userInteracted.current = true; // 사용자 직접 변경 표시
+    lastEditTime.current = Date.now(); // ⏱️ 편집 시각 기록 (realtime 보호용)
     try { localStorage.setItem(key, json); } catch (e) { console.warn("[usePersist] localStorage 실패:", key); }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -3316,7 +3350,15 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
   const programs = settings.programs || [];
   const todayStr = new Date().toISOString().slice(0, 10);
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  const stagePrograms = programs.filter(p => p.stageId);
+  // 공연 필터: stageId 있거나 / 카테고리가 S(공연) 또는 P(공식) / 공연무대 키워드 위치
+  const stageNames = stages.map(s => s.name).filter(Boolean);
+  const stagePrograms = programs.filter(p => {
+    if (p.stageId) return true;
+    if (p.category === "S" || p.category === "P") return true;
+    if (p.location && stageNames.some(sn => p.location.includes(sn))) return true;
+    if (p.location && (p.location.includes("무대") || p.location.includes("공연장"))) return true;
+    return false;
+  });
   
   // 사용 가능한 날짜 추출
   const availableDates = [...new Set(stagePrograms.map(p => p.date).filter(d => d && d !== "always"))].sort();
@@ -3367,7 +3409,7 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
     </CC_Card>}
 
     {/* 🎵 무대 × 시간 캘린더 그리드 */}
-    {stages.length > 0 && (() => {
+    {stagePrograms.length > 0 && (() => {
       const calendarPgs = dayStagePgs.filter(p => p.time && p.endTime);
       
       // 시간 범위 계산
@@ -3402,20 +3444,42 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
       const showNowLine = filterDate === todayStr && nowMin >= minHour * 60 && nowMin <= maxHour * 60;
       const nowLineTop = showNowLine ? ((nowMin - minHour * 60) / 60) * hourHeight : 0;
       
-      // 무대별 분류
+      // 장소별 분류 (stageId 우선, 없으면 location)
+      const stageColumns = []; // [{ id, name, capacity, isStage, count }]
+      stages.forEach(s => stageColumns.push({ id: s.id, name: s.name, capacity: s.capacity, isStage: true }));
+      // stage 없이 location만 있는 공연들의 location 추가
+      const extraLocs = [...new Set(calendarPgs.filter(p => !p.stageId && p.location).map(p => p.location))];
+      extraLocs.forEach(loc => {
+        if (!stageColumns.some(c => c.name === loc)) {
+          stageColumns.push({ id: `loc_${loc}`, name: loc, isStage: false });
+        }
+      });
+      // location 도 없는 공연
+      const noLocPgs = calendarPgs.filter(p => !p.stageId && !p.location);
+      if (noLocPgs.length > 0) stageColumns.push({ id: "_etc", name: "기타", isStage: false });
+      
       const byStage = {};
-      stages.forEach(s => byStage[s.id] = []);
-      calendarPgs.forEach(p => { if (byStage[p.stageId]) byStage[p.stageId].push(p); });
+      stageColumns.forEach(c => byStage[c.id] = []);
+      calendarPgs.forEach(p => {
+        if (p.stageId && byStage[p.stageId]) { byStage[p.stageId].push(p); return; }
+        if (p.location) {
+          const matchStage = stages.find(s => s.name === p.location);
+          if (matchStage) { byStage[matchStage.id].push(p); return; }
+          const locKey = `loc_${p.location}`;
+          if (byStage[locKey]) { byStage[locKey].push(p); return; }
+        }
+        if (byStage["_etc"]) byStage["_etc"].push(p);
+      });
       
       return (<CC_Card title="🎵 무대 × 시간 공연 일정" sub={`${calendarPgs.length}개 공연 · ${filterDate}`} style={{ marginBottom: 16 }}>
         <div style={{ overflowX: "auto", overflowY: "hidden", paddingBottom: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: `70px repeat(${stages.length}, minmax(220px, 1fr))`, gap: 0, position: "relative", minWidth: 70 + stages.length * 220 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `70px repeat(${stageColumns.length}, minmax(220px, 1fr))`, gap: 0, position: "relative", minWidth: 70 + stageColumns.length * 220 }}>
             {/* 헤더 */}
             <div style={{ height: 44, position: "sticky", top: 0, zIndex: 4, background: "#14151f", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
-            {stages.map(s => {
+            {stageColumns.map(s => {
               const sPgs = byStage[s.id] || [];
               return (<div key={s.id} style={{ height: 44, padding: "10px 12px", background: "linear-gradient(180deg, #1a1d2a, #14151f)", borderBottom: "1px solid rgba(255,255,255,0.08)", borderLeft: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, zIndex: 4, fontSize: 12, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={s.name}>
-                🎤 {s.name}
+                {s.isStage ? "🎤" : "📍"} {s.name}
                 <span style={{ marginLeft: 6, fontSize: 10, color: "#6c6e7d", fontWeight: 600 }}>({sPgs.length})</span>
                 {s.capacity && <span style={{ marginLeft: 6, fontSize: 10, color: "#a980ff", fontWeight: 600 }}>👥{s.capacity}</span>}
               </div>);
@@ -3427,7 +3491,7 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
             </div>
             
             {/* 각 무대 컬럼 */}
-            {stages.map((s, sIdx) => (<div key={s.id} style={{ position: "relative", height: gridHeight, borderLeft: "1px solid rgba(255,255,255,0.04)" }}>
+            {stageColumns.map((s, sIdx) => (<div key={s.id} style={{ position: "relative", height: gridHeight, borderLeft: "1px solid rgba(255,255,255,0.04)" }}>
               {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, background: h % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)" }} />))}
               {hourLines.slice(0, -1).map(h => (<div key={`half-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight + 30, height: 1, background: "rgba(255,255,255,0.015)", borderTop: "1px dashed rgba(255,255,255,0.03)" }} />))}
               
