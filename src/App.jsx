@@ -3925,76 +3925,116 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
       )}
     </CC_Card>}
 
-    {/* 메인: 카테고리 통계 + 자산 목록 */}
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 2.2fr", gap: 16, marginBottom: 16 }}>
-      {/* 카테고리별 분포 */}
-      <CC_Card title="📊 카테고리별 현황" sub={`${Object.values(byCategory).filter(v=>v.count>0).length}개 사용중`}>
-        <div style={{ maxHeight: 600, overflowY: "auto" }}>
-          <div onClick={() => setFilter("all")} style={{ padding: "10px 12px", marginBottom: 4, borderRadius: 8, background: filter === "all" ? "rgba(107,138,255,0.12)" : "rgba(255,255,255,0.02)", border: filter === "all" ? "1px solid rgba(107,138,255,0.3)" : "1px solid rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa" }}>📦 전체</span>
-            <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700 }}>{assets.length} 품목 / {totalAssets} 개</span>
-          </div>
-          {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].total-a[1].total).map(([cat, v]) => {
-            const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
-            const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
-            return (<div key={cat} onClick={() => setFilter(cat)} style={{ padding: "10px 12px", marginBottom: 4, borderRadius: 8, background: filter === cat ? "rgba(107,138,255,0.12)" : "rgba(255,255,255,0.02)", border: filter === cat ? "1px solid rgba(107,138,255,0.3)" : "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{catIcon[cat] || "📦"} {cat}</span>
-                <span className="mono" style={{ fontSize: 11, color, fontWeight: 700 }}>{v.qty}/{v.total}</span>
+    {/* 카테고리 필터 칩 (가로 스크롤) */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600, marginRight: 4 }}>카테고리:</span>
+        <button onClick={() => setFilter("all")} style={{ padding: "8px 14px", borderRadius: 999, border: filter === "all" ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filter === "all" ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filter === "all" ? "#6b8aff" : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>📦 전체 ({assets.length})</button>
+        {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].count-a[1].count).map(([cat, v]) => {
+          const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
+          const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
+          return (<button key={cat} onClick={() => setFilter(cat)} style={{ padding: "8px 14px", borderRadius: 999, border: filter === cat ? `1.5px solid ${color}` : "1px solid rgba(255,255,255,0.08)", background: filter === cat ? `${color}15` : "rgba(255,255,255,0.02)", color: filter === cat ? color : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {catIcon[cat] || "📦"} {cat} ({v.count})
+          </button>);
+        })}
+      </div>
+    </CC_Card>
+
+    {/* 메인: 타일 그리드 (카드 형태) */}
+    <CC_Card title={`📦 물자 목록 ${filter !== "all" ? `(${filter})` : ""}`} sub={`${filtered.length}개 품목 · ${filtered.reduce((s,a)=>s+(a.total||0),0)}개 총수량`} style={{ marginBottom: 16 }}>
+      {filtered.length === 0 ? (
+        <div style={{ padding: "60px 20px", textAlign: "center", border: "2px dashed rgba(255,255,255,0.06)", borderRadius: 14, background: "rgba(255,255,255,0.01)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📦</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#b0b3c4", marginBottom: 6 }}>{filter === "all" ? "등록된 물자가 없습니다" : `${filter} 카테고리에 등록된 물자가 없습니다`}</div>
+          <div style={{ fontSize: 12, color: "#6c6e7d" }}>위의 빠른 추가 버튼이나 [+ 직접 추가]로 등록하세요</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+          {filtered.map(a => {
+            const ratio = a.total ? a.qty / a.total : 0;
+            const pct = Math.round(ratio * 100);
+            const color = ratio < 0.3 ? "#ff5e7e" : ratio < 0.6 ? "#ff9a3c" : "#4cd99a";
+            const icon = catIcon[a.category] || "📦";
+            return (<div key={a.id} style={{ padding: 16, borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}`, position: "relative", transition: "transform 0.15s, border-color 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${color}50`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${color}25`; }}>
+              {/* 헤더 */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                  <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{a.category}</div>
+                </div>
+                {canEdit && <button onClick={() => deleteAsset(a.id)} title="삭제" style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer", flexShrink: 0 }}>🗑</button>}
               </div>
-              <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
-                <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+
+              {/* 큰 숫자 + 게이지 */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span style={{ fontSize: 30, fontWeight: 700, color, fontFamily: "JetBrains Mono", letterSpacing: "-0.02em", lineHeight: 1 }}>{a.qty || 0}</span>
+                    <span style={{ fontSize: 14, color: "#6c6e7d", fontFamily: "JetBrains Mono" }}>/ {a.total || 0}</span>
+                  </div>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, background: `${color}15`, border: `1px solid ${color}30`, color, fontSize: 11, fontWeight: 700 }}>{pct}%</span>
+                </div>
+                <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 3, transition: "width 0.3s" }} />
+                </div>
               </div>
-              <div style={{ fontSize: 10, color: "#6c6e7d", marginTop: 4 }}>{v.count} 품목 · {ratio}% 가용</div>
+
+              {/* 인라인 편집 (관리자만) */}
+              {canEdit ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>가용</div>
+                    <input type="number" min="0" max={a.total} value={a.qty || 0} onChange={e => updateAsset(a.id, "qty", parseInt(e.target.value || "0"))} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 12, boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>총수량</div>
+                    <input type="number" min="1" value={a.total || 0} onChange={e => updateAsset(a.id, "total", parseInt(e.target.value || "1"))} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontFamily: "JetBrains Mono", fontSize: 12, boxSizing: "border-box" }} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* 위치 */}
+              {canEdit ? (
+                <div>
+                  <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 3, fontWeight: 600 }}>📍 보관 위치</div>
+                  <input value={a.location || ""} onChange={e => updateAsset(a.id, "location", e.target.value)} placeholder="위치 입력 (예: 본부, 창고 A)" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 12, boxSizing: "border-box" }} />
+                </div>
+              ) : (a.location && <div style={{ fontSize: 11, color: "#94A3B8" }}>📍 {a.location}</div>)}
+
+              {/* 빠른 ± 버튼 (관리자) */}
+              {canEdit && <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
+                <button onClick={() => updateAsset(a.id, "qty", Math.max(0, (a.qty || 0) - 1))} disabled={(a.qty || 0) === 0} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: (a.qty || 0) === 0 ? "#444" : "#ff8a99", fontSize: 12, fontWeight: 700, cursor: (a.qty || 0) === 0 ? "default" : "pointer" }}>-1</button>
+                <button onClick={() => updateAsset(a.id, "qty", Math.min(a.total, (a.qty || 0) + 1))} disabled={(a.qty || 0) >= (a.total || 0)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid rgba(76,217,154,0.2)", background: "rgba(76,217,154,0.05)", color: (a.qty || 0) >= (a.total || 0) ? "#444" : "#7ee5b3", fontSize: 12, fontWeight: 700, cursor: (a.qty || 0) >= (a.total || 0) ? "default" : "pointer" }}>+1</button>
+                <button onClick={() => { if (confirm(`${a.name} 전체 반납 처리?`)) updateAsset(a.id, "qty", a.total || 0); }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.2)", background: "rgba(107,138,255,0.05)", color: "#8fa6ff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↺ 전체</button>
+              </div>}
             </div>);
           })}
         </div>
-      </CC_Card>
+      )}
+    </CC_Card>
 
-      {/* 물자 목록 */}
-      <CC_Card title={`📦 물자 목록 ${filter !== "all" ? `(${filter})` : ""}`} sub={`${filtered.length}개 품목`}>
-        <div style={{ maxHeight: 600, overflowY: "auto" }}>
-          {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 물자가 없습니다. 위에서 추가하세요.</div> :
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, background: "#14151f", zIndex: 1 }}>
-                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>물자명</th>
-                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>분류</th>
-                  <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>가용</th>
-                  <th style={{ padding: "10px 8px", textAlign: "right", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>총수량</th>
-                  <th style={{ padding: "10px 8px", textAlign: "left", color: "#6c6e7d", fontSize: 11, fontWeight: 600 }}>위치</th>
-                  <th style={{ padding: "10px 8px", textAlign: "center", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 80 }}>상태</th>
-                  {canEdit && <th style={{ padding: "10px 8px", textAlign: "center", color: "#6c6e7d", fontSize: 11, fontWeight: 600, width: 60 }}></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(a => { 
-                  const ratio = a.total ? a.qty / a.total : 0; 
-                  const lv = ratio < 0.3 ? "red" : ratio < 0.6 ? "yellow" : "green"; 
-                  return (<tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <td style={{ padding: "10px 8px", color: "#f4f5fa", fontWeight: 600 }}>{catIcon[a.category] || "📦"} {a.name}</td>
-                    <td style={{ padding: "10px 8px", color: "#b0b3c4" }}>{a.category}</td>
-                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      {canEdit ? <input type="number" min="0" max={a.total} value={a.qty || 0} onChange={e => updateAsset(a.id, "qty", parseInt(e.target.value || "0"))} style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontFamily: "JetBrains Mono", fontSize: 13, textAlign: "right" }} /> : <span className="mono" style={{ color: "#f4f5fa" }}>{a.qty || 0}</span>}
-                    </td>
-                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      {canEdit ? <input type="number" min="1" value={a.total || 0} onChange={e => updateAsset(a.id, "total", parseInt(e.target.value || "1"))} style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#b0b3c4", fontFamily: "JetBrains Mono", fontSize: 13, textAlign: "right" }} /> : <span className="mono" style={{ color: "#b0b3c4" }}>{a.total || 0}</span>}
-                    </td>
-                    <td style={{ padding: "10px 8px", color: "#94A3B8", fontSize: 12 }}>
-                      {canEdit ? <input value={a.location || ""} onChange={e => updateAsset(a.id, "location", e.target.value)} placeholder="-" style={{ width: "100%", padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 12 }} /> : (a.location || "-")}
-                    </td>
-                    <td style={{ padding: "10px 8px", textAlign: "center" }}><CC_Chip level={lv}>{Math.round(ratio * 100)}%</CC_Chip></td>
-                    {canEdit && <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                      <button onClick={() => deleteAsset(a.id)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer" }}>🗑</button>
-                    </td>}
-                  </tr>);
-                })}
-              </tbody>
-            </table>
-          }
-        </div>
-      </CC_Card>
-    </div>
+    {/* 카테고리별 요약 (작은 카드) */}
+    {Object.values(byCategory).filter(v=>v.count>0).length > 0 && <CC_Card title="📊 카테고리별 요약" sub="가용률 한눈에" style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+        {Object.entries(byCategory).filter(([_, v]) => v.count > 0).sort((a,b)=>b[1].total-a[1].total).map(([cat, v]) => {
+          const ratio = v.total > 0 ? Math.round((v.qty / v.total) * 100) : 0;
+          const color = ratio < 30 ? "#ff5e7e" : ratio < 60 ? "#ff9a3c" : "#4cd99a";
+          return (<div key={cat} onClick={() => setFilter(cat)} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${filter === cat ? color : "rgba(255,255,255,0.05)"}`, cursor: "pointer", transition: "border-color 0.15s" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa" }}>{catIcon[cat] || "📦"} {cat}</span>
+              <span className="mono" style={{ fontSize: 11, color, fontWeight: 700 }}>{ratio}%</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6 }}>{v.qty}/{v.total} · {v.count} 품목</div>
+            <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
+              <div style={{ width: `${ratio}%`, height: "100%", background: color, borderRadius: 2 }} />
+            </div>
+          </div>);
+        })}
+      </div>
+    </CC_Card>}
 
     {/* 근무지별 분배 현황 */}
     <CC_Card title="🏠 근무지별 분배 현황" sub={`${workSites.filter(s=>s.id!=="_pool").length}개 근무지`} style={{ marginBottom: 16 }}>
