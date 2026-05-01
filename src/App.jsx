@@ -2945,6 +2945,21 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
       const showNowLine = todayMatch && nowMin >= minHour * 60 && nowMin <= maxHour * 60;
       const nowLineTop = showNowLine ? ((nowMin - minHour * 60) / 60) * hourHeight : 0;
       
+      // 🎪 축제 운영 시작/종료 시간 라인
+      const opStart = settings.operatingStart || "";
+      const opEnd = settings.operatingEnd || "";
+      const parseHM = (hm) => {
+        if (!hm || !hm.includes(":")) return null;
+        const [h, m] = hm.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const opStartMin = parseHM(opStart);
+      const opEndMin = parseHM(opEnd);
+      const showOpStart = opStartMin !== null && opStartMin >= minHour * 60 && opStartMin <= maxHour * 60;
+      const showOpEnd = opEndMin !== null && opEndMin >= minHour * 60 && opEndMin <= maxHour * 60;
+      const opStartTop = showOpStart ? ((opStartMin - minHour * 60) / 60) * hourHeight : 0;
+      const opEndTop = showOpEnd ? ((opEndMin - minHour * 60) / 60) * hourHeight : 0;
+      
       // 장소별로 프로그램 분류
       const byLoc = {};
       locations.forEach(loc => byLoc[loc] = []);
@@ -2974,6 +2989,14 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
               {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, background: h % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)" }} />))}
               {/* 30분 라인 */}
               {hourLines.slice(0, -1).map(h => (<div key={`half-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight + 30, height: 1, background: "rgba(255,255,255,0.015)", borderTop: "1px dashed rgba(255,255,255,0.03)" }} />))}
+              
+              {/* 🎪 축제 운영 시작 라인 (전체 컬럼에 그리고, 첫 컬럼에만 라벨) */}
+              {showOpStart && <div style={{ position: "absolute", left: 0, right: 0, top: opStartTop, height: 1, background: "#4cd99a", borderTop: "1px dashed #4cd99a", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpStart && locIdx === 0 && <div style={{ position: "absolute", left: 6, top: opStartTop - 18, padding: "2px 8px", borderRadius: 4, background: "rgba(76,217,154,0.15)", border: "1px solid rgba(76,217,154,0.4)", color: "#4cd99a", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🎪 개장 {opStart}</div>}
+              
+              {/* 🎪 축제 운영 종료 라인 */}
+              {showOpEnd && <div style={{ position: "absolute", left: 0, right: 0, top: opEndTop, height: 1, background: "#ff9a3c", borderTop: "1px dashed #ff9a3c", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpEnd && locIdx === 0 && <div style={{ position: "absolute", left: 6, top: opEndTop + 4, padding: "2px 8px", borderRadius: 4, background: "rgba(255,154,60,0.15)", border: "1px solid rgba(255,154,60,0.4)", color: "#ff9a3c", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🌙 폐장 {opEnd}</div>}
               
               {/* 현재 시간 라인 */}
               {showNowLine && locIdx === 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none", boxShadow: "0 0 6px #ef535080" }}>
@@ -3192,9 +3215,19 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
               <span style={{ fontSize: 11, color: "#94A3B8" }}>{k} ({cnt})</span>
             </div>);
           })}
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
-            <span style={{ width: 18, height: 2, background: "#ef5350" }} />
-            <span style={{ fontSize: 11, color: "#94A3B8" }}>현재 시각</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginLeft: "auto", flexWrap: "wrap" }}>
+            {opStart && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #4cd99a" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>🎪 개장 {opStart}</span>
+            </div>}
+            {opEnd && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #ff9a3c" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>🌙 폐장 {opEnd}</span>
+            </div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 2, background: "#ef5350" }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>현재 시각</span>
+            </div>
           </div>
         </div>
       </CC_Card>);
@@ -3284,6 +3317,13 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
   const stagePrograms = programs.filter(p => p.stageId);
+  
+  // 사용 가능한 날짜 추출
+  const availableDates = [...new Set(stagePrograms.map(p => p.date).filter(d => d && d !== "always"))].sort();
+  const [filterDate, setFilterDate] = useState(availableDates.includes(todayStr) ? todayStr : (availableDates[0] || todayStr));
+  
+  // 선택된 날짜의 공연들
+  const dayStagePgs = stagePrograms.filter(p => p.date === "always" || p.date === filterDate);
   const todayStagePgs = stagePrograms.filter(p => p.date === "always" || p.date === todayStr);
   const activeStagePgs = todayStagePgs.filter(p => {
     const [sh, sm] = (p.time || "00:00").split(":").map(Number);
@@ -3298,13 +3338,236 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
         { label: "무대", value: stages.length, color: "#a980ff", icon: "🎤" },
         { label: "아티스트", value: artists.length, color: "#FF7043", icon: "🎙️" },
         { label: "셋리스트", value: setlists.length, color: "#42A5F5", icon: "🎵" },
-        { label: "오늘 공연", value: todayStagePgs.length, color: "#a980ff", icon: "🎭" },
+        { label: "선택일 공연", value: dayStagePgs.length, color: "#a980ff", icon: "🎭" },
         { label: "진행중 공연", value: activeStagePgs.length, color: "#4cd99a", icon: "▶" },
       ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
         <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</div>
       </div>))}
     </div>
+
+    {/* 날짜 필터 */}
+    {availableDates.length > 0 && <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#6c6e7d", fontWeight: 600 }}>날짜:</span>
+        {availableDates.includes(todayStr) && <button onClick={() => setFilterDate(todayStr)} style={{ padding: "6px 14px", borderRadius: 999, border: filterDate === todayStr ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.08)", background: filterDate === todayStr ? "rgba(76,217,154,0.12)" : "rgba(255,255,255,0.02)", color: filterDate === todayStr ? "#4cd99a" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>● 오늘</button>}
+        {availableDates.map(d => {
+          const dt = new Date(d);
+          const wkday = ["일","월","화","수","목","금","토"][dt.getDay()];
+          const cnt = stagePrograms.filter(p => p.date === d).length;
+          const isToday = d === todayStr;
+          return (<button key={d} onClick={() => setFilterDate(d)} style={{ padding: "6px 14px", borderRadius: 999, border: filterDate === d ? "1.5px solid #a980ff" : "1px solid rgba(255,255,255,0.08)", background: filterDate === d ? "rgba(169,128,255,0.15)" : "rgba(255,255,255,0.02)", color: filterDate === d ? "#a980ff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+            <span>{d.slice(5)} ({wkday})</span>
+            <span style={{ padding: "1px 6px", borderRadius: 999, background: filterDate === d ? "rgba(169,128,255,0.3)" : "rgba(255,255,255,0.05)", fontSize: 10, fontWeight: 700 }}>{cnt}</span>
+            {isToday && <span style={{ width: 6, height: 6, borderRadius: 3, background: "#4cd99a" }} />}
+          </button>);
+        })}
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "#6c6e7d" }}>📅 {filterDate}</span>
+      </div>
+    </CC_Card>}
+
+    {/* 🎵 무대 × 시간 캘린더 그리드 */}
+    {stages.length > 0 && (() => {
+      const calendarPgs = dayStagePgs.filter(p => p.time && p.endTime);
+      
+      // 시간 범위 계산
+      let minHour = 9, maxHour = 23;
+      calendarPgs.forEach(p => {
+        const [sh] = (p.time || "00:00").split(":").map(Number);
+        const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+        if (sh < minHour) minHour = sh;
+        if (eh > maxHour || (eh === maxHour && em > 0)) maxHour = eh + (em > 0 ? 1 : 0);
+      });
+      minHour = Math.max(0, minHour - 1);
+      maxHour = Math.min(24, maxHour + 1);
+      const totalHours = maxHour - minHour;
+      const hourHeight = 60;
+      const gridHeight = totalHours * hourHeight;
+      
+      const hourLines = [];
+      for (let h = minHour; h <= maxHour; h++) hourLines.push(h);
+      
+      // 운영시간
+      const opStart = settings.operatingStart || "";
+      const opEnd = settings.operatingEnd || "";
+      const parseHM = (hm) => { if (!hm || !hm.includes(":")) return null; const [h, m] = hm.split(":").map(Number); return h * 60 + m; };
+      const opStartMin = parseHM(opStart);
+      const opEndMin = parseHM(opEnd);
+      const showOpStart = opStartMin !== null && opStartMin >= minHour * 60 && opStartMin <= maxHour * 60;
+      const showOpEnd = opEndMin !== null && opEndMin >= minHour * 60 && opEndMin <= maxHour * 60;
+      const opStartTop = showOpStart ? ((opStartMin - minHour * 60) / 60) * hourHeight : 0;
+      const opEndTop = showOpEnd ? ((opEndMin - minHour * 60) / 60) * hourHeight : 0;
+      
+      // 현재 시간
+      const showNowLine = filterDate === todayStr && nowMin >= minHour * 60 && nowMin <= maxHour * 60;
+      const nowLineTop = showNowLine ? ((nowMin - minHour * 60) / 60) * hourHeight : 0;
+      
+      // 무대별 분류
+      const byStage = {};
+      stages.forEach(s => byStage[s.id] = []);
+      calendarPgs.forEach(p => { if (byStage[p.stageId]) byStage[p.stageId].push(p); });
+      
+      return (<CC_Card title="🎵 무대 × 시간 공연 일정" sub={`${calendarPgs.length}개 공연 · ${filterDate}`} style={{ marginBottom: 16 }}>
+        <div style={{ overflowX: "auto", overflowY: "hidden", paddingBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `70px repeat(${stages.length}, minmax(220px, 1fr))`, gap: 0, position: "relative", minWidth: 70 + stages.length * 220 }}>
+            {/* 헤더 */}
+            <div style={{ height: 44, position: "sticky", top: 0, zIndex: 4, background: "#14151f", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
+            {stages.map(s => {
+              const sPgs = byStage[s.id] || [];
+              return (<div key={s.id} style={{ height: 44, padding: "10px 12px", background: "linear-gradient(180deg, #1a1d2a, #14151f)", borderBottom: "1px solid rgba(255,255,255,0.08)", borderLeft: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, zIndex: 4, fontSize: 12, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={s.name}>
+                🎤 {s.name}
+                <span style={{ marginLeft: 6, fontSize: 10, color: "#6c6e7d", fontWeight: 600 }}>({sPgs.length})</span>
+                {s.capacity && <span style={{ marginLeft: 6, fontSize: 10, color: "#a980ff", fontWeight: 600 }}>👥{s.capacity}</span>}
+              </div>);
+            })}
+            
+            {/* 시간 라벨 */}
+            <div style={{ position: "relative", height: gridHeight, background: "rgba(0,0,0,0.2)" }}>
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, fontSize: 10, color: "#6c6e7d", fontFamily: "JetBrains Mono", paddingRight: 6, textAlign: "right", transform: "translateY(-6px)" }}>{String(h).padStart(2, "0")}:00</div>))}
+            </div>
+            
+            {/* 각 무대 컬럼 */}
+            {stages.map((s, sIdx) => (<div key={s.id} style={{ position: "relative", height: gridHeight, borderLeft: "1px solid rgba(255,255,255,0.04)" }}>
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, background: h % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)" }} />))}
+              {hourLines.slice(0, -1).map(h => (<div key={`half-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight + 30, height: 1, background: "rgba(255,255,255,0.015)", borderTop: "1px dashed rgba(255,255,255,0.03)" }} />))}
+              
+              {/* 운영시간 라인 */}
+              {showOpStart && <div style={{ position: "absolute", left: 0, right: 0, top: opStartTop, height: 1, background: "#4cd99a", borderTop: "1px dashed #4cd99a", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpStart && sIdx === 0 && <div style={{ position: "absolute", left: 6, top: opStartTop - 18, padding: "2px 8px", borderRadius: 4, background: "rgba(76,217,154,0.15)", border: "1px solid rgba(76,217,154,0.4)", color: "#4cd99a", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🎪 개장 {opStart}</div>}
+              {showOpEnd && <div style={{ position: "absolute", left: 0, right: 0, top: opEndTop, height: 1, background: "#ff9a3c", borderTop: "1px dashed #ff9a3c", opacity: 0.6, zIndex: 3, pointerEvents: "none" }} />}
+              {showOpEnd && sIdx === 0 && <div style={{ position: "absolute", left: 6, top: opEndTop + 4, padding: "2px 8px", borderRadius: 4, background: "rgba(255,154,60,0.15)", border: "1px solid rgba(255,154,60,0.4)", color: "#ff9a3c", fontSize: 10, fontWeight: 700, fontFamily: "JetBrains Mono", zIndex: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>🌙 폐장 {opEnd}</div>}
+              
+              {/* 현재 시각 */}
+              {showNowLine && sIdx === 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none", boxShadow: "0 0 6px #ef535080" }}>
+                <div style={{ position: "absolute", left: -6, top: -4, width: 10, height: 10, borderRadius: 5, background: "#ef5350", boxShadow: "0 0 6px #ef535080" }} />
+              </div>}
+              {showNowLine && sIdx > 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none" }} />}
+              
+              {/* 공연 블록들 */}
+              {(() => {
+                const events = (byStage[s.id] || []).map(p => {
+                  const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                  const [eh, em] = (p.endTime || "00:00").split(":").map(Number);
+                  return { ...p, startMin: sh * 60 + sm, endMin: eh * 60 + em };
+                }).sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+                
+                // 충돌 그룹 + 컬럼 할당
+                const eventCol = {};
+                const eventGroupSize = {};
+                let i = 0;
+                while (i < events.length) {
+                  const group = [events[i]];
+                  let groupEnd = events[i].endMin;
+                  let j = i + 1;
+                  while (j < events.length && events[j].startMin < groupEnd) {
+                    group.push(events[j]);
+                    if (events[j].endMin > groupEnd) groupEnd = events[j].endMin;
+                    j++;
+                  }
+                  const colEnds = [];
+                  group.forEach(e => {
+                    let assigned = -1;
+                    for (let c = 0; c < colEnds.length; c++) {
+                      if (colEnds[c] <= e.startMin) { assigned = c; break; }
+                    }
+                    if (assigned < 0) { assigned = colEnds.length; colEnds.push(0); }
+                    colEnds[assigned] = e.endMin;
+                    eventCol[e.id] = assigned;
+                  });
+                  group.forEach(e => { eventGroupSize[e.id] = colEnds.length; });
+                  i = j;
+                }
+                const MAX_COLS = 2;
+                
+                return events.map(p => {
+                  const col = eventCol[p.id] || 0;
+                  if (col >= MAX_COLS) return null;
+                  const top = ((p.startMin - minHour * 60) / 60) * hourHeight;
+                  const height = Math.max(28, ((p.endMin - p.startMin) / 60) * hourHeight - 2);
+                  
+                  let status = "scheduled";
+                  if (p.pgStatus === "ended") status = "ended";
+                  else if (filterDate === todayStr) {
+                    if (nowMin >= p.startMin && nowMin <= p.endMin) status = "active";
+                    else if (nowMin > p.endMin) status = "ended";
+                  }
+                  const isActive = status === "active";
+                  const isEnded = status === "ended";
+                  
+                  const artist = artists.find(a => a.id === p.artistId);
+                  const groupSize = Math.min(eventGroupSize[p.id] || 1, MAX_COLS);
+                  const widthPercent = 100 / groupSize;
+                  const leftPercent = col * widthPercent;
+                  
+                  // 공연은 보라색 통일
+                  const cBg = "#8e24aa";
+                  const cLight = "rgba(142,36,170,0.2)";
+                  
+                  return (<div key={p.id} title={`${p.time}~${p.endTime} ${p.title}${artist ? ` · ${artist.name}` : ""}`}
+                    style={{ 
+                      position: "absolute",
+                      left: `calc(${leftPercent}% + 3px)`,
+                      width: `calc(${widthPercent}% - 6px)`,
+                      top: top + 1,
+                      height,
+                      padding: height < 36 ? "3px 8px" : "6px 9px",
+                      borderRadius: 6,
+                      background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cBg : cLight,
+                      border: isActive ? `1.5px solid ${cBg}` : `1px solid ${cBg}40`,
+                      borderLeft: `3px solid ${cBg}`,
+                      color: isActive ? "#fff" : isEnded ? "#94A3B8" : "#f4f5fa",
+                      fontSize: 12,
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      transition: "transform 0.15s, box-shadow 0.15s",
+                      opacity: isEnded ? 0.6 : 1,
+                      zIndex: isActive ? 3 : 2,
+                      boxSizing: "border-box"
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 6px 20px ${cBg}60`; e.currentTarget.style.zIndex = "10"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
+                    {height < 36 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
+                        <span style={{ fontFamily: "JetBrains Mono", fontWeight: 700, opacity: 0.9, flexShrink: 0 }}>{p.time}~{p.endTime}</span>
+                        <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.time}~{p.endTime}{isActive && " ●"}
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 50 ? 2 : 1, WebkitBoxOrient: "vertical" }}>{p.title}</div>
+                        {height > 60 && artist && <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🎙️ {artist.name}</div>}
+                      </>
+                    )}
+                  </div>);
+                });
+              })()}
+            </div>))}
+          </div>
+        </div>
+        {/* 범례 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 600 }}>범례:</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: "#8e24aa", borderLeft: "3px solid #8e24aa" }} />
+            <span style={{ fontSize: 11, color: "#94A3B8" }}>공연 ({calendarPgs.length})</span>
+          </div>
+          {opStart && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #4cd99a" }} />
+            <span style={{ fontSize: 11, color: "#94A3B8" }}>🎪 개장 {opStart}</span>
+          </div>}
+          {opEnd && <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 18, height: 0, borderTop: "1.5px dashed #ff9a3c" }} />
+            <span style={{ fontSize: 11, color: "#94A3B8" }}>🌙 폐장 {opEnd}</span>
+          </div>}
+          {showNowLine && <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
+            <span style={{ width: 18, height: 2, background: "#ef5350" }} />
+            <span style={{ fontSize: 11, color: "#94A3B8" }}>현재 시각</span>
+          </div>}
+        </div>
+      </CC_Card>);
+    })()}
 
     {/* 무대별 현황 + 아티스트 목록 */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -3313,6 +3576,7 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
         stages.map(s => {
           const sPgs = stagePrograms.filter(p => p.stageId === s.id);
           const sToday = sPgs.filter(p => p.date === "always" || p.date === todayStr);
+          const sDay = sPgs.filter(p => p.date === "always" || p.date === filterDate);
           const sActive = sToday.find(p => {
             const [sh, sm] = (p.time || "00:00").split(":").map(Number);
             const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
@@ -3325,6 +3589,7 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
             </div>
             {sActive && <div style={{ fontSize: 12, color: "#4cd99a", marginBottom: 6 }}>♪ {sActive.title} ({sActive.time}~{sActive.endTime})</div>}
             <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#6c6e7d" }}>
+              <span>선택일 {sDay.length}회</span>
               <span>오늘 {sToday.length}회</span>
               <span>전체 {sPgs.length}회</span>
               {s.capacity && <span>수용 {s.capacity}명</span>}
@@ -3349,18 +3614,20 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
       </CC_Card>
     </div>
 
-    {/* 오늘의 공연 타임라인 */}
-    <CC_Card title="🎵 오늘의 공연 타임라인" sub={`${todayStagePgs.length}개 공연`}>
-      {todayStagePgs.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>오늘 예정된 공연이 없습니다</div> :
-      todayStagePgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
+    {/* 선택일 공연 타임라인 */}
+    <CC_Card title={`🎵 ${filterDate === todayStr ? "오늘" : filterDate}의 공연 타임라인`} sub={`${dayStagePgs.length}개 공연`}>
+      {dayStagePgs.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 날짜 예정된 공연이 없습니다</div> :
+      dayStagePgs.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(p => {
         const stage = stages.find(s => s.id === p.stageId);
         const artist = artists.find(a => a.id === p.artistId);
         let status = "scheduled", color = "#6b8aff", label = "예정";
         const [sh, sm] = (p.time || "00:00").split(":").map(Number);
         const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
         if (p.pgStatus === "ended") { status = "ended"; color = "#6c6e7d"; label = "종료"; }
-        else if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "공연중"; }
-        else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        else if (filterDate === todayStr) {
+          if (nowMin >= sh*60+sm && nowMin <= eh*60+em) { status = "active"; color = "#4cd99a"; label = "공연중"; }
+          else if (nowMin > eh*60+em) { status = "ended"; color = "#6c6e7d"; label = "종료"; }
+        }
         return (<div key={p.id} style={{ padding: 12, marginBottom: 6, borderRadius: 10, background: status === "active" ? "rgba(76,217,154,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}` }}>
           <div style={{ display: "grid", gridTemplateColumns: "100px 1fr auto auto", gap: 12, alignItems: "center" }}>
             <span className="mono" style={{ fontSize: 13, color, fontWeight: 700 }}>{p.time}~{p.endTime}</span>
