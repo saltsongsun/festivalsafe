@@ -2897,9 +2897,165 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
       </div>
     </CC_Card>
 
+    {/* 📅 캘린더 뷰 (시간 × 장소 그리드) */}
+    {(() => {
+      // 표시할 프로그램 (필터된 + 시간 정보 있는 것만)
+      const calendarPgs = filtered.filter(p => p.time && p.endTime);
+      
+      // 장소(컬럼) 추출 - 위치 또는 구역 기준
+      const locations = [...new Set(calendarPgs.map(p => {
+        if (p.location) return p.location;
+        const z = (settings.zones || []).find(zz => zz.id === p.zoneId);
+        return z?.name || "기타";
+      }))].sort();
+      
+      if (locations.length === 0) return null;
+      
+      // 시간 범위 계산 (모든 프로그램의 최소~최대 시간)
+      let minHour = 9, maxHour = 22;
+      calendarPgs.forEach(p => {
+        const [sh] = (p.time || "00:00").split(":").map(Number);
+        const [eh, em] = (p.endTime || "23:59").split(":").map(Number);
+        if (sh < minHour) minHour = sh;
+        if (eh > maxHour || (eh === maxHour && em > 0)) maxHour = eh + (em > 0 ? 1 : 0);
+      });
+      minHour = Math.max(0, minHour - 1);
+      maxHour = Math.min(24, maxHour + 1);
+      const totalHours = maxHour - minHour;
+      const hourHeight = 60; // 1시간 = 60px
+      const gridHeight = totalHours * hourHeight;
+      
+      // 카테고리별 색상 (구글 캘린더 스타일)
+      const catColors = {
+        "S": { bg: "#1a73e8", light: "rgba(26,115,232,0.2)" },  // 파랑
+        "E": { bg: "#33b679", light: "rgba(51,182,121,0.2)" },  // 초록
+        "P": { bg: "#8e24aa", light: "rgba(142,36,170,0.2)" },  // 보라
+        "O": { bg: "#f4511e", light: "rgba(244,81,30,0.2)" },   // 주황
+      };
+      const getCatColor = (cat) => catColors[cat] || { bg: "#5f6368", light: "rgba(95,99,104,0.2)" };
+      
+      // 시간 라인 생성 (정시마다)
+      const hourLines = [];
+      for (let h = minHour; h <= maxHour; h++) {
+        hourLines.push(h);
+      }
+      
+      // 현재 시간 라인 (오늘 + 시간 범위 안일 때)
+      const todayMatch = filterDate === "today" || filterDate === todayStr;
+      const showNowLine = todayMatch && nowMin >= minHour * 60 && nowMin <= maxHour * 60;
+      const nowLineTop = showNowLine ? ((nowMin - minHour * 60) / 60) * hourHeight : 0;
+      
+      // 장소별로 프로그램 분류
+      const byLoc = {};
+      locations.forEach(loc => byLoc[loc] = []);
+      calendarPgs.forEach(p => {
+        const loc = p.location || (settings.zones || []).find(zz => zz.id === p.zoneId)?.name || "기타";
+        if (byLoc[loc]) byLoc[loc].push(p);
+      });
+      
+      return (<CC_Card title="📅 일정 캘린더" sub={`${calendarPgs.length}개 일정 · 시간 × 장소 뷰`} style={{ marginBottom: 16 }}>
+        <div style={{ overflowX: "auto", overflowY: "hidden", paddingBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `60px repeat(${locations.length}, minmax(180px, 1fr))`, gap: 0, position: "relative", minWidth: 60 + locations.length * 180 }}>
+            {/* 좌상단 빈 칸 + 장소 헤더 */}
+            <div style={{ height: 44, position: "sticky", top: 0, zIndex: 4, background: "#14151f", borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
+            {locations.map(loc => (<div key={loc} style={{ height: 44, padding: "10px 12px", background: "linear-gradient(180deg, #1a1d2a, #14151f)", borderBottom: "1px solid rgba(255,255,255,0.08)", borderLeft: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, zIndex: 4, fontSize: 12, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={loc}>
+              📍 {loc}
+              <span style={{ marginLeft: 6, fontSize: 10, color: "#6c6e7d", fontWeight: 600 }}>({byLoc[loc].length})</span>
+            </div>))}
+
+            {/* 시간 라벨 컬럼 + 그리드 셀들 */}
+            <div style={{ position: "relative", height: gridHeight, background: "rgba(0,0,0,0.2)" }}>
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, fontSize: 10, color: "#6c6e7d", fontFamily: "JetBrains Mono", paddingRight: 6, textAlign: "right", transform: "translateY(-6px)" }}>{String(h).padStart(2, "0")}:00</div>))}
+            </div>
+            
+            {/* 각 장소 컬럼 */}
+            {locations.map((loc, locIdx) => (<div key={loc} style={{ position: "relative", height: gridHeight, borderLeft: "1px solid rgba(255,255,255,0.04)" }}>
+              {/* 시간 라인 (가로 그리드선) */}
+              {hourLines.map(h => (<div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight, height: 1, background: h % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)" }} />))}
+              {/* 30분 라인 */}
+              {hourLines.slice(0, -1).map(h => (<div key={`half-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - minHour) * hourHeight + 30, height: 1, background: "rgba(255,255,255,0.015)", borderTop: "1px dashed rgba(255,255,255,0.03)" }} />))}
+              
+              {/* 현재 시간 라인 */}
+              {showNowLine && locIdx === 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none", boxShadow: "0 0 6px #ef535080" }}>
+                <div style={{ position: "absolute", left: -6, top: -4, width: 10, height: 10, borderRadius: 5, background: "#ef5350", boxShadow: "0 0 6px #ef535080" }} />
+              </div>}
+              {showNowLine && locIdx > 0 && <div style={{ position: "absolute", left: 0, right: 0, top: nowLineTop, height: 2, background: "#ef5350", zIndex: 5, pointerEvents: "none" }} />}
+              
+              {/* 프로그램 블록들 */}
+              {byLoc[loc].map(p => {
+                const [sh, sm] = (p.time || "00:00").split(":").map(Number);
+                const [eh, em] = (p.endTime || "00:00").split(":").map(Number);
+                const startMin = sh * 60 + sm;
+                const endMin = eh * 60 + em;
+                const top = ((startMin - minHour * 60) / 60) * hourHeight;
+                const height = Math.max(28, ((endMin - startMin) / 60) * hourHeight - 2);
+                
+                let status = "scheduled";
+                if (p.pgStatus === "ended") status = "ended";
+                else if (p.date === todayStr || p.date === "always") {
+                  if (nowMin >= startMin && nowMin <= endMin) status = "active";
+                  else if (nowMin > endMin) status = "ended";
+                }
+                
+                const cc = getCatColor(p.category);
+                const isActive = status === "active";
+                const isEnded = status === "ended";
+                
+                return (<div key={p.id} title={`${p.time}~${p.endTime} ${p.title}`}
+                  style={{ 
+                    position: "absolute",
+                    left: 4,
+                    right: 4,
+                    top: top + 1,
+                    height,
+                    padding: "5px 8px",
+                    borderRadius: 6,
+                    background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cc.bg : cc.light,
+                    border: isActive ? `1.5px solid ${cc.bg}` : `1px solid ${cc.bg}40`,
+                    borderLeft: `3px solid ${cc.bg}`,
+                    color: isActive ? "#fff" : isEnded ? "#94A3B8" : "#f4f5fa",
+                    fontSize: 11,
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    transition: "transform 0.15s, box-shadow 0.15s",
+                    opacity: isEnded ? 0.6 : 1,
+                    zIndex: isActive ? 3 : 2
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.02)"; e.currentTarget.style.boxShadow = `0 4px 12px ${cc.bg}50`; e.currentTarget.style.zIndex = "6"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 2, opacity: 0.9 }}>
+                    <span>{p.time}~{p.endTime}</span>
+                    {isActive && <span style={{ width: 5, height: 5, borderRadius: 3, background: "#fff", boxShadow: "0 0 4px #fff", animation: "blink 1.2s infinite", marginLeft: 2 }} />}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 40 ? 2 : 1, WebkitBoxOrient: "vertical" }}>{p.title}</div>
+                  {height > 56 && p.category && <div style={{ marginTop: 3, fontSize: 9, opacity: 0.85 }}>● {p.category}</div>}
+                </div>);
+              })}
+            </div>))}
+          </div>
+        </div>
+        {/* 범례 */}
+        <div style={{ display: "flex", gap: 14, marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 600 }}>범례:</span>
+          {Object.entries(catColors).map(([k, c]) => {
+            const cnt = calendarPgs.filter(p => p.category === k).length;
+            if (cnt === 0) return null;
+            return (<div key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: c.bg, borderLeft: `3px solid ${c.bg}` }} />
+              <span style={{ fontSize: 11, color: "#94A3B8" }}>{k} ({cnt})</span>
+            </div>);
+          })}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
+            <span style={{ width: 18, height: 2, background: "#ef5350" }} />
+            <span style={{ fontSize: 11, color: "#94A3B8" }}>현재 시각</span>
+          </div>
+        </div>
+      </CC_Card>);
+    })()}
+
     {/* 메인: 타임라인 + 상세 (2 컬럼) */}
     <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 16, marginBottom: 16 }}>
-      <CC_Card title="📅 프로그램 일정" sub={`${filtered.length}개 일정`}>
+      <CC_Card title="📅 프로그램 목록" sub={`${filtered.length}개 일정`}>
         <div style={{ maxHeight: 600, overflowY: "auto" }}>
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 조건의 프로그램이 없습니다</div> : 
           filtered.map(p => {
