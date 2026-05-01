@@ -2170,11 +2170,28 @@ function MCC_Monitor({ categories }) {
     {/* 임계값 표 */}
     <div className="mcc-card">
       <div className="mcc-card-title" style={{ marginBottom: 10 }}>임계값</div>
-      {[{ k: "yellow", lbl: "주의 (YELLOW)", c: "#f5c451" }, { k: "orange", lbl: "경계 (ORANGE)", c: "#ff9a3c" }, { k: "red", lbl: "심각 (RED)", c: "#ff5e7e" }].map(t => (<div key={t.k} className="mcc-list-row">
-        <span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />
-        <span style={{ flex: 1, color: "#b0b3c4", fontSize: 13 }}>{t.lbl}</span>
-        <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{cat.thresholds?.[t.k] || "-"} {cat.unit}</span>
-      </div>))}
+      {[
+        { k: "BLUE", lbl: "정상", c: "#4cd99a" },
+        { k: "YELLOW", lbl: "주의", c: "#f5c451" },
+        { k: "ORANGE", lbl: "경계", c: "#ff9a3c" },
+        { k: "RED", lbl: "심각", c: "#ff5e7e" }
+      ].map(t => {
+        const range = cat.thresholds?.[t.k];
+        let display = "-";
+        if (Array.isArray(range) && range.length === 2) {
+          const [from, to] = range;
+          if (to === Infinity || to >= 999999) display = `${from} 이상`;
+          else if (from === 0 || from === undefined) display = `${to} 미만`;
+          else display = `${from} ~ ${to}`;
+        } else if (range !== undefined && range !== null) {
+          display = String(range);
+        }
+        return (<div key={t.k} className="mcc-list-row">
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />
+          <span style={{ flex: 1, color: t.c, fontSize: 13, fontWeight: 600 }}>{t.lbl}</span>
+          <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 13 }}>{display} {cat.unit}</span>
+        </div>);
+      })}
     </div>
 
     {/* 체크리스트 */}
@@ -4438,12 +4455,33 @@ function CC_MonitorPage({ categories, settings, setSettings, session }) {
     </div>
 
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-      <CC_Card title="임계값 표">
+      <CC_Card title="임계값 표" sub="단계별 기준값">
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {[{ k: "yellow", lbl: "주의 (YELLOW)", c: "#f5c451" }, { k: "orange", lbl: "경계 (ORANGE)", c: "#ff9a3c" }, { k: "red", lbl: "심각 (RED)", c: "#ff5e7e" }].map(t => (<div key={t.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#b0b3c4", fontSize: 13 }}><span style={{ width: 8, height: 8, borderRadius: 4, background: t.c }} />{t.lbl}</span>
-            <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{cat.thresholds?.[t.k] || "-"} {cat.unit}</span>
-          </div>))}
+          {[
+            { k: "BLUE", lbl: "정상", c: "#4cd99a" },
+            { k: "YELLOW", lbl: "주의", c: "#f5c451" },
+            { k: "ORANGE", lbl: "경계", c: "#ff9a3c" },
+            { k: "RED", lbl: "심각", c: "#ff5e7e" }
+          ].map(t => {
+            const range = cat.thresholds?.[t.k];
+            let display = "-";
+            if (Array.isArray(range) && range.length === 2) {
+              const [from, to] = range;
+              if (to === Infinity || to >= 999999) display = `${from} 이상`;
+              else if (from === 0 || from === undefined) display = `${to} 미만`;
+              else display = `${from} ~ ${to}`;
+            } else if (range !== undefined && range !== null) {
+              display = String(range);
+            }
+            return (<div key={t.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 10, background: `${t.c}08`, border: `1px solid ${t.c}25` }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 5, background: t.c }} />
+                <span style={{ color: t.c, fontWeight: 700 }}>{t.lbl}</span>
+                <span style={{ color: "#6c6e7d", fontSize: 11 }}>{t.k}</span>
+              </span>
+              <span className="mono" style={{ color: t.c, fontWeight: 700, fontSize: 14 }}>{display} {cat.unit}</span>
+            </div>);
+          })}
         </div>
       </CC_Card>
 
