@@ -3866,6 +3866,85 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     });
   };
   
+  // 개별 근무상태 초기화 (모든 기록 제거)
+  const resetWorkerStatus = (workerId) => {
+    if (!confirm("이 근무자의 근무 상태와 기록을 초기화하시겠습니까?\n(근무 시작/종료 시간, 휴게 기록, 관리자 확인 모두 초기화)")) return;
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        const w = (s.workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          delete w.workStatus;
+          delete w.workStartedAt;
+          delete w.workEndedAt;
+          delete w.breaks;
+          delete w.breakOverride;
+          delete w.breakOverrideBy;
+          delete w.breakOverrideAt;
+          w.onDuty = false;
+          break;
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 전체 근무상태 일괄 초기화
+  const resetAllStatus = () => {
+    if (!confirm(`전체 ${allWorkers.length}명의 근무 상태와 기록을 초기화하시겠습니까?\n(되돌릴 수 없습니다)`)) return;
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      ws.forEach(s => {
+        (s.workers || []).forEach(w => {
+          delete w.workStatus;
+          delete w.workStartedAt;
+          delete w.workEndedAt;
+          delete w.breaks;
+          delete w.breakOverride;
+          delete w.breakOverrideBy;
+          delete w.breakOverrideAt;
+          w.onDuty = false;
+        });
+      });
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 새 근무자 추가
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newWorker, setNewWorker] = useState({ name: "", phone: "", role: "운영", siteId: "_pool", meals: 0 });
+  
+  const addWorker = () => {
+    if (!newWorker.name.trim()) { alert("이름을 입력하세요"); return; }
+    const id = "wkr_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+    let targetSite = newWorker.siteId;
+    
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      let ti = ws.findIndex(s => s.id === targetSite);
+      if (targetSite === "_pool" && ti < 0) {
+        ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
+        ti = ws.length - 1;
+      }
+      if (ti >= 0) {
+        ws[ti].workers = [...(ws[ti].workers || []), {
+          id,
+          name: newWorker.name.trim(),
+          phone: newWorker.phone.trim(),
+          role: newWorker.role,
+          meals: parseInt(newWorker.meals) || 0,
+          mealNote: "",
+          onDuty: false,
+          radios: []
+        }];
+      }
+      return { ...prev, workSites: ws };
+    });
+    
+    setNewWorker({ name: "", phone: "", role: newWorker.role, siteId: newWorker.siteId, meals: 0 });
+    setShowAddModal(false);
+  };
+  
   // 휴게시간 경고 해제 (관리자 확인)
   const overrideBreakWarn = (workerId) => {
     setSettings(prev => {
@@ -4012,7 +4091,9 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
         ].map(f => (
           <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? `1.5px solid ${f.c}` : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? `${f.c}15` : "rgba(255,255,255,0.02)", color: filter === f.k ? f.c : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
         ))}
+        <CC_Btn size="sm" variant="primary" onClick={() => setShowAddModal(true)}>+ 인력 추가</CC_Btn>
         <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
+        <CC_Btn size="sm" variant="ghost" onClick={resetAllStatus}>🔄 전체 초기화</CC_Btn>
       </div>
     </CC_Card>
 
@@ -4264,15 +4345,76 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
             </div>
 
             {/* 근무지 변경 (이동) */}
-            <div>
+            <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 8, fontWeight: 600 }}>근무지 이동</div>
               <select value={w.siteId} onChange={e => { moveWorker(w.id, w.siteId, e.target.value); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0a0b12", color: "#f4f5fa", fontSize: 13 }}>
                 {(settings.workSites || []).map(s => (<option key={s.id} value={s.id}>{s.id === "_pool" ? "⚠️ 미배치 풀 (배치 해제)" : `🏠 ${s.name}`}</option>))}
                 {!(settings.workSites || []).some(s => s.id === "_pool") && <option value="_pool">⚠️ 미배치 풀 (배치 해제)</option>}
               </select>
             </div>
+
+            {/* 근무 상태 초기화 */}
+            <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+              <button onClick={() => { resetWorkerStatus(w.id); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 근무 상태 초기화 (시간/휴게/확인 기록 모두)</button>
+            </div>
           </>);
         })()}
+      </div>
+    </div>}
+    
+    {/* ➕ 인력 추가 모달 */}
+    {showAddModal && <div onClick={() => setShowAddModal(false)} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 500, background: "linear-gradient(180deg, #14151f, #0e0f17)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa" }}>👤 새 인력 추가</div>
+            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>이름은 필수, 다른 항목은 선택</div>
+          </div>
+          <button onClick={() => setShowAddModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+        </div>
+        
+        <div style={{ display: "grid", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>이름 *</div>
+            <input value={newWorker.name} onChange={e => setNewWorker({...newWorker, name: e.target.value})} autoFocus onKeyDown={e => { if (e.key === "Enter") addWorker(); }} placeholder="예: 김철수" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+          </div>
+          
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>연락처</div>
+            <input value={newWorker.phone} onChange={e => setNewWorker({...newWorker, phone: e.target.value.replace(/[^0-9-]/g, "")})} onKeyDown={e => { if (e.key === "Enter") addWorker(); }} placeholder="예: 010-1234-5678" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+          </div>
+          
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>역할</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+              {["운영", "안전", "의료", "교통", "안내", "지원", "관리자", "기타"].map(r => (
+                <button key={r} onClick={() => setNewWorker({...newWorker, role: r})} style={{ padding: "8px", borderRadius: 6, border: newWorker.role === r ? "1.5px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: newWorker.role === r ? "rgba(107,138,255,0.12)" : "rgba(255,255,255,0.02)", color: newWorker.role === r ? "#6b8aff" : "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{r}</button>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>배치 근무지</div>
+            <select value={newWorker.siteId} onChange={e => setNewWorker({...newWorker, siteId: e.target.value})} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0a0b12", color: "#f4f5fa", fontSize: 13 }}>
+              <option value="_pool">⚠️ 미배치 풀 (나중에 배치)</option>
+              {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => (<option key={s.id} value={s.id}>🏠 {s.name}</option>))}
+            </select>
+          </div>
+          
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>식수 (선택)</div>
+            <input type="number" min="0" value={newWorker.meals} onChange={e => setNewWorker({...newWorker, meals: parseInt(e.target.value) || 0})} placeholder="0" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+          </div>
+        </div>
+        
+        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          <button onClick={() => setShowAddModal(false)} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>취소</button>
+          <button onClick={addWorker} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(107,138,255,0.3)" }}>+ 추가하기</button>
+        </div>
+        
+        <div style={{ marginTop: 14, padding: 10, borderRadius: 8, background: "rgba(76,217,154,0.05)", border: "1px solid rgba(76,217,154,0.15)", fontSize: 11, color: "#94A3B8" }}>
+          💡 추가 후에도 카드를 드래그하여 다른 근무지로 이동할 수 있습니다. 계정 발급은 모바일의 사용자 관리에서 가능합니다.
+        </div>
       </div>
     </div>}
   </div>);
