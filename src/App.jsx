@@ -3367,14 +3367,15 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
   const programs = settings.programs || [];
   const todayStr = new Date().toISOString().slice(0, 10);
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  // 공연 필터: 무대에 등록된 공연만 (stageId 있거나 / S 카테고리 / 무대명 location)
-  // ⚠️ P(공식프로그램)은 제외 - 그건 프로그램관리 페이지에서 다룸
+  // 공연 필터: 무대에 명시적으로 배정된 것만
+  // - stageId 있음 (무대 지정) OR
+  // - location에 등록된 무대명이 정확히 포함됨
+  // ⚠️ 카테고리만으로는 판단하지 않음 (전체 프로그램이 S로 분류된 경우 방지)
   const stageNames = stages.map(s => s.name).filter(Boolean);
   const stagePrograms = programs.filter(p => {
-    if (p.stageId) return true;  // 무대 지정된 것
-    if (p.category === "S") return true;  // 공연 카테고리만 (P는 제외)
-    if (p.location && stageNames.some(sn => p.location.includes(sn))) return true;  // 무대명에 등록된 location
-    return false;
+    if (p.stageId) return true;  // ✅ 무대 명시 지정
+    if (p.location && stageNames.length > 0 && stageNames.some(sn => p.location === sn || p.location.includes(sn))) return true;  // ✅ location이 등록된 무대명
+    return false;  // ❌ 그 외는 공연 아님 (장터/체험 등)
   });
   
   // 사용 가능한 날짜 추출
@@ -3426,6 +3427,23 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
     </CC_Card>}
 
     {/* 🎵 무대 × 시간 캘린더 그리드 */}
+    {stagePrograms.length === 0 && stages.length === 0 && <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ padding: "40px 20px", textAlign: "center" }}>
+        <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>🎤</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#b0b3c4", marginBottom: 6 }}>등록된 무대가 없습니다</div>
+        <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 14 }}>모바일 ⚙️관리 → 공연 관리에서 무대를 먼저 등록하세요</div>
+        <CC_Btn size="sm" variant="primary" onClick={() => setCcPage("settings")}>⚙️ 설정으로 이동</CC_Btn>
+      </div>
+    </CC_Card>}
+    
+    {stagePrograms.length === 0 && stages.length > 0 && <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ padding: "30px 20px", textAlign: "center" }}>
+        <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.4 }}>📭</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", marginBottom: 4 }}>무대에 배정된 공연이 없습니다</div>
+        <div style={{ fontSize: 12, color: "#6c6e7d" }}>프로그램 관리에서 공연에 무대를 배정하면 여기에 표시됩니다</div>
+      </div>
+    </CC_Card>}
+    
     {stagePrograms.length > 0 && (() => {
       const calendarPgs = dayStagePgs.filter(p => p.time && p.endTime);
       
@@ -3731,12 +3749,32 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
 function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccounts, setCcPage }) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [selectedWorker, setSelectedWorker] = useState(null); // 근무자 클릭 모달
+  const [touchDragWorker, setTouchDragWorker] = useState(null); // 터치 드래그 중인 근무자 정보
+  const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
+  
   const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, siteId: s.id, zoneId: s.zoneId })));
-  const onDuty = allWorkers.filter(w => w.onDuty);
+  const onDuty = allWorkers.filter(w => w.workStatus === "working" || (w.onDuty && !w.workStatus));
+  const onBreak = allWorkers.filter(w => w.workStatus === "break");
+  const noShow = allWorkers.filter(w => w.workStatus === "noshow");
+  const offDuty = allWorkers.filter(w => w.workStatus === "off");
   const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
   const allRadios = (settings.assets || []).find(a => a.id === "radio")?.units || [];
   const radiosUsed = allRadios.filter(u => u.assignedTo).length;
   const noAccount = allWorkers.filter(w => !w.accountId).length;
+  
+  // 휴게시간 체크: 4시간마다 30분 휴게가 필요. 근무 시작 후 4시간 경과했는데 휴게 기록이 없거나 부족하면 경고
+  const now = Date.now();
+  const needBreakWarning = allWorkers.filter(w => {
+    if (w.workStatus !== "working") return false;  // 근무중인 사람만 체크
+    if (w.breakOverride) return false;  // 관리자 확인 처리됨
+    if (!w.workStartedAt) return false;
+    const workedMs = now - w.workStartedAt;
+    const totalBreakMs = (w.breaks || []).reduce((s, b) => s + ((b.endedAt || now) - b.startedAt), 0);
+    const required4h = Math.floor(workedMs / (4 * 60 * 60 * 1000));  // 4시간마다 1회
+    const requiredBreakMs = required4h * 30 * 60 * 1000;  // 30분씩
+    return required4h >= 1 && totalBreakMs < requiredBreakMs;
+  });
 
   // 역할별 분류
   const byRole = {};
@@ -3744,9 +3782,12 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
 
   // 필터링
   let filtered = allWorkers;
-  if (filter === "onduty") filtered = filtered.filter(w => w.onDuty);
+  if (filter === "working") filtered = filtered.filter(w => w.workStatus === "working" || (w.onDuty && !w.workStatus));
+  else if (filter === "break") filtered = filtered.filter(w => w.workStatus === "break");
+  else if (filter === "noshow") filtered = filtered.filter(w => w.workStatus === "noshow");
+  else if (filter === "off") filtered = filtered.filter(w => w.workStatus === "off");
+  else if (filter === "warn") filtered = needBreakWarning;
   else if (filter === "noacc") filtered = filtered.filter(w => !w.accountId);
-  else if (filter === "noradio") filtered = filtered.filter(w => !(w.radios || []).length);
   else if (filter !== "all" && filter.startsWith("site:")) filtered = filtered.filter(w => w.siteId === filter.slice(5));
   if (search) {
     const q = search.toLowerCase();
@@ -3754,85 +3795,275 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
   }
 
   const exportCSV = () => {
-    const rows = [["이름", "연락처", "역할", "근무지", "식수", "메모", "근무상태"]];
-    allWorkers.forEach(w => rows.push([w.name, w.phone || "", w.role || "", w.siteName, w.meals || 0, w.mealNote || "", w.onDuty ? "근무중" : "-"]));
+    const rows = [["이름", "연락처", "역할", "근무지", "근무상태", "식수", "메모"]];
+    const statusLabel = { working: "근무중", break: "휴식중", noshow: "노쇼", off: "퇴근" };
+    allWorkers.forEach(w => rows.push([w.name, w.phone || "", w.role || "", w.siteName, statusLabel[w.workStatus] || "-", w.meals || 0, w.mealNote || ""]));
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `근무자_${new Date().toISOString().slice(0,10)}.csv`; a.click();
   };
+  
+  // 근무자 이동 (사이트 간)
+  const moveWorker = (workerId, fromSiteId, toSiteId) => {
+    if (!workerId || fromSiteId === toSiteId) return;
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      const fi = ws.findIndex(s => s.id === fromSiteId);
+      let ti = ws.findIndex(s => s.id === toSiteId);
+      // 미배치 풀이 없으면 생성
+      if (toSiteId === "_pool" && ti < 0) {
+        ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] });
+        ti = ws.length - 1;
+      }
+      if (fi >= 0 && ti >= 0) {
+        const w = (ws[fi].workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== workerId) };
+          ws[ti] = { ...ws[ti], workers: [...(ws[ti].workers || []), w] };
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 근무 상태 변경
+  const setWorkerStatus = (workerId, status) => {
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        const w = (s.workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          const oldStatus = w.workStatus || (w.onDuty ? "working" : null);
+          w.workStatus = status;
+          w.onDuty = status === "working";
+          
+          // 상태 전환 처리
+          if (status === "working" && oldStatus !== "working") {
+            if (!w.workStartedAt) w.workStartedAt = Date.now();
+            // 휴식중에서 복귀 → 마지막 break 닫기
+            if (oldStatus === "break" && w.breaks && w.breaks.length > 0) {
+              const lastBreak = w.breaks[w.breaks.length - 1];
+              if (!lastBreak.endedAt) lastBreak.endedAt = Date.now();
+            }
+          } else if (status === "break") {
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now() });
+          } else if (status === "off") {
+            // 퇴근 → 진행중 break 닫기 + 누적 시간 보존
+            if (w.breaks && w.breaks.length > 0) {
+              const lastBreak = w.breaks[w.breaks.length - 1];
+              if (!lastBreak.endedAt) lastBreak.endedAt = Date.now();
+            }
+            w.workEndedAt = Date.now();
+          } else if (status === "noshow") {
+            w.workStartedAt = null;  // 노쇼는 시작 안 함
+            w.breaks = [];
+          }
+          break;
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 휴게시간 경고 해제 (관리자 확인)
+  const overrideBreakWarn = (workerId) => {
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        const w = (s.workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          w.breakOverride = true;
+          w.breakOverrideBy = session?.name || "?";
+          w.breakOverrideAt = Date.now();
+          break;
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  const removeBreakOverride = (workerId) => {
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        const w = (s.workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          delete w.breakOverride;
+          delete w.breakOverrideBy;
+          delete w.breakOverrideAt;
+          break;
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 터치 드래그 시작
+  const handleTouchStart = (worker, e) => {
+    const touch = e.touches[0];
+    setTouchDragWorker(worker);
+    setTouchPos({ x: touch.clientX, y: touch.clientY });
+  };
+  
+  // 터치 드래그 이동
+  const handleTouchMove = (e) => {
+    if (!touchDragWorker) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    setTouchPos({ x: touch.clientX, y: touch.clientY });
+    
+    // 드롭 영역 하이라이트
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dropZone = el?.closest("[data-drop-site]");
+    document.querySelectorAll("[data-drop-site]").forEach(el => {
+      if (el === dropZone) {
+        el.style.background = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.18)" : "rgba(76,217,154,0.1)";
+        el.style.borderColor = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.5)" : "rgba(76,217,154,0.5)";
+      } else {
+        el.style.background = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.06)" : "rgba(255,255,255,0.02)";
+        el.style.borderColor = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.2)" : "rgba(255,255,255,0.06)";
+      }
+    });
+  };
+  
+  // 터치 드래그 종료
+  const handleTouchEnd = (e) => {
+    if (!touchDragWorker) return;
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dropZone = el?.closest("[data-drop-site]");
+    
+    // 모든 하이라이트 제거
+    document.querySelectorAll("[data-drop-site]").forEach(el => {
+      el.style.background = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.06)" : "rgba(255,255,255,0.02)";
+      el.style.borderColor = el.dataset.dropSite === "_pool" ? "rgba(255,154,60,0.2)" : "rgba(255,255,255,0.06)";
+    });
+    
+    if (dropZone) {
+      const toSiteId = dropZone.dataset.dropSite;
+      moveWorker(touchDragWorker.id, touchDragWorker.siteId, toSiteId);
+    }
+    setTouchDragWorker(null);
+  };
 
-  return (<div>
-    {/* KPI 6개 */}
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
+  return (<div onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+    {/* 터치 드래그 중인 근무자 미리보기 */}
+    {touchDragWorker && <div style={{ 
+      position: "fixed", 
+      left: touchPos.x - 60, 
+      top: touchPos.y - 20,
+      pointerEvents: "none",
+      zIndex: 9999,
+      padding: "8px 14px",
+      borderRadius: 999,
+      background: "rgba(107,138,255,0.95)",
+      border: "1.5px solid #8fa6ff",
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.5)"
+    }}>
+      📌 {touchDragWorker.name}
+    </div>}
+    
+    {/* KPI 7개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10, marginBottom: 16 }}>
       {[
         { label: "총 인력", value: allWorkers.length, color: "#6b8aff", icon: "👥" },
         { label: "근무중", value: onDuty.length, sub: `${allWorkers.length > 0 ? Math.round(onDuty.length/allWorkers.length*100) : 0}%`, color: "#4cd99a", icon: "🟢" },
-        { label: "근무지", value: (settings.workSites || []).filter(s=>s.id!=="_pool" && (s.workers||[]).length>0).length, color: "#a980ff", icon: "🏠" },
-        { label: "무전기 분배", value: `${radiosUsed}/${allRadios.length}`, color: "#f5c451", icon: "📻" },
-        { label: "총 식수", value: totalMeals, sub: "식", color: "#FF7043", icon: "🍱" },
-        { label: "계정 미발급", value: noAccount, color: noAccount > 0 ? "#ff5e7e" : "#4cd99a", icon: "🔑" },
-      ].map(k => (<div key={k.label} style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><span style={{ fontSize: 14 }}>{k.icon}</span><span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span></div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
-          {k.sub && <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>}
+        { label: "휴식중", value: onBreak.length, color: "#42A5F5", icon: "☕" },
+        { label: "노쇼", value: noShow.length, color: noShow.length > 0 ? "#ff5e7e" : "#6c6e7d", icon: "🚫" },
+        { label: "퇴근", value: offDuty.length, color: "#a980ff", icon: "🚪" },
+        { label: "휴게 필요", value: needBreakWarning.length, sub: needBreakWarning.length > 0 ? "확인 요" : "정상", color: needBreakWarning.length > 0 ? "#ff9a3c" : "#4cd99a", icon: "⚠️" },
+        { label: "무전기", value: `${radiosUsed}/${allRadios.length}`, color: "#f5c451", icon: "📻" },
+      ].map(k => (<div key={k.label} style={{ padding: "12px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}><span style={{ fontSize: 13 }}>{k.icon}</span><span style={{ fontSize: 10, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          {k.sub && <span style={{ fontSize: 10, color: "#6c6e7d" }}>{k.sub}</span>}
         </div>
       </div>))}
     </div>
+
+    {/* 휴게시간 경고 배너 */}
+    {needBreakWarning.length > 0 && <CC_Card tinted style={{ marginBottom: 16, border: "1px solid rgba(255,154,60,0.3)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: 4 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,154,60,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, animation: "blink 1.5s infinite" }}>⚠️</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#ff9a3c" }}>휴게시간 점검 필요 - {needBreakWarning.length}명</div>
+          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>4시간 근무 시 30분 휴게 의무. 휴게 부족자: {needBreakWarning.slice(0, 3).map(w => w.name).join(", ")}{needBreakWarning.length > 3 ? ` 외 ${needBreakWarning.length - 3}명` : ""}</div>
+        </div>
+        <CC_Btn size="sm" variant="primary" onClick={() => setFilter("warn")}>대상자 보기</CC_Btn>
+      </div>
+    </CC_Card>}
 
     {/* 필터 + 검색 */}
     <CC_Card style={{ marginBottom: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·연락처·역할" style={{ flex: 1, minWidth: 200, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13 }} />
         {[
-          { k: "all", l: `전체 (${allWorkers.length})` },
-          { k: "onduty", l: `근무중 (${onDuty.length})` },
-          { k: "noacc", l: `계정없음 (${noAccount})` },
-          { k: "noradio", l: `무전기없음` },
+          { k: "all", l: `전체 ${allWorkers.length}`, c: "#6b8aff" },
+          { k: "working", l: `🟢 근무중 ${onDuty.length}`, c: "#4cd99a" },
+          { k: "break", l: `☕ 휴식 ${onBreak.length}`, c: "#42A5F5" },
+          { k: "noshow", l: `🚫 노쇼 ${noShow.length}`, c: "#ff5e7e" },
+          { k: "off", l: `🚪 퇴근 ${offDuty.length}`, c: "#a980ff" },
+          { k: "warn", l: `⚠️ 휴게필요 ${needBreakWarning.length}`, c: "#ff9a3c" },
         ].map(f => (
-          <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? "1px solid #6b8aff" : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? "rgba(107,138,255,0.15)" : "rgba(255,255,255,0.02)", color: filter === f.k ? "#6b8aff" : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
+          <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? `1.5px solid ${f.c}` : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? `${f.c}15` : "rgba(255,255,255,0.02)", color: filter === f.k ? f.c : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
         ))}
         <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
       </div>
     </CC_Card>
 
-    {/* 메인: 좌측 인력 풀 + 우측 근무지 그리드 (드래그앤드롭) */}
+    {/* 메인: 좌측 인력 풀 + 우측 근무지 그리드 (드래그앤드롭 + 터치) */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 16 }}>
-      {/* 좌측: 인력 목록 (드래그 소스) */}
-      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명 · 드래그하여 근무지에 배치`}>
+      {/* 좌측: 인력 목록 */}
+      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명 · 드래그/탭하여 배치, 클릭하여 상태 변경`}>
         <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
-          filtered.map(w => (<div key={w.id}
-            draggable
-            onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
-            onDragEnd={e => { e.currentTarget.style.opacity = "1"; }}
-            style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto auto 1fr auto auto", gap: 10, alignItems: "center", cursor: "grab", transition: "background 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(107,138,255,0.06)"}
-            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}>
-            <span style={{ fontSize: 13, color: "#6c6e7d", cursor: "grab" }} title="드래그하여 이동">⠿</span>
-            <span style={{ width: 8, height: 8, borderRadius: 4, background: w.onDuty ? "#4cd99a" : "#556" }} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
-                {w.role && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
-                {w.accountId && <span style={{ fontSize: 10, color: "#42A5F5" }}>🔑</span>}
+          filtered.map(w => {
+            const status = w.workStatus || (w.onDuty ? "working" : null);
+            const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#556";
+            const stLabel = status === "working" ? "근무" : status === "break" ? "휴식" : status === "noshow" ? "노쇼" : status === "off" ? "퇴근" : "대기";
+            const needWarn = needBreakWarning.find(nw => nw.id === w.id);
+            return (<div key={w.id}
+              draggable
+              onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
+              onDragEnd={e => { e.currentTarget.style.opacity = "1"; }}
+              onTouchStart={e => handleTouchStart(w, e)}
+              onClick={(e) => {
+                // 드래그 안 한 클릭만 모달 열기
+                if (!touchDragWorker) setSelectedWorker(w);
+              }}
+              style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: needWarn ? "rgba(255,154,60,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${needWarn ? "rgba(255,154,60,0.3)" : "rgba(255,255,255,0.04)"}`, display: "grid", gridTemplateColumns: "auto auto 1fr auto", gap: 10, alignItems: "center", cursor: "pointer", transition: "background 0.15s", touchAction: "none", userSelect: "none" }}>
+              <span style={{ fontSize: 13, color: "#6c6e7d" }} title="드래그">⠿</span>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: stColor }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>{w.name}</span>
+                  {w.role && <span style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(0,150,136,0.1)", color: "#009688", fontSize: 10, fontWeight: 600 }}>{w.role}</span>}
+                  <span style={{ padding: "2px 6px", borderRadius: 4, background: `${stColor}15`, color: stColor, fontSize: 10, fontWeight: 700 }}>{stLabel}</span>
+                  {needWarn && !w.breakOverride && <span style={{ fontSize: 11, color: "#ff9a3c", animation: "blink 1.5s infinite" }} title="휴게시간 부족">⚠️</span>}
+                  {w.breakOverride && <span style={{ fontSize: 10, color: "#94A3B8" }} title={`확인: ${w.breakOverrideBy}`}>✓확인</span>}
+                </div>
+                <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName}</div>
               </div>
-              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName} {w.phone && `· ${w.phone}`}</div>
-            </div>
-            <span className="mono" style={{ fontSize: 11, color: "#FF7043" }}>🍱 {w.meals || 0}</span>
-            {(w.radios || []).length > 0 && <span className="mono" style={{ fontSize: 11, color: "#a980ff" }}>📻 {w.radios.length}</span>}
-          </div>))}
+              <span style={{ fontSize: 10, color: "#6c6e7d" }}>›</span>
+            </div>);
+          })}
         </div>
       </CC_Card>
 
-      {/* 우측: 근무지 그리드 (드롭 영역) */}
-      <CC_Card title="🏠 근무지별 배치" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지 · 여기에 드롭`}>
+      {/* 우측: 근무지 그리드 */}
+      <CC_Card title="🏠 근무지별 배치" sub={`${(settings.workSites || []).filter(s=>s.id!=="_pool").length}개 근무지 · 드래그/탭하여 드롭`}>
         <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
-          {/* 미배치 풀 - 상단에 강조 */}
+          {/* 미배치 풀 */}
           {(() => {
             const pool = (settings.workSites || []).find(s => s.id === "_pool");
             const poolCount = (pool?.workers || []).length;
             return (<div
+              data-drop-site="_pool"
               onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(255,154,60,0.18)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.5)"; }}
               onDragLeave={e => { e.currentTarget.style.background = "rgba(255,154,60,0.06)"; e.currentTarget.style.borderColor = "rgba(255,154,60,0.2)"; }}
               onDrop={e => { 
@@ -3842,32 +4073,21 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                 const wid = e.dataTransfer.getData("workerId"); 
                 const from = e.dataTransfer.getData("fromSite"); 
                 if (!wid || from === "_pool") return;
-                setSettings(prev => {
-                  const ws = JSON.parse(JSON.stringify(prev.workSites || []));
-                  const fi = ws.findIndex(s => s.id === from);
-                  let pi = ws.findIndex(s => s.id === "_pool");
-                  if (pi < 0) { ws.push({ id: "_pool", name: "미배치", zoneId: null, status: "standby", workers: [] }); pi = ws.length - 1; }
-                  if (fi >= 0) {
-                    const w = (ws[fi].workers || []).find(ww => ww.id === wid);
-                    if (w) {
-                      ws[fi] = { ...ws[fi], workers: ws[fi].workers.filter(ww => ww.id !== wid) };
-                      ws[pi] = { ...ws[pi], workers: [...(ws[pi].workers || []), w] };
-                    }
-                  }
-                  return { ...prev, workSites: ws };
-                });
+                moveWorker(wid, from, "_pool");
               }}
               style={{ padding: 12, marginBottom: 10, borderRadius: 10, background: "rgba(255,154,60,0.06)", border: "1.5px dashed rgba(255,154,60,0.2)", transition: "all 0.15s" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: poolCount > 0 ? 8 : 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>⚠️ 미배치 풀</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>⚠️ 미배치 풀 (배치 해제 영역)</span>
                 <span className="mono" style={{ fontSize: 12, color: "#ff9a3c", fontWeight: 700 }}>{poolCount}명</span>
               </div>
               {poolCount > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                 {(pool.workers || []).slice(0, 12).map(w => (<span key={w.id}
                   draggable
                   onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", "_pool"); }}
-                  style={{ padding: "3px 8px", borderRadius: 999, background: "rgba(255,154,60,0.12)", border: "1px solid rgba(255,154,60,0.25)", color: "#ff9a3c", fontSize: 11, fontWeight: 600, cursor: "grab" }}>{w.name}</span>))}
-                {poolCount > 12 && <span style={{ padding: "3px 8px", color: "#6c6e7d", fontSize: 11 }}>+{poolCount - 12}</span>}
+                  onTouchStart={e => { e.stopPropagation(); handleTouchStart({ ...w, siteId: "_pool" }, e); }}
+                  onClick={(e) => { e.stopPropagation(); if (!touchDragWorker) setSelectedWorker({ ...w, siteId: "_pool", siteName: "미배치" }); }}
+                  style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(255,154,60,0.12)", border: "1px solid rgba(255,154,60,0.25)", color: "#ff9a3c", fontSize: 11, fontWeight: 600, cursor: "pointer", touchAction: "none", userSelect: "none" }}>{w.name}</span>))}
+                {poolCount > 12 && <span style={{ padding: "4px 10px", color: "#6c6e7d", fontSize: 11 }}>+{poolCount - 12}</span>}
               </div>}
               {poolCount === 0 && <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "4px 0" }}>여기로 드래그하면 배치 해제됩니다</div>}
             </div>);
@@ -3877,10 +4097,13 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {(settings.workSites || []).filter(s => s.id !== "_pool").map(s => {
               const ws = s.workers || [];
-              const onD = ws.filter(w => w.onDuty).length;
+              const onDinSite = ws.filter(w => (w.workStatus === "working") || (w.onDuty && !w.workStatus)).length;
+              const onBreakInSite = ws.filter(w => w.workStatus === "break").length;
               const meals = ws.reduce((sum, w) => sum + (w.meals || 0), 0);
               const zone = (settings.zones || []).find(z => z.id === s.zoneId);
+              const hasWarn = ws.some(w => needBreakWarning.find(nw => nw.id === w.id));
               return (<div key={s.id}
+                data-drop-site={s.id}
                 onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = "rgba(76,217,154,0.1)"; e.currentTarget.style.borderColor = "rgba(76,217,154,0.5)"; }}
                 onDragLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
                 onDrop={e => { 
@@ -3890,41 +4113,42 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                   const wid = e.dataTransfer.getData("workerId"); 
                   const from = e.dataTransfer.getData("fromSite"); 
                   if (!wid || from === s.id) return;
-                  setSettings(prev => {
-                    const wss = JSON.parse(JSON.stringify(prev.workSites || []));
-                    const fi = wss.findIndex(x => x.id === from);
-                    const ti = wss.findIndex(x => x.id === s.id);
-                    if (fi >= 0 && ti >= 0) {
-                      const w = (wss[fi].workers || []).find(ww => ww.id === wid);
-                      if (w) {
-                        wss[fi] = { ...wss[fi], workers: wss[fi].workers.filter(ww => ww.id !== wid) };
-                        wss[ti] = { ...wss[ti], workers: [...(wss[ti].workers || []), w] };
-                      }
-                    }
-                    return { ...prev, workSites: wss };
-                  });
+                  moveWorker(wid, from, s.id);
                 }}
-                style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1.5px dashed rgba(255,255,255,0.06)", minHeight: 100, transition: "all 0.15s" }}>
+                style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1.5px dashed ${hasWarn ? "rgba(255,154,60,0.3)" : "rgba(255,255,255,0.06)"}`, minHeight: 100, transition: "all 0.15s" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}</span>
-                  <span className="mono" style={{ fontSize: 12, color: "#6b8aff", fontWeight: 700, flexShrink: 0 }}>{onD}/{ws.length}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏠 {s.name}{hasWarn && <span style={{ marginLeft: 6, color: "#ff9a3c" }}>⚠️</span>}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "#6b8aff", fontWeight: 700, flexShrink: 0 }}>{onDinSite}/{ws.length}</span>
                 </div>
                 <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#6c6e7d", marginBottom: 6 }}>
                   {zone && <span>📍 {zone.name}</span>}
-                  {meals > 0 && <span>🍱 {meals}식</span>}
+                  {onBreakInSite > 0 && <span style={{ color: "#42A5F5" }}>☕ {onBreakInSite}</span>}
+                  {meals > 0 && <span>🍱 {meals}</span>}
                 </div>
                 {ws.length === 0 ? (
-                  <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "12px 0", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: 6 }}>여기에 드래그</div>
+                  <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center", padding: "12px 0", border: "1px dashed rgba(255,255,255,0.05)", borderRadius: 6 }}>여기에 드래그/탭</div>
                 ) : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {ws.map(w => (<span key={w.id}
-                      draggable
-                      onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
-                      title={`${w.name} ${w.role || ""} ${w.phone || ""} (드래그하여 이동)`}
-                      style={{ padding: "3px 8px", borderRadius: 999, background: w.onDuty ? "rgba(76,217,154,0.12)" : "rgba(107,138,255,0.1)", border: `1px solid ${w.onDuty ? "rgba(76,217,154,0.3)" : "rgba(107,138,255,0.2)"}`, color: w.onDuty ? "#4cd99a" : "#8fa6ff", fontSize: 11, fontWeight: 600, cursor: "grab", whiteSpace: "nowrap" }}>
-                      {w.onDuty && "● "}{w.name}
-                      {w.role && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 10 }}>({w.role})</span>}
-                    </span>))}
+                    {ws.map(w => {
+                      const status = w.workStatus || (w.onDuty ? "working" : null);
+                      const wColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#6b8aff";
+                      const wBg = status === "working" ? "rgba(76,217,154,0.12)" : status === "break" ? "rgba(66,165,245,0.12)" : status === "noshow" ? "rgba(255,94,126,0.12)" : status === "off" ? "rgba(169,128,255,0.12)" : "rgba(107,138,255,0.1)";
+                      const isWarn = needBreakWarning.find(nw => nw.id === w.id);
+                      return (<span key={w.id}
+                        draggable
+                        onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
+                        onTouchStart={e => { e.stopPropagation(); handleTouchStart({ ...w, siteId: s.id, siteName: s.name }, e); }}
+                        onClick={(e) => { e.stopPropagation(); if (!touchDragWorker) setSelectedWorker({ ...w, siteId: s.id, siteName: s.name }); }}
+                        title={`${w.name} ${w.role || ""} ${w.phone || ""} (탭/드래그)`}
+                        style={{ padding: "4px 10px", borderRadius: 999, background: wBg, border: `1px solid ${wColor}30`, color: wColor, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", touchAction: "none", userSelect: "none" }}>
+                        {status === "break" && "☕ "}
+                        {status === "noshow" && "🚫 "}
+                        {status === "off" && "🚪 "}
+                        {status === "working" && "● "}
+                        {w.name}
+                        {isWarn && !w.breakOverride && <span style={{ marginLeft: 3, color: "#ff9a3c" }}>⚠️</span>}
+                      </span>);
+                    })}
                   </div>
                 )}
               </div>);
@@ -3934,7 +4158,7 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       </CC_Card>
     </div>
 
-    {/* 보조: 역할별 분포 */}
+    {/* 역할별 분포 */}
     <CC_Card title="📊 역할별 분포" sub={`${Object.keys(byRole).length}개 역할`} style={{ marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         {Object.keys(byRole).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>역할 미지정</div> :
@@ -3958,13 +4182,102 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18 }}>💡</span>
-          <span style={{ fontSize: 13, color: "#94A3B8" }}>인력을 근무지로 드래그하여 즉시 배치할 수 있습니다. 상세 정보 편집(이름·연락처·계정)은 모바일에서 사용 가능</span>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>드래그(데스크탑) / 길게 누르고 이동(태블릿) / 클릭하여 상태 변경. 4시간 근무 시 30분 휴게 의무.</span>
         </div>
         <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("settings")}>⚙️ 설정으로 →</CC_Btn>
       </div>
     </CC_Card>
+
+    {/* 🧑 근무자 상세 모달 */}
+    {selectedWorker && <div onClick={() => setSelectedWorker(null)} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 540, maxHeight: "90vh", overflow: "auto", background: "linear-gradient(180deg, #14151f, #0e0f17)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+        {(() => {
+          const w = allWorkers.find(x => x.id === selectedWorker.id) || selectedWorker;
+          const status = w.workStatus || (w.onDuty ? "working" : null);
+          const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#6c6e7d";
+          const stLabel = status === "working" ? "🟢 근무중" : status === "break" ? "☕ 휴식중" : status === "noshow" ? "🚫 노쇼" : status === "off" ? "🚪 퇴근" : "⏳ 대기";
+          const isWarn = needBreakWarning.find(nw => nw.id === w.id);
+          
+          // 근무 시간 계산
+          const totalWorkMs = w.workStartedAt ? (w.workEndedAt || Date.now()) - w.workStartedAt : 0;
+          const workH = Math.floor(totalWorkMs / 3600000);
+          const workM = Math.floor((totalWorkMs % 3600000) / 60000);
+          const totalBreakMs = (w.breaks || []).reduce((s, b) => s + ((b.endedAt || Date.now()) - b.startedAt), 0);
+          const breakH = Math.floor(totalBreakMs / 3600000);
+          const breakM = Math.floor((totalBreakMs % 3600000) / 60000);
+          
+          return (<>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: "#f4f5fa" }}>{w.name}</span>
+                  {w.role && <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(0,150,136,0.12)", color: "#009688", fontSize: 11, fontWeight: 700 }}>{w.role}</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#94A3B8" }}>📍 {w.siteName} {w.phone && `· `}{w.phone && <a href={`tel:${w.phone}`} style={{ color: "#6b8aff", textDecoration: "none" }}>{w.phone}</a>}</div>
+              </div>
+              <button onClick={() => setSelectedWorker(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+            </div>
+
+            {/* 현재 상태 */}
+            <div style={{ padding: 14, borderRadius: 12, background: `${stColor}10`, border: `1px solid ${stColor}30`, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 5, background: stColor, boxShadow: `0 0 8px ${stColor}` }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: stColor }}>{stLabel}</span>
+              </div>
+              {totalWorkMs > 0 && <div style={{ marginTop: 8, fontSize: 12, color: "#94A3B8", display: "flex", gap: 14 }}>
+                <span>⏱ 근무: <span className="mono" style={{ color: "#f4f5fa", fontWeight: 600 }}>{workH}h {workM}m</span></span>
+                <span>☕ 휴게: <span className="mono" style={{ color: "#f4f5fa", fontWeight: 600 }}>{breakH}h {breakM}m</span></span>
+              </div>}
+            </div>
+
+            {/* 휴게시간 경고 */}
+            {isWarn && !w.breakOverride && <div style={{ padding: 12, borderRadius: 10, background: "rgba(255,154,60,0.1)", border: "1px solid rgba(255,154,60,0.3)", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>휴게시간 부족 - 관리자 확인 필요</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10 }}>4시간 근무 시 30분 휴게 의무. 현재 누적 휴게: {breakH}h {breakM}m</div>
+              <button onClick={() => overrideBreakWarn(w.id)} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.4)", background: "rgba(255,154,60,0.15)", color: "#ff9a3c", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✓ 관리자 확인 (경고 해제)</button>
+            </div>}
+            
+            {w.breakOverride && <div style={{ padding: 12, borderRadius: 10, background: "rgba(94,150,150,0.08)", border: "1px solid rgba(94,150,150,0.25)", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 12, color: "#94A3B8" }}>✓ 관리자 확인됨: {w.breakOverrideBy} ({w.breakOverrideAt ? new Date(w.breakOverrideAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : ""})</div>
+              <button onClick={() => removeBreakOverride(w.id)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>해제</button>
+            </div>}
+
+            {/* 상태 변경 버튼 */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 8, fontWeight: 600 }}>근무 상태 변경</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  { k: "working", l: "🟢 근무 시작/복귀", c: "#4cd99a" },
+                  { k: "break", l: "☕ 휴식 시작", c: "#42A5F5" },
+                  { k: "off", l: "🚪 퇴근", c: "#a980ff" },
+                  { k: "noshow", l: "🚫 노쇼 처리", c: "#ff5e7e" },
+                ].map(s => {
+                  const isActive = status === s.k;
+                  return (<button key={s.k} onClick={() => setWorkerStatus(w.id, s.k)} disabled={isActive} style={{ padding: "12px", borderRadius: 10, border: isActive ? `1.5px solid ${s.c}` : "1px solid rgba(255,255,255,0.1)", background: isActive ? `${s.c}15` : "rgba(255,255,255,0.03)", color: isActive ? s.c : "#b0b3c4", fontSize: 13, fontWeight: 700, cursor: isActive ? "default" : "pointer", opacity: isActive ? 0.7 : 1 }}>
+                    {s.l}{isActive && " (현재)"}
+                  </button>);
+                })}
+              </div>
+            </div>
+
+            {/* 근무지 변경 (이동) */}
+            <div>
+              <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 8, fontWeight: 600 }}>근무지 이동</div>
+              <select value={w.siteId} onChange={e => { moveWorker(w.id, w.siteId, e.target.value); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0a0b12", color: "#f4f5fa", fontSize: 13 }}>
+                {(settings.workSites || []).map(s => (<option key={s.id} value={s.id}>{s.id === "_pool" ? "⚠️ 미배치 풀 (배치 해제)" : `🏠 ${s.name}`}</option>))}
+                {!(settings.workSites || []).some(s => s.id === "_pool") && <option value="_pool">⚠️ 미배치 풀 (배치 해제)</option>}
+              </select>
+            </div>
+          </>);
+        })()}
+      </div>
+    </div>}
   </div>);
 }
+
 
 function ControlCenterDashboard({ session, accounts, setAccounts, settings, setSettings, categories, setCategories, alerts, setAlerts, smsLog, setSmsLog, onLogout, onMobileSwitch, onNav, setActiveAlert, onAction }) {
   const [ccPage, setCcPage] = useState("dashboard");
