@@ -3069,7 +3069,7 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                         width: `calc(${widthPercent}% - 6px)`,
                         top: top + 1,
                         height,
-                        padding: "6px 9px",
+                        padding: height < 36 ? "3px 8px" : "6px 9px",
                         borderRadius: 6,
                         background: isEnded ? "rgba(95,99,104,0.25)" : isActive ? cc.bg : cc.light,
                         border: isActive ? `1.5px solid ${cc.bg}` : `1px solid ${cc.bg}40`,
@@ -3085,26 +3085,36 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                       }}
                       onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 6px 20px ${cc.bg}60`; e.currentTarget.style.zIndex = "10"; }}
                       onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.zIndex = isActive ? "3" : "2"; }}>
-                      <div style={{ fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {p.time}~{p.endTime}{isActive && " ●"}
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 50 ? 3 : height > 30 ? 2 : 1, WebkitBoxOrient: "vertical" }}>{p.title}</div>
-                      {height > 70 && p.category && groupSize === 1 && <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85 }}>● {p.category}</div>}
+                      {height < 36 ? (
+                        // 작은 블록: 한 줄에 시간 + 제목
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ fontFamily: "JetBrains Mono", fontWeight: 700, opacity: 0.9, flexShrink: 0 }}>{p.time}~{p.endTime}</span>
+                          <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 10, fontFamily: "JetBrains Mono", fontWeight: 700, marginBottom: 3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {p.time}~{p.endTime}{isActive && " ●"}
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: height > 50 ? 3 : 2, WebkitBoxOrient: "vertical" }}>{p.title}</div>
+                          {height > 70 && p.category && groupSize === 1 && <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85 }}>● {p.category}</div>}
+                        </>
+                      )}
                     </div>);
                   })}
                   
                   {/* "+N개 더보기" 배지 (가려진 이벤트가 있을 때) */}
                   {Object.values(hiddenInfo).map(h => {
                     const top = ((h.startMin - minHour * 60) / 60) * hourHeight;
-                    const tooltipText = h.ids.map(id => {
-                      const ev = events.find(e => e.id === id);
-                      return ev ? `${ev.time}~${ev.endTime} ${ev.title}` : "";
-                    }).filter(Boolean).join("\n");
-                    return (<div key={`hidden-${h.startMin}`} title={`이 시간대에 가려진 일정 ${h.count}개:\n${tooltipText}`}
+                    const hiddenEvents = h.ids.map(id => events.find(e => e.id === id)).filter(Boolean);
+                    return (<div key={`hidden-${h.startMin}`} className="hidden-badge-wrap"
                       style={{ 
                         position: "absolute",
                         right: 4,
                         top: top + 4,
+                        zIndex: 7
+                      }}>
+                      <div style={{ 
                         padding: "3px 8px",
                         borderRadius: 999,
                         background: "rgba(255,154,60,0.18)",
@@ -3112,11 +3122,60 @@ function CC_ProgramPage({ settings, setSettings, session, setCcPage }) {
                         color: "#ff9a3c",
                         fontSize: 10,
                         fontWeight: 700,
-                        cursor: "help",
-                        zIndex: 4,
-                        whiteSpace: "nowrap"
-                      }}>+{h.count}</div>);
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
+                      }}>+{h.count}</div>
+                      {/* 호버 시 팝오버 */}
+                      <div className="hidden-badge-pop" style={{ 
+                        position: "absolute",
+                        right: 0,
+                        top: "calc(100% + 6px)",
+                        minWidth: 240,
+                        maxWidth: 320,
+                        padding: 12,
+                        borderRadius: 10,
+                        background: "linear-gradient(180deg, #1f2030, #14151f)",
+                        border: "1px solid rgba(255,154,60,0.3)",
+                        boxShadow: "0 12px 32px rgba(0,0,0,0.6)",
+                        zIndex: 50,
+                        opacity: 0,
+                        visibility: "hidden",
+                        transform: "translateY(-4px)",
+                        transition: "opacity 0.15s, transform 0.15s, visibility 0.15s",
+                        pointerEvents: "none"
+                      }}>
+                        <div style={{ fontSize: 11, color: "#ff9a3c", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>🔍 가려진 일정 {h.count}개</div>
+                        {hiddenEvents.map(ev => {
+                          const evCC = getCatColor(ev.category);
+                          let evStatus = "scheduled";
+                          if (ev.pgStatus === "ended") evStatus = "ended";
+                          else if (ev.date === todayStr || ev.date === "always") {
+                            if (nowMin >= ev.startMin && nowMin <= ev.endMin) evStatus = "active";
+                            else if (nowMin > ev.endMin) evStatus = "ended";
+                          }
+                          return (<div key={ev.id} style={{ padding: "8px 10px", marginBottom: 4, borderRadius: 6, background: "rgba(255,255,255,0.03)", borderLeft: `3px solid ${evCC.bg}` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                              <span className="mono" style={{ fontSize: 10, color: evCC.bg, fontWeight: 700 }}>{ev.time}~{ev.endTime}</span>
+                              {evStatus === "active" && <span style={{ padding: "1px 6px", borderRadius: 999, background: "rgba(76,217,154,0.15)", color: "#4cd99a", fontSize: 9, fontWeight: 700 }}>● 진행중</span>}
+                              {evStatus === "ended" && <span style={{ fontSize: 9, color: "#6c6e7d" }}>종료</span>}
+                              {ev.category && <span style={{ marginLeft: "auto", fontSize: 9, color: evCC.bg, fontWeight: 700 }}>● {ev.category}</span>}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#f4f5fa", fontWeight: 600 }}>{ev.title}</div>
+                            {ev.description && <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 3, lineHeight: 1.4 }}>{ev.description}</div>}
+                          </div>);
+                        })}
+                      </div>
+                    </div>);
                   })}
+                  <style>{`
+                    .hidden-badge-wrap:hover .hidden-badge-pop {
+                      opacity: 1 !important;
+                      visibility: visible !important;
+                      transform: translateY(0) !important;
+                      pointer-events: auto !important;
+                    }
+                  `}</style>
                 </>);
               })()}
             </div>))}
