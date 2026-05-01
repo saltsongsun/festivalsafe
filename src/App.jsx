@@ -3971,6 +3971,18 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 토글
   // 페이지 변경 시 사이드바 닫기
   useEffect(() => { setSidebarOpen(false); }, [ccPage]);
+  
+  // 체크리스트 편집 이벤트 리스너
+  useEffect(() => {
+    const handler = (e) => {
+      const { catId, items } = e.detail || {};
+      if (catId && Array.isArray(items) && setCategories) {
+        setCategories(prev => prev.map(c => c.id === catId ? { ...c, actionItems: items } : c));
+      }
+    };
+    window.addEventListener("update-cat-actionItems", handler);
+    return () => window.removeEventListener("update-cat-actionItems", handler);
+  }, [setCategories]);
   const overall = useMemo(() => {
     // 🚫 temp/humidity는 종합 위험도 계산에서 제외
     const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
@@ -4485,14 +4497,139 @@ function CC_MonitorPage({ categories, settings, setSettings, session }) {
         </div>
       </CC_Card>
 
-      <CC_Card title="대응 체크리스트" sub={`${(cat.actionItems || []).length}개`}>
-        {(cat.actionItems || []).length === 0 ? <div style={{ padding: 20, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 체크리스트가 없습니다</div> :
-          (cat.actionItems || []).map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: i < cat.actionItems.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-            <span style={{ width: 18, height: 18, borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0, marginTop: 2 }} />
-            <span style={{ color: "#b0b3c4", fontSize: 13, lineHeight: 1.5 }}>{item}</span>
-          </div>))}
+      <CC_Card title="대응 체크리스트" sub={`${(cat.actionItems || []).length}개 · 클릭하여 체크/편집`}>
+        <CC_ChecklistEditor cat={cat} setCategories={(updater) => {
+          if (typeof setSettings === "function") {
+            // categories는 setCategories prop이 없으면 무시
+          }
+        }} session={session} />
       </CC_Card>
     </div>
+
+    {/* 초단기 예보 (6시간) */}
+    {(cat.forecast || []).length > 0 && <CC_Card title="🌤️ 초단기 예보" sub={`향후 ${(cat.forecast || []).length}시간`} style={{ marginTop: 16 }}>
+      <div style={{ width: "100%", height: 220 }}>
+        <ResponsiveContainer>
+          <LineChart data={cat.forecast} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+            <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+            <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={50} />
+            <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => [`${v} ${cat.unit}`, "예보"]} />
+            {Array.isArray(cat.thresholds?.YELLOW) && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 11 }} />}
+            {Array.isArray(cat.thresholds?.ORANGE) && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 11 }} />}
+            {Array.isArray(cat.thresholds?.RED) && <ReferenceLine y={cat.thresholds.RED[0]} stroke="#ff5e7e" strokeDasharray="4 4" label={{ value: "심각", fill: "#ff5e7e", fontSize: 11 }} />}
+            <Line type="monotone" dataKey="value" stroke={lvColor} strokeWidth={2.5} dot={{ fill: lvColor, r: 4 }} activeDot={{ r: 6 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </CC_Card>}
+
+    {/* 단기 예보 (3일) */}
+    {(cat.shortForecast || []).length > 0 && <CC_Card title="📅 단기 예보" sub={`향후 ${(cat.shortForecast || []).length}회 (3시간 간격, 최대 3일)`} style={{ marginTop: 16 }}>
+      <div style={{ width: "100%", height: 240 }}>
+        <ResponsiveContainer>
+          <LineChart data={cat.shortForecast} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+            <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 10 }} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={50} />
+            <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v, _, props) => [`${v} ${cat.unit}`, props.payload?.fcstDate ? `${props.payload.fcstDate.slice(4,6)}/${props.payload.fcstDate.slice(6,8)} ${props.payload.fcstTime?.slice(0,2)}시` : "예보"]} />
+            {Array.isArray(cat.thresholds?.YELLOW) && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 11 }} />}
+            {Array.isArray(cat.thresholds?.ORANGE) && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 11 }} />}
+            {Array.isArray(cat.thresholds?.RED) && <ReferenceLine y={cat.thresholds.RED[0]} stroke="#ff5e7e" strokeDasharray="4 4" label={{ value: "심각", fill: "#ff5e7e", fontSize: 11 }} />}
+            <Line type="monotone" dataKey="value" stroke="#a980ff" strokeWidth={2} dot={{ fill: "#a980ff", r: 3 }} activeDot={{ r: 5 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </CC_Card>}
+  </>);
+}
+
+// 대응 체크리스트 편집 컴포넌트
+function CC_ChecklistEditor({ cat, session }) {
+  const [checked, setChecked] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [items, setItems] = useState(cat.actionItems || []);
+  const [newItem, setNewItem] = useState("");
+  const canEdit = ["admin","manager","sysadmin"].includes(session?.role);
+  
+  // cat 바뀌면 items 갱신
+  useEffect(() => { setItems(cat.actionItems || []); }, [cat.id]);
+  
+  const toggleCheck = (i) => setChecked(p => ({ ...p, [i]: !p[i] }));
+  
+  const saveItems = (newItems) => {
+    setItems(newItems);
+    // categories를 직접 수정하지 않고, 부모에서 받은 setCategories 통해 수정 필요
+    // 여기서는 window 이벤트로 처리
+    window.dispatchEvent(new CustomEvent("update-cat-actionItems", { detail: { catId: cat.id, items: newItems } }));
+  };
+  
+  const addItem = () => {
+    if (!newItem.trim()) return;
+    saveItems([...items, newItem.trim()]);
+    setNewItem("");
+  };
+  
+  const removeItem = (i) => {
+    if (!confirm("이 항목을 삭제하시겠습니까?")) return;
+    const next = items.filter((_, idx) => idx !== i);
+    saveItems(next);
+  };
+  
+  const moveItem = (i, dir) => {
+    const next = [...items];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    saveItems(next);
+  };
+  
+  const checkedCount = items.filter((_, i) => checked[i]).length;
+  
+  return (<>
+    {items.length === 0 && !editing ? (
+      <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>
+        등록된 체크리스트가 없습니다
+        {canEdit && <div style={{ marginTop: 12 }}>
+          <CC_Btn size="sm" variant="primary" onClick={() => setEditing(true)}>+ 항목 추가</CC_Btn>
+        </div>}
+      </div>
+    ) : (
+      <>
+        {!editing && items.length > 0 && <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(76,217,154,0.05)", border: "1px solid rgba(76,217,154,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#94A3B8" }}>진행: <span style={{ color: "#4cd99a", fontWeight: 700 }}>{checkedCount}</span> / {items.length}</span>
+          <div style={{ flex: 1, height: 4, marginLeft: 12, marginRight: 12, borderRadius: 2, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+            <div style={{ width: `${items.length > 0 ? (checkedCount/items.length)*100 : 0}%`, height: "100%", background: "linear-gradient(90deg, #4cd99a, #6b8aff)" }} />
+          </div>
+          {canEdit && <button onClick={() => setEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 11, cursor: "pointer" }}>✏️ 편집</button>}
+        </div>}
+        
+        {items.map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 4, borderRadius: 8, background: checked[i] ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${checked[i] ? "rgba(76,217,154,0.2)" : "rgba(255,255,255,0.04)"}`, transition: "all 0.15s" }}>
+          {!editing && (
+            <button onClick={() => toggleCheck(i)} style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${checked[i] ? "#4cd99a" : "rgba(255,255,255,0.2)"}`, background: checked[i] ? "#4cd99a" : "transparent", color: "#fff", fontSize: 13, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+              {checked[i] && "✓"}
+            </button>
+          )}
+          {editing && <span style={{ fontSize: 14, color: "#6c6e7d" }}>⠿</span>}
+          <span style={{ flex: 1, fontSize: 13, color: checked[i] ? "#6c6e7d" : "#f4f5fa", textDecoration: checked[i] ? "line-through" : "none", lineHeight: 1.5 }}>{item}</span>
+          {editing && (<>
+            <button onClick={() => moveItem(i, -1)} disabled={i === 0} style={{ padding: "4px 6px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: i === 0 ? "#444" : "#b0b3c4", fontSize: 11, cursor: i === 0 ? "default" : "pointer" }}>↑</button>
+            <button onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} style={{ padding: "4px 6px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: i === items.length - 1 ? "#444" : "#b0b3c4", fontSize: 11, cursor: i === items.length - 1 ? "default" : "pointer" }}>↓</button>
+            <button onClick={() => removeItem(i)} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer" }}>🗑</button>
+          </>)}
+        </div>))}
+        
+        {editing && <>
+          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+            <input value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addItem(); }} placeholder="새 항목 (예: 무대 구조물 점검)" style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            <button onClick={addItem} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>+ 추가</button>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+            <button onClick={() => setEditing(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>✓ 편집 완료</button>
+          </div>
+        </>}
+      </>
+    )}
   </>);
 }
 
