@@ -3595,6 +3595,83 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
               </CC_Card>
             </div>
 
+            {/* 🚨 비상연락망 (긴급 호출) */}
+            <CC_Card title="🚨 비상연락망" sub={`${(settings.emergencyContacts || []).length}명 등록 · 클릭하여 즉시 통화`} action={<CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("emergency")}>관리 →</CC_Btn>} style={{ marginBottom: 16 }}>
+              {/* 119/112/120 항상 표시 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 }}>
+                <a href="tel:119" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(255,94,126,0.15), rgba(255,94,126,0.05))", border: "1.5px solid rgba(255,94,126,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(255,94,126,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🚑</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#ff8a99", fontWeight: 600, marginBottom: 2 }}>응급 / 소방</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#ff5e7e", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>119</div>
+                  </div>
+                </a>
+                <a href="tel:112" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(107,138,255,0.15), rgba(107,138,255,0.05))", border: "1.5px solid rgba(107,138,255,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(107,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👮</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#a5b8ff", fontWeight: 600, marginBottom: 2 }}>경찰</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#6b8aff", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>112</div>
+                  </div>
+                </a>
+                <a href="tel:120" style={{ padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(76,217,154,0.15), rgba(76,217,154,0.05))", border: "1.5px solid rgba(76,217,154,0.35)", textDecoration: "none", display: "flex", alignItems: "center", gap: 12, transition: "transform 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(76,217,154,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🏛️</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#7ee5b3", fontWeight: 600, marginBottom: 2 }}>다산콜</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "#4cd99a", fontFamily: "JetBrains Mono", letterSpacing: "-0.02em" }}>120</div>
+                  </div>
+                </a>
+              </div>
+
+              {/* 등록된 비상연락처 (우선순위 순) */}
+              {(() => {
+                const contacts = settings.emergencyContacts || [];
+                if (contacts.length === 0) {
+                  return (<div style={{ padding: "20px 16px", textAlign: "center", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 13, color: "#94A3B8", marginBottom: 4 }}>등록된 비상연락처가 없습니다</div>
+                    <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("emergency")}>+ 비상연락망 등록 →</CC_Btn>
+                  </div>);
+                }
+                // 우선순위 정렬
+                const sorted = [...contacts].sort((a, b) => {
+                  const pri = { critical: 0, high: 1, normal: 2 };
+                  return (pri[a.priority] || 2) - (pri[b.priority] || 2);
+                });
+                // 그룹별 분류
+                const grouped = {};
+                sorted.forEach(c => {
+                  const g = c.group || "기타";
+                  if (!grouped[g]) grouped[g] = [];
+                  grouped[g].push(c);
+                });
+                return (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {Object.entries(grouped).map(([group, list]) => (<div key={group} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 8 }}>{group} ({list.length})</div>
+                    {list.slice(0, 4).map(c => {
+                      const pColor = c.priority === "critical" ? "#ff5e7e" : c.priority === "high" ? "#ff9a3c" : "#6b8aff";
+                      return (<a key={c.id} href={`tel:${c.phone}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 4, borderRadius: 8, background: "rgba(0,0,0,0.2)", border: `1px solid ${pColor}20`, borderLeft: `3px solid ${pColor}`, textDecoration: "none", transition: "background 0.15s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = `${pColor}10`}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.2)"}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {c.priority === "critical" && "🔴 "}{c.priority === "high" && "🟠 "}{c.name}
+                          </div>
+                          {c.role && <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.role}</div>}
+                        </div>
+                        <span className="mono" style={{ fontSize: 11, color: pColor, fontWeight: 700, flexShrink: 0 }}>📞 {c.phone}</span>
+                      </a>);
+                    })}
+                    {list.length > 4 && <div style={{ fontSize: 10, color: "#6c6e7d", textAlign: "center", marginTop: 4 }}>+{list.length - 4}명 더 보기</div>}
+                  </div>))}
+                </div>);
+              })()}
+            </CC_Card>
+
             {/* 시간대별 인파 추이 그래프 */}
             {(() => {
               const crowd = categories.find(c => c.id === "crowd");
