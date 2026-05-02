@@ -7612,6 +7612,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
   };
 
   const showZoneFirst = hasGates && myGate;
+  const [showAllGates, setShowAllGates] = useState(false);  // 다른 게이트도 보기 토글
   const Stat = ({ label, value, color }) => (
     <div style={{ textAlign: "center" }}>
       <div style={{ color: "#94A3B8", fontSize: 14 }}>{label}</div>
@@ -7624,52 +7625,98 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
       <PageHeader icon="👥" title="인파 계수" subtitle={fmtTime(now)} accent="#66BB6A" />
     </div>
 
+    {/* 🎯 내 담당 출입구 - 메인 카드 (크게 강조) */}
     {showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === myGate.id); return z ? (
-      <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, padding: 16, borderRadius: 16, background: "rgba(76,175,80,0.06)", border: "1.5px solid rgba(76,175,80,0.2)", textAlign: "center" }}>
-        <div style={{ color: "#66BB6A", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>📍 내 출입구: {z.name}</div>
-        <div style={{ display: "flex", justifyContent: "center", gap: 30 }}>
-          <Stat label="체류" value={z.count || 0} color="#66BB6A" />
-          <Stat label="누적" value={z.cumulative || 0} color="#42A5F5" />
+      <div style={{ width: "100%", maxWidth: 400, marginBottom: 14, padding: 18, borderRadius: 18, background: "linear-gradient(180deg, rgba(76,175,80,0.12), rgba(76,175,80,0.04))", border: "2px solid rgba(76,175,80,0.35)", boxShadow: "0 8px 24px rgba(76,175,80,0.15)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>📍</span>
+            <div>
+              <div style={{ color: "#66BB6A", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>내 담당 출입구</div>
+              <div style={{ color: "#fff", fontSize: 18, fontWeight: 800, marginTop: 2 }}>{z.name}</div>
+            </div>
+          </div>
+          <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(76,175,80,0.2)", color: "#66BB6A", fontSize: 11, fontWeight: 700, animation: "blink 2s infinite" }}>● 활성</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div style={{ padding: 14, borderRadius: 12, background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.2)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 11, marginBottom: 4 }}>🏃 현재 체류</div>
+            <div style={{ color: "#66BB6A", fontSize: 36, fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{(z.count || 0).toLocaleString()}</div>
+          </div>
+          <div style={{ padding: 14, borderRadius: 12, background: "rgba(66,165,245,0.08)", border: "1px solid rgba(66,165,245,0.2)" }}>
+            <div style={{ color: "#94A3B8", fontSize: 11, marginBottom: 4 }}>📊 누적 입장</div>
+            <div style={{ color: "#42A5F5", fontSize: 36, fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{(z.cumulative || 0).toLocaleString()}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 4px", fontSize: 11, color: "#94A3B8" }}>
+          <span>👤 {myGate.assignee || session?.name || "계수원"}</span>
+          <span>전체 인원의 {curTotal > 0 ? Math.round((z.count / curTotal) * 100) : 0}%</span>
         </div>
       </div>
     ) : null; })()}
 
-    <div style={{ width: "100%", maxWidth: 400, background: li.bg, border: `2px solid ${li.border}`, borderRadius: 20, padding: 20, textAlign: "center", marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "center", gap: 30, marginBottom: 8 }}>
+    {/* 🌐 전체 인원 - 작은 카드 (담당 게이트가 있을 땐 보조) */}
+    <div style={{ width: "100%", maxWidth: 400, background: showZoneFirst ? "rgba(255,255,255,0.02)" : li.bg, border: showZoneFirst ? "1px solid rgba(255,255,255,0.05)" : `2px solid ${li.border}`, borderRadius: 16, padding: showZoneFirst ? 12 : 20, textAlign: "center", marginBottom: 16 }}>
+      {showZoneFirst && <div style={{ color: "#6c6e7d", fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>🌐 축제 전체 (참고)</div>}
+      <div style={{ display: "flex", justifyContent: "center", gap: showZoneFirst ? 20 : 30, marginBottom: showZoneFirst ? 0 : 8 }}>
         <div>
-          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>🏃 체류 인원</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{curTotal.toLocaleString()}</div>
-          <div style={{ color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</div>
+          <div style={{ color: "#8892b0", fontSize: showZoneFirst ? 11 : 13, marginBottom: 4 }}>🏃 체류 인원</div>
+          <div style={{ fontSize: showZoneFirst ? 24 : 40, fontWeight: 900, color: li.color, fontVariantNumeric: "tabular-nums" }}>{curTotal.toLocaleString()}</div>
+          {!showZoneFirst && <div style={{ color: li.color, fontSize: 14, fontWeight: 700 }}>{li.icon} {li.label}</div>}
         </div>
         <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
         <div>
-          <div style={{ color: "#8892b0", fontSize: 13, marginBottom: 4 }}>📊 누적 방문</div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: "#42A5F5", fontVariantNumeric: "tabular-nums" }}>{cumTotal.toLocaleString()}</div>
-          <div style={{ color: "#94A3B8", fontSize: 14 }}>총 방문객</div>
+          <div style={{ color: "#8892b0", fontSize: showZoneFirst ? 11 : 13, marginBottom: 4 }}>📊 누적 방문</div>
+          <div style={{ fontSize: showZoneFirst ? 24 : 40, fontWeight: 900, color: "#42A5F5", fontVariantNumeric: "tabular-nums" }}>{cumTotal.toLocaleString()}</div>
+          {!showZoneFirst && <div style={{ color: "#94A3B8", fontSize: 14 }}>총 방문객</div>}
         </div>
       </div>
-      {settings.venueArea > 0 && <div style={{ color: "#8892b0", fontSize: 13 }}>밀집도: {(curTotal / settings.venueArea).toFixed(2)}명/㎡</div>}
+      {!showZoneFirst && settings.venueArea > 0 && <div style={{ color: "#8892b0", fontSize: 13 }}>밀집도: {(curTotal / settings.venueArea).toFixed(2)}명/㎡</div>}
     </div>
 
-    {hasGates && <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#42A5F5" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>전체</button>
-        {zoneData.filter(z => z.name).map(z => (
-          <button key={z.id} onClick={() => setSelZone(z.id)} style={{ padding: "8px 14px", borderRadius: 8, border: selZone === z.id ? "1.5px solid #4CAF50" : "1px solid #333", background: selZone === z.id ? "rgba(76,175,80,0.15)" : "transparent", color: selZone === z.id ? "#66BB6A" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-            {z.name} ({z.count || 0})
-          </button>
-        ))}
-      </div>
-      {selZone && !showZoneFirst && (() => { const z = zoneData.find(zz => zz.id === selZone); return z ? (
-        <div style={{ textAlign: "center", marginTop: 8, padding: 10, background: "rgba(76,175,80,0.06)", borderRadius: 8, border: "1px solid rgba(76,175,80,0.15)" }}>
-          <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>📍 {z.name}</span>
-          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 6 }}>
-            <Stat label="체류" value={z.count || 0} color="#66BB6A" />
-            <Stat label="누적" value={z.cumulative || 0} color="#42A5F5" />
+    {/* 게이트 선택 칩: 내 담당이 있으면 토글 가능, 없으면 항상 표시 */}
+    {hasGates && (showZoneFirst ? (
+      // 담당 게이트 있음: 기본 숨김 + 토글
+      <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
+        <button onClick={() => setShowAllGates(!showAllGates)} style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", color: "#94A3B8", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>🚪 다른 출입구 보기 / 전환 ({zoneData.filter(z => z.name).length}곳)</span>
+          <span>{showAllGates ? "▲" : "▼"}</span>
+        </button>
+        {showAllGates && <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 8 }}>
+            <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#42A5F5" : "#667", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🌐 전체</button>
+            {zoneData.filter(z => z.name).map(z => {
+              const isMine = z.id === myGate?.id;
+              return (<button key={z.id} onClick={() => setSelZone(z.id)} style={{ padding: "8px 14px", borderRadius: 8, border: selZone === z.id ? "1.5px solid #4CAF50" : `1px solid ${isMine ? "rgba(76,175,80,0.3)" : "#333"}`, background: selZone === z.id ? "rgba(76,175,80,0.15)" : "transparent", color: selZone === z.id ? "#66BB6A" : isMine ? "#a4d99a" : "#667", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {isMine && "📍 "}{z.name} ({z.count || 0})
+              </button>);
+            })}
           </div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", textAlign: "center" }}>💡 +/- 버튼은 선택된 게이트에 적용됩니다 (현재: <strong style={{ color: "#66BB6A" }}>{selZone ? zoneData.find(z => z.id === selZone)?.name || "?" : "전체"}</strong>)</div>
+        </div>}
+      </div>
+    ) : (
+      // 담당 게이트 없음: 기존처럼 항상 표시
+      <div style={{ width: "100%", maxWidth: 400, marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+          <button onClick={() => setSelZone(null)} style={{ padding: "8px 14px", borderRadius: 8, border: !selZone ? "1.5px solid #2196F3" : "1px solid #333", background: !selZone ? "rgba(33,150,243,0.15)" : "transparent", color: !selZone ? "#42A5F5" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>전체</button>
+          {zoneData.filter(z => z.name).map(z => (
+            <button key={z.id} onClick={() => setSelZone(z.id)} style={{ padding: "8px 14px", borderRadius: 8, border: selZone === z.id ? "1.5px solid #4CAF50" : "1px solid #333", background: selZone === z.id ? "rgba(76,175,80,0.15)" : "transparent", color: selZone === z.id ? "#66BB6A" : "#667", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              {z.name} ({z.count || 0})
+            </button>
+          ))}
         </div>
-      ) : null; })()}
-    </div>}
+        {selZone && (() => { const z = zoneData.find(zz => zz.id === selZone); return z ? (
+          <div style={{ textAlign: "center", marginTop: 8, padding: 10, background: "rgba(76,175,80,0.06)", borderRadius: 8, border: "1px solid rgba(76,175,80,0.15)" }}>
+            <span style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700 }}>📍 {z.name}</span>
+            <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 6 }}>
+              <Stat label="체류" value={z.count || 0} color="#66BB6A" />
+              <Stat label="누적" value={z.cumulative || 0} color="#42A5F5" />
+            </div>
+          </div>
+        ) : null; })()}
+      </div>
+    ))}
 
     <div style={{ width: "100%", maxWidth: 400 }}>
       <div style={{ color: "#66BB6A", fontSize: 13, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>▲ 입장 (체류 + 누적 증가)</div>
