@@ -7382,17 +7382,38 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
   });
 
   // ★ 카운터: 즉시 반영 → localStorage 즉시 → Supabase 비동기
-  const adjustTotal = (d) => {
-    const prev = stateRef.current;
-    const newCur = Math.max(0, (prev.total || 0) + d);
-    const newCum = d > 0 ? (prev.cumulative || 0) + d : (prev.cumulative || 0);
-    // settings.gates 기준으로 생성, 기존 카운트 병합
+  const adjustTotal = async (d) => {
+    // 🔄 클라우드에서 최신값 먼저 가져와서 머지 (race condition 방지)
+    let prev = stateRef.current;
+    if (window.crowdDB) {
+      try {
+        const cloud = await window.crowdDB.get();
+        if (cloud && cloud.updatedAt && cloud.updatedAt > (prev.updatedAt || 0)) {
+          prev = { ...cloud };
+          console.log("[counter] 🔄 클라우드 최신값으로 업데이트:", cloud.total);
+        }
+      } catch {}
+    }
+    
+    // settings.gates 기준으로 생성, 기존 카운트 병합 (다른 게이트는 클라우드 값 유지)
     let newZones = gates.map(z => {
       const saved = (prev.zones || []).find(sz => sz.id === z.id);
       return { id: z.id, name: z.name, count: saved?.count || 0, cumulative: saved?.cumulative || 0, range: z.range, assignee: z.assignee };
     });
+    
+    let newCur, newCum;
     if (selZone) {
+      // 게이트 모드: 해당 게이트만 변경
       newZones = newZones.map(z => z.id === selZone ? { ...z, count: Math.max(0, (z.count || 0) + d), cumulative: d > 0 ? (z.cumulative || 0) + d : (z.cumulative || 0) } : z);
+      // 전체는 게이트 합으로 재계산 (정합성 보장)
+      newCur = newZones.reduce((s, z) => s + (z.count || 0), 0);
+      newCum = newZones.reduce((s, z) => s + (z.cumulative || 0), 0);
+      // 기존 누적이 더 크면 그대로 유지 (게이트 외 입력분)
+      if ((prev.cumulative || 0) > newCum) newCum = (prev.cumulative || 0) + (d > 0 ? d : 0);
+    } else {
+      // 전체 모드: total만 변경
+      newCur = Math.max(0, (prev.total || 0) + d);
+      newCum = d > 0 ? (prev.cumulative || 0) + d : (prev.cumulative || 0);
     }
 
     // 1) ref + state 즉시
@@ -13801,22 +13822,40 @@ export default function App() {
     } catch {}
   }, []);
   
+  // 🌐 window.crowdDB 재초기화 트리거 (session 변경 시)
+  const [crowdReinit, setCrowdReinit] = useState(0);
+  useEffect(() => {
+    const handler = () => setCrowdReinit(p => p + 1);
+    window.addEventListener("crowdDB-reinit", handler);
+    return () => window.removeEventListener("crowdDB-reinit", handler);
+  }, []);
+  
   // 🌐 window.crowdDB 정의 - 인파 데이터 동기화 인터페이스
+  // session이 바뀌면 fid도 바뀌므로 useEffect가 다시 실행되어야 함
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.crowdDB) return;  // 이미 정의됨
     
-    const fid = localStorage.getItem("_fid") || "default";
+    // session에서 festivalId 가져오기 (없으면 default)
+    const session = window._safeflowSession;
+    const fid = session?.festivalId || localStorage.getItem("_fid") || "default";
     const CROWD_KEY = `${fid}_crowd_v1`;
     
+    // 기존 정의가 있고 같은 키를 쓰면 그대로 유지
+    if (window.crowdDB && window.crowdDB._key === CROWD_KEY) return;
+    
+    console.log(`[SAFEFLOW] window.crowdDB 초기화 (key: ${CROWD_KEY})`);
+    
     window.crowdDB = {
+      _key: CROWD_KEY,  // 디버깅용
+      
       // Supabase 또는 localStorage에서 최신 인파 데이터 로드
       get: async () => {
         try {
           if (window.storage) {
             const r = await window.storage.get(CROWD_KEY);
             if (r?.value) {
-              return typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+              const data = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+              return data;
             }
           }
           // 폴백: localStorage
@@ -13847,28 +13886,35 @@ export default function App() {
           
           // 3) Supabase 저장 (있으면)
           if (window.storage) {
-            await window.storage.set(CROWD_KEY, JSON.stringify(data));
+            const r = await window.storage.set(CROWD_KEY, JSON.stringify(data));
+            console.log(`[crowdDB] ☁️ Supabase 저장 완료 (key: ${CROWD_KEY}, total: ${data.total})`, r);
+          } else {
+            console.warn(`[crowdDB] ⚠️ window.storage 없음 - localStorage만 저장`);
           }
           
           return data;
         } catch (e) {
-          console.warn("[crowdDB] set 실패:", e);
+          console.error("[crowdDB] set 실패:", e);
           return null;
         }
       }
     };
-    
-    console.log("[SAFEFLOW] ✅ window.crowdDB 초기화 완료");
     
     // Supabase realtime 수신 시 crowd-update 이벤트 발생
     const realtimeHandler = (e) => {
       if (e.detail?.key === CROWD_KEY && e.detail?.value) {
         try {
           const data = typeof e.detail.value === "string" ? JSON.parse(e.detail.value) : e.detail.value;
+          // 자기 자신이 방금 저장한 데이터면 무시 (updatedAt이 1초 이내인 경우)
+          const local = JSON.parse(localStorage.getItem("_crowd") || "{}");
+          if (local.updatedAt && data.updatedAt && Math.abs(local.updatedAt - data.updatedAt) < 500) {
+            console.log("[crowdDB] 📡 자기 변경 무시:", data.total);
+            return;
+          }
           localStorage.setItem("_crowd", JSON.stringify(data));
           window.dispatchEvent(new CustomEvent("crowd-update", { detail: data }));
-          console.log("[crowdDB] 📡 Realtime 수신:", data.total);
-        } catch {}
+          console.log(`[crowdDB] 📡 다른 기기에서 변경 수신:`, data.total);
+        } catch (e) { console.warn("[crowdDB] realtime 처리 실패:", e); }
       }
     };
     window.addEventListener("supabase-sync", realtimeHandler);
@@ -13878,14 +13924,32 @@ export default function App() {
       const data = await window.crowdDB.get();
       if (data && data.total !== undefined) {
         window.dispatchEvent(new CustomEvent("crowd-update", { detail: data }));
-        console.log("[crowdDB] 초기 로드:", data.total);
+        console.log("[crowdDB] 초기 로드 완료:", data.total);
       }
     }, 1500);
     
+    // 5초마다 폴링 (realtime 놓칠 경우 대비)
+    const poll = setInterval(async () => {
+      if (!window.storage) return;
+      try {
+        const r = await window.storage.get(CROWD_KEY);
+        if (!r?.value) return;
+        const cloud = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+        const local = JSON.parse(localStorage.getItem("_crowd") || "{}");
+        // 클라우드가 더 최신이면 갱신
+        if ((cloud.updatedAt || 0) > (local.updatedAt || 0)) {
+          localStorage.setItem("_crowd", JSON.stringify(cloud));
+          window.dispatchEvent(new CustomEvent("crowd-update", { detail: cloud }));
+          console.log(`[crowdDB] 🔄 폴링 갱신: cloud(${cloud.total}) > local(${local.total || 0})`);
+        }
+      } catch {}
+    }, 5000);
+    
     return () => {
       window.removeEventListener("supabase-sync", realtimeHandler);
+      clearInterval(poll);
     };
-  }, []);
+  }, [crowdReinit]);
   
   if (fatalError) {
     return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif" }}>
@@ -13927,6 +13991,23 @@ function AppMain({ onError }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       window._safeflowSession = session;
+      // session 변경 시 _fid도 갱신 + crowdDB 재초기화 트리거
+      if (session?.festivalId) {
+        const oldFid = localStorage.getItem("_fid");
+        if (oldFid !== session.festivalId) {
+          localStorage.setItem("_fid", session.festivalId);
+          // crowdDB 재초기화 (App 레벨 useEffect가 다시 실행되도록 강제)
+          if (window.crowdDB) {
+            const expectedKey = `${session.festivalId}_crowd_v1`;
+            if (window.crowdDB._key !== expectedKey) {
+              console.log(`[SAFEFLOW] festival 변경 감지: ${window.crowdDB._key} → ${expectedKey}`);
+              delete window.crowdDB;
+              // 페이지 새로고침해서 깔끔하게 재초기화 (선택적)
+              window.dispatchEvent(new CustomEvent("crowdDB-reinit", { detail: { fid: session.festivalId } }));
+            }
+          }
+        }
+      }
     }
   }, [session]);
 
