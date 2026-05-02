@@ -98,7 +98,7 @@ const DEFAULT_SETTINGS = {
   kma: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", enabled: true, interval: 10, lastFetch: null, nxOverride: null, nyOverride: null },
   airQuality: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", sidoName: "경남", stationFilter: "진주", enabled: true, interval: 30, lastFetch: null },
   dam: { serviceKey: "53ed52a312626ba7b1fe74c00f0c676245c88a3ab708606bbed554761786a263", damName: "남강", enabled: true, interval: 30, lastFetch: null },
-  zones: [ { id: "z1", name: "A구역", range: "", assignee: "" } ],
+  zones: [ { id: "z1", name: "A구역", range: "", assignee: "", capacity: 0 } ],
   gates: [ { id: "g1", name: "출입구1", assignee: "", accountId: "" } ],
   workers: [],
   actionReports: [],
@@ -4041,6 +4041,7 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     byZone[z.id] = { 
       name: z.name, 
       zoneType: z.zoneType,
+      capacity: z.capacity || 0,
       total: 0, 
       working: 0, 
       break: 0, 
@@ -4050,12 +4051,12 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     };
   });
   // zoneId 없는 근무자용
-  byZone["_none"] = { name: "구역 미지정", zoneType: null, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
+  byZone["_none"] = { name: "구역 미지정", zoneType: null, capacity: 0, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
   
   (settings.workSites || []).forEach(s => {
     const zid = s.zoneId || "_none";
-    if (!byZone[zid]) byZone[zid] = { name: "알 수 없는 구역", zoneType: null, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
-    if (s.id !== "_pool") byZone[zid].sites.push({ name: s.name, count: (s.workers || []).length });
+    if (!byZone[zid]) byZone[zid] = { name: "알 수 없는 구역", zoneType: null, capacity: 0, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
+    if (s.id !== "_pool") byZone[zid].sites.push({ name: s.name, count: (s.workers || []).length, capacity: s.capacity || 0 });
     (s.workers || []).forEach(w => {
       byZone[zid].total += 1;
       const st = w.workStatus || (w.onDuty ? "working" : null);
@@ -4539,17 +4540,32 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     </CC_Card>}
     
     {/* 🗺️ 구역별 인원 현황 */}
-    {Object.keys(byZone).filter(zid => byZone[zid].total > 0).length > 0 && <CC_Card title="🗺️ 구역별 인원 현황" sub={`${Object.keys(byZone).filter(zid => byZone[zid].total > 0).length}개 구역 · 총 ${allWorkers.length}명`} style={{ marginBottom: 16 }}>
+    {Object.keys(byZone).filter(zid => byZone[zid].total > 0 || byZone[zid].capacity > 0).length > 0 && <CC_Card title="🗺️ 구역별 인원 현황" sub={`${Object.keys(byZone).filter(zid => byZone[zid].total > 0 || byZone[zid].capacity > 0).length}개 구역 · 총 ${allWorkers.length}명`} style={{ marginBottom: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-        {Object.entries(byZone).filter(([zid, z]) => z.total > 0).sort((a, b) => b[1].total - a[1].total).map(([zid, z]) => {
+        {Object.entries(byZone).filter(([zid, z]) => z.total > 0 || z.capacity > 0).sort((a, b) => b[1].total - a[1].total).map(([zid, z]) => {
           const onDutyRatio = z.total > 0 ? Math.round(z.working / z.total * 100) : 0;
           const zoneTypeIcon = z.zoneType === "danger" ? "⚠️" : z.zoneType === "crowded" ? "👥" : z.zoneType === "safe" ? "✅" : "📍";
           const zoneColor = zid === "_none" ? "#6c6e7d" : "#42A5F5";
+          // 적정인원 대비 충족률
+          const capRatio = z.capacity > 0 ? (z.total / z.capacity) * 100 : 0;
+          const capColor = capRatio === 0 ? "#6c6e7d" : capRatio > 100 ? "#ff5e7e" : capRatio >= 80 ? "#4cd99a" : capRatio >= 50 ? "#f5c451" : "#ff9a3c";
+          const capStatus = z.capacity === 0 ? null : capRatio > 100 ? "초과" : capRatio >= 80 ? "적정" : capRatio >= 50 ? "보통" : "부족";
           return (<div key={zid} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${zoneColor}25`, borderLeft: `3px solid ${zoneColor}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{zoneTypeIcon} {z.name}</span>
-              <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: zoneColor }}>{z.total}<span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 400 }}>명</span></span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: zoneColor }}>{z.total}<span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 400 }}>명{z.capacity > 0 ? `/${z.capacity}` : ""}</span></span>
             </div>
+            
+            {/* 적정인원 대비 (capacity 설정된 경우만) */}
+            {z.capacity > 0 && <div style={{ marginBottom: 8, padding: 6, borderRadius: 6, background: `${capColor}10`, border: `1px solid ${capColor}25` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3, fontSize: 10, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8" }}>👥 적정인원 대비</span>
+                <span style={{ color: capColor, fontWeight: 700 }}>{capStatus} {Math.round(capRatio)}%</span>
+              </div>
+              <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(100, capRatio)}%`, height: "100%", background: capColor, transition: "width 0.3s" }} />
+              </div>
+            </div>}
             
             {/* 상태별 분포 */}
             <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#94A3B8", marginBottom: 8, flexWrap: "wrap" }}>
@@ -4568,9 +4584,12 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
               <div style={{ width: `${onDutyRatio}%`, height: "100%", background: onDutyRatio >= 70 ? "#4cd99a" : onDutyRatio >= 40 ? "#f5c451" : "#ff9a3c", transition: "width 0.3s" }} />
             </div>
             
-            {/* 근무지 목록 */}
+            {/* 근무지 목록 (적정인원 함께 표시) */}
             {z.sites.length > 0 && <div style={{ fontSize: 10, color: "#6c6e7d", paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-              {z.sites.slice(0, 3).map((s, i) => (<span key={i}>{i > 0 && " · "}🏠 {s.name}({s.count})</span>))}
+              {z.sites.slice(0, 3).map((s, i) => {
+                const overShort = s.capacity > 0 ? (s.count > s.capacity ? "⚠️" : s.count < s.capacity * 0.5 ? "▼" : "") : "";
+                return (<span key={i}>{i > 0 && " · "}🏠 {s.name}({s.count}{s.capacity > 0 ? `/${s.capacity}` : ""}){overShort}</span>);
+              })}
               {z.sites.length > 3 && <span> 외 {z.sites.length - 3}곳</span>}
             </div>}
           </div>);
@@ -12706,6 +12725,15 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
               <div><Label>구역명</Label><Input value={z.name} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, name: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="A구역" /></div>
               <div><Label>범위</Label><Input value={z.range || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, range: e.target.value }; setSettings({ ...settings, zones: zs }); }} placeholder="동문~남문" /></div>
             </div>
+            <div style={{ marginBottom: 6 }}>
+              <Label>👥 적정 수용 인원 (capacity)</Label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <Input type="number" min="0" value={z.capacity || ""} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, capacity: parseInt(e.target.value) || 0 }; setSettings({ ...settings, zones: zs }); }} placeholder="예: 500" style={{ flex: 1 }} />
+                <span style={{ color: "#94A3B8", fontSize: 12, whiteSpace: "nowrap" }}>명</span>
+                {z.capacity > 0 && <span style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 11, fontWeight: 600 }}>✓ 설정됨</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 4 }}>이 구역에 적정한 인원 수. 초과 시 경고 표시</div>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
               <div><Label>구역 속성</Label><select value={z.zoneType || "normal"} onChange={e => { const zs = [...settings.zones]; zs[i] = { ...z, zoneType: e.target.value }; setSettings({ ...settings, zones: zs }); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#fff", fontSize: 13 }}>
                 <option value="none">⬜ 속성없음</option>
@@ -12761,6 +12789,14 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
               </select>
               <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            </div>
+            {/* 부스 적정인원 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 22, marginTop: 4 }}>
+              <span style={{ fontSize: 11, color: "#94A3B8", minWidth: 80 }}>👥 적정인원</span>
+              <Input type="number" min="0" value={site.capacity || ""} onChange={e => { const ws = [...(settings.workSites || [])]; ws[si] = { ...site, capacity: parseInt(e.target.value) || 0 }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="0" style={{ flex: 1, maxWidth: 100 }} />
+              <span style={{ color: "#6c6e7d", fontSize: 11 }}>명</span>
+              <span style={{ flex: 1 }} />
+              {site.capacity > 0 && <span style={{ fontSize: 10, color: "#4cd99a" }}>현재 {(site.workers || []).length}/{site.capacity}</span>}
             </div>
           </div>
         ))}
@@ -13371,6 +13407,18 @@ function CMSPage({ categories, setCategories, settings, setSettings, alerts, set
                 {(settings.zones || []).filter(z => z.name).map(z => <option key={z.id} value={z.id}>📍{z.name}</option>)}
               </select>
               <button onClick={() => setSettings(prev => ({ ...prev, workSites: prev.workSites.filter(s => s.id !== site.id) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #a33", background: "transparent", color: "#EF5350", fontSize: 12, cursor: "pointer" }}>🗑</button>
+            </div>
+            {/* 부스/근무지 적정인원 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 24, marginTop: 4, marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "#94A3B8", minWidth: 90 }}>👥 적정인원</span>
+              <Input type="number" min="0" value={site.capacity || ""} onChange={e => { const ws = [...(settings.workSites || [])]; ws[si] = { ...site, capacity: parseInt(e.target.value) || 0 }; setSettings(prev => ({ ...prev, workSites: ws })); }} placeholder="0" style={{ flex: "0 0 100px" }} />
+              <span style={{ color: "#6c6e7d", fontSize: 12 }}>명</span>
+              {site.capacity > 0 && (() => {
+                const cur = (site.workers || []).length;
+                const ratio = (cur / site.capacity) * 100;
+                const c = ratio >= 100 ? "#ff5e7e" : ratio >= 80 ? "#ff9a3c" : ratio >= 50 ? "#4cd99a" : "#42A5F5";
+                return <span style={{ marginLeft: "auto", fontSize: 11, color: c, fontWeight: 700, fontFamily: "JetBrains Mono" }}>현재 {cur}/{site.capacity}명 ({Math.round(ratio)}%)</span>;
+              })()}
             </div>
 
             {/* 근무자 목록 */}
