@@ -3960,6 +3960,7 @@ function CC_StagePage({ settings, setSettings, session, setCcPage }) {
 function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccounts, setCcPage }) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("default"); // default | name_asc | name_desc | role | site
   const [selectedWorker, setSelectedWorker] = useState(null); // 근무자 클릭 모달
   const [touchDragWorker, setTouchDragWorker] = useState(null); // 터치 드래그 중인 근무자 정보
   const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
@@ -4004,6 +4005,49 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     const q = search.toLowerCase();
     filtered = filtered.filter(w => (w.name || "").toLowerCase().includes(q) || (w.phone || "").includes(q) || (w.role || "").includes(q));
   }
+  
+  // 정렬 적용
+  if (sortMode === "name_asc") {
+    filtered = [...filtered].sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
+  } else if (sortMode === "name_desc") {
+    filtered = [...filtered].sort((a, b) => (b.name || "").localeCompare(a.name || "", "ko"));
+  } else if (sortMode === "role") {
+    filtered = [...filtered].sort((a, b) => (a.role || "기타").localeCompare(b.role || "기타", "ko") || (a.name || "").localeCompare(b.name || "", "ko"));
+  } else if (sortMode === "site") {
+    filtered = [...filtered].sort((a, b) => (a.siteName || "").localeCompare(b.siteName || "", "ko") || (a.name || "").localeCompare(b.name || "", "ko"));
+  }
+  
+  // 구역별 인원 수 (zoneId 기준)
+  const zones = settings.zones || [];
+  const byZone = {};
+  zones.forEach(z => {
+    byZone[z.id] = { 
+      name: z.name, 
+      zoneType: z.zoneType,
+      total: 0, 
+      working: 0, 
+      break: 0, 
+      off: 0,
+      noshow: 0,
+      sites: []
+    };
+  });
+  // zoneId 없는 근무자용
+  byZone["_none"] = { name: "구역 미지정", zoneType: null, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
+  
+  (settings.workSites || []).forEach(s => {
+    const zid = s.zoneId || "_none";
+    if (!byZone[zid]) byZone[zid] = { name: "알 수 없는 구역", zoneType: null, total: 0, working: 0, break: 0, off: 0, noshow: 0, sites: [] };
+    if (s.id !== "_pool") byZone[zid].sites.push({ name: s.name, count: (s.workers || []).length });
+    (s.workers || []).forEach(w => {
+      byZone[zid].total += 1;
+      const st = w.workStatus || (w.onDuty ? "working" : null);
+      if (st === "working") byZone[zid].working += 1;
+      else if (st === "break") byZone[zid].break += 1;
+      else if (st === "off") byZone[zid].off += 1;
+      else if (st === "noshow") byZone[zid].noshow += 1;
+    });
+  });
 
   const exportCSV = () => {
     const rows = [["이름", "연락처", "역할", "근무지", "근무상태", "식수", "메모"]];
@@ -4330,16 +4374,76 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
         ].map(f => (
           <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? `1.5px solid ${f.c}` : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? `${f.c}15` : "rgba(255,255,255,0.02)", color: filter === f.k ? f.c : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
         ))}
+        {/* 정렬 드롭다운 */}
+        <select value={sortMode} onChange={e => setSortMode(e.target.value)} title="정렬 방식" style={{ padding: "6px 10px", borderRadius: 999, border: sortMode !== "default" ? "1.5px solid #a980ff" : "1px solid rgba(255,255,255,0.08)", background: sortMode !== "default" ? "rgba(169,128,255,0.1)" : "rgba(255,255,255,0.02)", color: sortMode !== "default" ? "#a980ff" : "#b0b3c4", fontSize: 12, fontWeight: 600, cursor: "pointer", outline: "none" }}>
+          <option value="default" style={{ background: "#14151f" }}>↕ 기본 순서</option>
+          <option value="name_asc" style={{ background: "#14151f" }}>↑ 이름 (가나다)</option>
+          <option value="name_desc" style={{ background: "#14151f" }}>↓ 이름 (역순)</option>
+          <option value="role" style={{ background: "#14151f" }}>📑 역할별</option>
+          <option value="site" style={{ background: "#14151f" }}>🏠 근무지별</option>
+        </select>
         <CC_Btn size="sm" variant="primary" onClick={() => setShowAddModal(true)}>+ 인력 추가</CC_Btn>
         <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
         <CC_Btn size="sm" variant="ghost" onClick={resetAllStatus}>🔄 전체 초기화</CC_Btn>
       </div>
     </CC_Card>
+    
+    {/* 🗺️ 구역별 인원 현황 */}
+    {Object.keys(byZone).filter(zid => byZone[zid].total > 0).length > 0 && <CC_Card title="🗺️ 구역별 인원 현황" sub={`${Object.keys(byZone).filter(zid => byZone[zid].total > 0).length}개 구역 · 총 ${allWorkers.length}명`} style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+        {Object.entries(byZone).filter(([zid, z]) => z.total > 0).sort((a, b) => b[1].total - a[1].total).map(([zid, z]) => {
+          const onDutyRatio = z.total > 0 ? Math.round(z.working / z.total * 100) : 0;
+          const zoneTypeIcon = z.zoneType === "danger" ? "⚠️" : z.zoneType === "crowded" ? "👥" : z.zoneType === "safe" ? "✅" : "📍";
+          const zoneColor = zid === "_none" ? "#6c6e7d" : "#42A5F5";
+          return (<div key={zid} style={{ padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${zoneColor}25`, borderLeft: `3px solid ${zoneColor}` }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{zoneTypeIcon} {z.name}</span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: zoneColor }}>{z.total}<span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 400 }}>명</span></span>
+            </div>
+            
+            {/* 상태별 분포 */}
+            <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#94A3B8", marginBottom: 8, flexWrap: "wrap" }}>
+              {z.working > 0 && <span style={{ color: "#4cd99a" }}>🟢 근무 {z.working}</span>}
+              {z.break > 0 && <span style={{ color: "#42A5F5" }}>☕ 휴식 {z.break}</span>}
+              {z.off > 0 && <span style={{ color: "#a980ff" }}>🚪 퇴근 {z.off}</span>}
+              {z.noshow > 0 && <span style={{ color: "#ff5e7e" }}>🚫 노쇼 {z.noshow}</span>}
+            </div>
+            
+            {/* 근무률 게이지 */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 10, color: "#6c6e7d" }}>
+              <span>근무률</span>
+              <span style={{ color: onDutyRatio >= 70 ? "#4cd99a" : onDutyRatio >= 40 ? "#f5c451" : "#ff9a3c", fontWeight: 700 }}>{onDutyRatio}%</span>
+            </div>
+            <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", overflow: "hidden", marginBottom: 6 }}>
+              <div style={{ width: `${onDutyRatio}%`, height: "100%", background: onDutyRatio >= 70 ? "#4cd99a" : onDutyRatio >= 40 ? "#f5c451" : "#ff9a3c", transition: "width 0.3s" }} />
+            </div>
+            
+            {/* 근무지 목록 */}
+            {z.sites.length > 0 && <div style={{ fontSize: 10, color: "#6c6e7d", paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+              {z.sites.slice(0, 3).map((s, i) => (<span key={i}>{i > 0 && " · "}🏠 {s.name}({s.count})</span>))}
+              {z.sites.length > 3 && <span> 외 {z.sites.length - 3}곳</span>}
+            </div>}
+          </div>);
+        })}
+      </div>
+      
+      {/* 구역 합계 표시 */}
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 600 }}>합계</span>
+        <div style={{ display: "flex", gap: 14, fontSize: 12, fontFamily: "JetBrains Mono" }}>
+          <span style={{ color: "#f4f5fa", fontWeight: 700 }}>총 {allWorkers.length}명</span>
+          <span style={{ color: "#4cd99a" }}>🟢 {Object.values(byZone).reduce((s, z) => s + z.working, 0)}</span>
+          <span style={{ color: "#42A5F5" }}>☕ {Object.values(byZone).reduce((s, z) => s + z.break, 0)}</span>
+          <span style={{ color: "#a980ff" }}>🚪 {Object.values(byZone).reduce((s, z) => s + z.off, 0)}</span>
+          <span style={{ color: "#ff5e7e" }}>🚫 {Object.values(byZone).reduce((s, z) => s + z.noshow, 0)}</span>
+        </div>
+      </div>
+    </CC_Card>}
 
     {/* 메인: 좌측 인력 풀 + 우측 근무지 그리드 (드래그앤드롭 + 터치) */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 16 }}>
       {/* 좌측: 인력 목록 */}
-      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명 · 드래그/탭하여 배치, 클릭하여 상태 변경`}>
+      <CC_Card title="👥 인력 목록" sub={`${filtered.length}명${sortMode === "name_asc" ? " · 이름 오름차순" : sortMode === "name_desc" ? " · 이름 내림차순" : sortMode === "role" ? " · 역할별" : sortMode === "site" ? " · 근무지별" : " · 드래그/탭하여 배치"}`}>
         <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
           filtered.map(w => {
