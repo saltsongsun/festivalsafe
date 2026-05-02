@@ -5303,10 +5303,11 @@ function CC_ChecklistEditor({ cat, session }) {
   </>);
 }
 
-// ─── PC: 인파 관리 (관제센터에서 직접 조작) ───────────────────────────────────
+// ─── PC: 인파 관리 (계수원 데이터 실시간 모니터링) ───────────────────────────────────
 function CC_CrowdPage({ settings, setSettings, categories, setCategories, session, setCcPage }) {
-  const [crowdState, setCrowdState] = useState({ total: 0, cumulative: 0, zones: [] });
+  const [crowdState, setCrowdState] = useState({ total: 0, cumulative: 0, zones: [], updatedAt: 0, updatedBy: "" });
   const stateRef = useRef(crowdState);
+  const [showAdminControls, setShowAdminControls] = useState(false);
   
   // 초기 로드 + 폴링
   useEffect(() => {
@@ -5315,13 +5316,19 @@ function CC_CrowdPage({ settings, setSettings, categories, setCategories, sessio
       if (!window.crowdDB) return;
       window.crowdDB.get().then(data => {
         if (!mounted || !data) return;
-        const d = { total: data.total || 0, cumulative: data.cumulative || 0, zones: data.zones || [] };
+        const d = { 
+          total: data.total || 0, 
+          cumulative: data.cumulative || 0, 
+          zones: data.zones || [],
+          updatedAt: data.updatedAt || 0,
+          updatedBy: data.updatedBy || ""
+        };
         stateRef.current = d;
         setCrowdState(d);
       }).catch(() => {});
     };
     fetchDB();
-    const poll = setInterval(fetchDB, 10000);
+    const poll = setInterval(fetchDB, 5000);
     return () => { mounted = false; clearInterval(poll); };
   }, []);
   
@@ -5329,7 +5336,13 @@ function CC_CrowdPage({ settings, setSettings, categories, setCategories, sessio
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.total !== undefined) {
-        const d = { total: e.detail.total || 0, cumulative: e.detail.cumulative || 0, zones: e.detail.zones || stateRef.current.zones || [] };
+        const d = { 
+          total: e.detail.total || 0, 
+          cumulative: e.detail.cumulative || 0, 
+          zones: e.detail.zones || stateRef.current.zones || [],
+          updatedAt: e.detail.updatedAt || Date.now(),
+          updatedBy: e.detail.updatedBy || ""
+        };
         stateRef.current = d;
         setCrowdState(d);
       }
@@ -5338,145 +5351,215 @@ function CC_CrowdPage({ settings, setSettings, categories, setCategories, sessio
     return () => window.removeEventListener("crowd-update", handler);
   }, []);
   
+  const gates = settings.gates || [];
   const crowd = (categories || []).find(c => c.id === "crowd");
   const lv = crowd ? getLevel({ ...crowd, currentValue: crowdState.total }) : "BLUE";
   const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
   const lvLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[lv];
   
-  // 변경 함수
-  const updateCrowd = (deltaCurrent, deltaCumulative = 0) => {
-    const newTotal = Math.max(0, (stateRef.current.total || 0) + deltaCurrent);
-    const newCum = Math.max(0, (stateRef.current.cumulative || 0) + deltaCumulative);
-    if (window.crowdDB) {
-      window.crowdDB.set(newTotal, newCum, stateRef.current.zones || [], session?.id || "pc-control");
-    }
-  };
+  // 게이트별 데이터 + 비활성 감지
+  const now = Date.now();
+  const gateData = gates.map(g => {
+    const z = (crowdState.zones || []).find(zz => zz.id === g.id);
+    return {
+      ...g,
+      count: z?.count || 0,
+      cumulative: z?.cumulative || 0,
+      lastSeen: z?.lastSeen || null
+    };
+  });
   
+  const sumGateCount = gateData.reduce((s, z) => s + z.count, 0);
+  const sumGateCum = gateData.reduce((s, z) => s + z.cumulative, 0);
+  
+  // 마지막 업데이트
+  const sinceUpdate = crowdState.updatedAt ? Math.floor((now - crowdState.updatedAt) / 1000) : null;
+  const updateLabel = sinceUpdate === null ? "데이터 없음" : 
+    sinceUpdate < 60 ? `${sinceUpdate}초 전` : 
+    sinceUpdate < 3600 ? `${Math.floor(sinceUpdate/60)}분 전` : 
+    `${Math.floor(sinceUpdate/3600)}시간 전`;
+  const updateColor = sinceUpdate === null ? "#6c6e7d" :
+    sinceUpdate < 30 ? "#4cd99a" :
+    sinceUpdate < 300 ? "#f5c451" : "#ff9a3c";
+  
+  // 관리자 직접 조작 함수
   const setExactCurrent = () => {
-    const v = parseInt(prompt("현재 체류 인원을 입력하세요:", crowdState.total) || "");
+    const v = parseInt(prompt("현재 체류 인원을 직접 입력하세요:", crowdState.total) || "");
     if (isNaN(v) || v < 0) return;
     if (window.crowdDB) {
-      window.crowdDB.set(v, stateRef.current.cumulative || 0, stateRef.current.zones || [], session?.id || "pc-control");
+      window.crowdDB.set(v, stateRef.current.cumulative || 0, stateRef.current.zones || [], (session?.name || "관리자") + " (PC)");
     }
   };
   
   const setExactCumulative = () => {
-    const v = parseInt(prompt("누적 방문객 수를 입력하세요:", crowdState.cumulative) || "");
+    const v = parseInt(prompt("누적 방문객 수를 직접 입력하세요:", crowdState.cumulative) || "");
     if (isNaN(v) || v < 0) return;
     if (window.crowdDB) {
-      window.crowdDB.set(stateRef.current.total || 0, v, stateRef.current.zones || [], session?.id || "pc-control");
+      window.crowdDB.set(stateRef.current.total || 0, v, stateRef.current.zones || [], (session?.name || "관리자") + " (PC)");
     }
   };
   
   const resetAll = () => {
-    if (!confirm("인파관리 데이터를 초기화하시겠습니까?\n현재 체류 인원과 누적 방문객이 모두 0이 됩니다.")) return;
+    if (!confirm("⚠️ 인파 데이터 전체 초기화\n\n현재 체류 인원, 누적 방문객, 게이트별 카운트가 모두 0이 됩니다.\n\n계속하시겠습니까?")) return;
     if (window.crowdDB) {
-      window.crowdDB.set(0, 0, (stateRef.current.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })), session?.id || "pc-control");
+      const resetZones = (stateRef.current.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 }));
+      window.crowdDB.set(0, 0, resetZones, (session?.name || "관리자") + " (PC)");
     }
   };
   
   const resetCumOnly = () => {
-    if (!confirm("누적 방문객만 0으로 초기화하시겠습니까?\n(현재 체류 인원은 유지)")) return;
+    if (!confirm("누적 방문객만 0으로 초기화하시겠습니까?\n(현재 체류 인원과 게이트별 카운트는 유지)")) return;
     if (window.crowdDB) {
-      window.crowdDB.set(stateRef.current.total || 0, 0, stateRef.current.zones || [], session?.id || "pc-control");
+      const resetZones = (stateRef.current.zones || []).map(z => ({ ...z, cumulative: 0 }));
+      window.crowdDB.set(stateRef.current.total || 0, 0, resetZones, (session?.name || "관리자") + " (PC)");
     }
   };
   
-  const incrementBy = (n) => updateCrowd(n, n > 0 ? n : 0);  // 입장은 누적도 증가
-  
   return (<div>
-    {/* KPI 카드 */}
+    {/* 메인 KPI - 4열 */}
     <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-      {/* 메인 카드 - 현재 인원 */}
-      <CC_Card style={{ background: `linear-gradient(180deg, ${lvColor}15, ${lvColor}05), #14151f`, border: `1px solid ${lvColor}40`, position: "relative", overflow: "hidden" }}>
+      <CC_Card style={{ background: `linear-gradient(180deg, ${lvColor}15, ${lvColor}05), #14151f`, border: `1px solid ${lvColor}40` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>👥 현재 체류 인원</span>
-          <span style={{ padding: "3px 10px", borderRadius: 999, background: `${lvColor}25`, color: lvColor, fontSize: 11, fontWeight: 700 }}>{lvLabel}</span>
+          <span style={{ padding: "3px 10px", borderRadius: 999, background: `${lvColor}25`, color: lvColor, fontSize: 11, fontWeight: 700, animation: lv === "RED" || lv === "ORANGE" ? "blink 1.5s infinite" : "none" }}>● {lvLabel}</span>
         </div>
-        <div style={{ fontSize: 56, fontWeight: 800, color: lvColor, fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowdState.total || 0).toLocaleString()}</div>
-        <div style={{ fontSize: 14, color: "#94A3B8" }}>명 (실시간)</div>
+        <div style={{ fontSize: 56, fontWeight: 800, color: lvColor, fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 6 }}>{(crowdState.total || 0).toLocaleString()}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>명</span>
+          <span style={{ width: 4, height: 4, borderRadius: 2, background: "#6c6e7d" }} />
+          <span style={{ fontSize: 11, color: updateColor }}>● {updateLabel}</span>
+          {crowdState.updatedBy && <>
+            <span style={{ width: 4, height: 4, borderRadius: 2, background: "#6c6e7d" }} />
+            <span style={{ fontSize: 11, color: "#6c6e7d" }}>by {crowdState.updatedBy}</span>
+          </>}
+        </div>
       </CC_Card>
       
-      {/* 누적 방문객 */}
       <CC_Card>
         <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>📊 누적 방문객</div>
         <div style={{ fontSize: 32, fontWeight: 700, color: "#42A5F5", fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowdState.cumulative || 0).toLocaleString()}</div>
         <div style={{ fontSize: 12, color: "#94A3B8" }}>명 (오늘 총합)</div>
       </CC_Card>
       
-      {/* 임계값 정보 */}
+      <CC_Card>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>🚪 활성 출입구</div>
+        <div style={{ fontSize: 32, fontWeight: 700, color: "#a980ff", fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{gates.length}</div>
+        <div style={{ fontSize: 12, color: "#94A3B8" }}>{gates.filter(g => g.accountId).length}곳 계수원 배정</div>
+      </CC_Card>
+      
       <CC_Card>
         <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>⚠️ 임계값 (RED)</div>
         <div style={{ fontSize: 24, fontWeight: 700, color: "#ff5e7e", fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowd?.thresholds?.RED?.[0] || 30000).toLocaleString()}</div>
         <div style={{ fontSize: 12, color: "#94A3B8" }}>명 이상 위험</div>
       </CC_Card>
-      
-      {/* 단계 */}
-      <CC_Card>
-        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>📍 현재 단계</div>
-        <div style={{ fontSize: 28, fontWeight: 800, color: lvColor, lineHeight: 1, marginBottom: 4 }}>{lv}</div>
-        <div style={{ fontSize: 12, color: lvColor }}>{lvLabel} 단계</div>
-      </CC_Card>
     </div>
     
-    {/* 빠른 조작 */}
-    <CC_Card title="🎮 빠른 조작" sub="입장/퇴장 인원 카운트" style={{ marginBottom: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {/* 입장 (체류 + 누적 동시 증가) */}
-        <div style={{ padding: 16, borderRadius: 12, background: "rgba(76,217,154,0.05)", border: "1px solid rgba(76,217,154,0.2)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 20 }}>➕</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#4cd99a" }}>입장 (체류 + 누적 증가)</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-            {[1, 5, 10, 50].map(n => (<button key={n} onClick={() => incrementBy(n)} style={{ padding: "14px 8px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.08)", color: "#4cd99a", fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(76,217,154,0.18)"; e.currentTarget.style.transform = "scale(1.05)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(76,217,154,0.08)"; e.currentTarget.style.transform = "scale(1)"; }}>
-              +{n}
-            </button>))}
-          </div>
+    {/* 출입구별 실시간 현황 (메인) */}
+    <CC_Card title="🚪 출입구별 실시간 현황" sub={`${gates.length}개 출입구 · 계수원 데이터 실시간 수신`} style={{ marginBottom: 16 }}>
+      {gates.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>🚪</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#b0b3c4", marginBottom: 6 }}>등록된 출입구가 없습니다</div>
+          <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 14 }}>모바일 ⚙️설정 → 인파관리 설정에서 출입구를 등록하세요</div>
+          <CC_Btn size="sm" variant="primary" onClick={() => setCcPage("settings")}>⚙️ 설정으로 이동</CC_Btn>
         </div>
-        
-        {/* 퇴장 (체류만 감소) */}
-        <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,154,60,0.05)", border: "1px solid rgba(255,154,60,0.2)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 20 }}>➖</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#ff9a3c" }}>퇴장 (체류만 감소)</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-            {[1, 5, 10, 50].map(n => (<button key={n} onClick={() => updateCrowd(-n, 0)} disabled={crowdState.total < n} style={{ padding: "14px 8px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.3)", background: crowdState.total < n ? "rgba(255,255,255,0.02)" : "rgba(255,154,60,0.08)", color: crowdState.total < n ? "#444" : "#ff9a3c", fontSize: 16, fontWeight: 700, cursor: crowdState.total < n ? "default" : "pointer", transition: "all 0.15s" }}
-              onMouseEnter={e => { if (crowdState.total >= n) { e.currentTarget.style.background = "rgba(255,154,60,0.18)"; e.currentTarget.style.transform = "scale(1.05)"; } }}
-              onMouseLeave={e => { if (crowdState.total >= n) { e.currentTarget.style.background = "rgba(255,154,60,0.08)"; e.currentTarget.style.transform = "scale(1)"; } }}>
-              -{n}
-            </button>))}
-          </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+          {gateData.map(g => {
+            const ratio = sumGateCount > 0 ? (g.count / sumGateCount) * 100 : 0;
+            const cumRatio = sumGateCum > 0 ? (g.cumulative / sumGateCum) * 100 : 0;
+            return (<div key={g.id} style={{ padding: 14, borderRadius: 12, background: "linear-gradient(180deg, rgba(76,217,154,0.04), rgba(76,217,154,0.01)), #14151f", border: "1px solid rgba(76,217,154,0.15)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", display: "flex", alignItems: "center", gap: 6 }}>
+                  🚪 {g.name}
+                </span>
+                {g.accountId ? <span style={{ padding: "2px 8px", borderRadius: 999, background: "rgba(76,217,154,0.15)", color: "#4cd99a", fontSize: 10, fontWeight: 700 }}>● 배정됨</span> : <span style={{ fontSize: 10, color: "#6c6e7d" }}>미배정</span>}
+              </div>
+              {g.assignee && <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 8 }}>👤 {g.assignee}</div>}
+              
+              {/* 현재 체류 */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: "#6c6e7d" }}>현재 체류</span>
+                  <span style={{ fontSize: 10, color: "#6c6e7d" }}>{ratio.toFixed(1)}%</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: "#4cd99a", fontFamily: "JetBrains Mono", lineHeight: 1 }}>{g.count.toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: "#6c6e7d" }}>명</span>
+                </div>
+                <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, ratio)}%`, height: "100%", background: "linear-gradient(90deg, #4cd99a, #6b8aff)", borderRadius: 2, transition: "width 0.3s" }} />
+                </div>
+              </div>
+              
+              {/* 누적 입장 */}
+              <div style={{ paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 11, color: "#6c6e7d" }}>누적 입장</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#42A5F5", fontFamily: "JetBrains Mono" }}>{g.cumulative.toLocaleString()}<span style={{ fontSize: 10, color: "#6c6e7d", fontWeight: 400 }}> 명 ({cumRatio.toFixed(1)}%)</span></span>
+                </div>
+              </div>
+            </div>);
+          })}
         </div>
-      </div>
+      )}
     </CC_Card>
     
-    {/* 직접 입력 + 초기화 */}
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-      <CC_Card title="✏️ 직접 입력" sub="정확한 값으로 설정">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button onClick={setExactCurrent} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.05)", color: "#4cd99a", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>👥 현재 체류 인원 직접 입력 →</button>
-          <button onClick={setExactCumulative} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(66,165,245,0.3)", background: "rgba(66,165,245,0.05)", color: "#42A5F5", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>📊 누적 방문객 직접 입력 →</button>
+    {/* 합계 검증 + 데이터 불일치 알림 */}
+    {gates.length > 0 && Math.abs(sumGateCount - crowdState.total) > 0 && <CC_Card tinted style={{ marginBottom: 16, border: "1px solid rgba(255,154,60,0.3)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,154,60,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⚠️</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#ff9a3c" }}>합계 불일치 감지</div>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+            게이트 합: <span style={{ fontFamily: "JetBrains Mono", fontWeight: 700 }}>{sumGateCount.toLocaleString()}</span>명 / 표시 인원: <span style={{ fontFamily: "JetBrains Mono", fontWeight: 700 }}>{crowdState.total.toLocaleString()}</span>명 (차이: {(crowdState.total - sumGateCount).toLocaleString()}명)
+          </div>
         </div>
-      </CC_Card>
+        <CC_Btn size="sm" variant="ghost" onClick={() => {
+          if (!confirm(`전체 인원을 게이트 합계 (${sumGateCount}명)로 맞추시겠습니까?`)) return;
+          if (window.crowdDB) window.crowdDB.set(sumGateCount, sumGateCum, stateRef.current.zones || [], (session?.name || "관리자") + " (PC)");
+        }}>합계로 맞추기</CC_Btn>
+      </div>
+    </CC_Card>}
+    
+    {/* 관리자 도구 (접기/펼치기) */}
+    <CC_Card style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>🛠️</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa" }}>관리자 도구</div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>직접 입력 / 초기화 / CCTV 카운트 입력</div>
+          </div>
+        </div>
+        <CC_Btn size="sm" variant="ghost" onClick={() => setShowAdminControls(!showAdminControls)}>{showAdminControls ? "▲ 닫기" : "▼ 펼치기"}</CC_Btn>
+      </div>
       
-      <CC_Card title="🔄 초기화" sub="확인 후 적용">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button onClick={resetCumOnly} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>📊 누적만 초기화 (체류는 유지)</button>
-          <button onClick={resetAll} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>🚨 전체 초기화 (체류 + 누적 + 구역)</button>
+      {showAdminControls && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6, fontWeight: 600 }}>✏️ 직접 입력</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={setExactCurrent} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.05)", color: "#4cd99a", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>👥 현재 체류 인원 입력 →</button>
+            <button onClick={setExactCumulative} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(66,165,245,0.3)", background: "rgba(66,165,245,0.05)", color: "#42A5F5", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>📊 누적 방문객 입력 →</button>
+          </div>
         </div>
-      </CC_Card>
-    </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6, fontWeight: 600 }}>🔄 초기화</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={resetCumOnly} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>📊 누적만 초기화</button>
+            <button onClick={resetAll} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>🚨 전체 초기화</button>
+          </div>
+        </div>
+      </div>}
+    </CC_Card>
     
     {/* 안내 */}
     <CC_Card>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 18 }}>💡</span>
-          <span style={{ fontSize: 13, color: "#94A3B8" }}>모든 변경은 모바일 카운터와 실시간 동기화됩니다. 다른 기기 변경 사항이 자동 반영됩니다.</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 4 }}>
+        <span style={{ fontSize: 18 }}>💡</span>
+        <div style={{ flex: 1, fontSize: 12, color: "#94A3B8" }}>
+          <strong style={{ color: "#f4f5fa" }}>실시간 흐름:</strong> 계수원 모바일(+/-) → Supabase → PC 관제 (5초 폴링 + Realtime)
+          <br /><strong style={{ color: "#f4f5fa" }}>참고:</strong> 계수원이 카운트하면 즉시 반영됩니다. 데이터 불일치 시 게이트 합계로 자동 조정 가능합니다.
         </div>
         <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("monitor")}>📡 모니터링 →</CC_Btn>
       </div>
@@ -7404,7 +7487,7 @@ function CounterPage({ categories, setCategories, settings, setSettings, session
     let newCur, newCum;
     if (selZone) {
       // 게이트 모드: 해당 게이트만 변경
-      newZones = newZones.map(z => z.id === selZone ? { ...z, count: Math.max(0, (z.count || 0) + d), cumulative: d > 0 ? (z.cumulative || 0) + d : (z.cumulative || 0) } : z);
+      newZones = newZones.map(z => z.id === selZone ? { ...z, count: Math.max(0, (z.count || 0) + d), cumulative: d > 0 ? (z.cumulative || 0) + d : (z.cumulative || 0), lastSeen: Date.now(), lastBy: session?.name || session?.id || "counter" } : z);
       // 전체는 게이트 합으로 재계산 (정합성 보장)
       newCur = newZones.reduce((s, z) => s + (z.count || 0), 0);
       newCum = newZones.reduce((s, z) => s + (z.cumulative || 0), 0);
