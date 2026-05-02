@@ -5271,6 +5271,225 @@ function CC_MonitorPage({ categories, settings, setSettings, session }) {
         </ResponsiveContainer>
       </div>
     </CC_Card>}
+    
+    {/* 👥 인파 카테고리 선택 시 - 시간별/일자별/게이트별 추가 분석 */}
+    {cat.id === "crowd" && <CC_CrowdAnalytics settings={settings} cat={cat} />}
+  </>);
+}
+
+// 인파관리 추가 분석 (읽기 전용 - 동기화 안 건드림)
+function CC_CrowdAnalytics({ settings, cat }) {
+  const [crowdState, setCrowdState] = useState({ total: 0, cumulative: 0, zones: [], updatedAt: 0 });
+  const [hourlyHistory, setHourlyHistory] = useState([]);  // 시간별 누적 히스토리
+  
+  // 인파 데이터 폴링 (읽기 전용 - crowdDB 동기화는 건드리지 않음)
+  useEffect(() => {
+    let mounted = true;
+    const fetchData = () => {
+      if (!window.crowdDB) return;
+      window.crowdDB.get().then(data => {
+        if (!mounted || !data) return;
+        setCrowdState({
+          total: data.total || 0,
+          cumulative: data.cumulative || 0,
+          zones: data.zones || [],
+          updatedAt: data.updatedAt || 0
+        });
+      }).catch(() => {});
+    };
+    fetchData();
+    const poll = setInterval(fetchData, 10000);
+    
+    // crowd-update 이벤트도 수신
+    const handler = (e) => {
+      if (e.detail?.total !== undefined) {
+        setCrowdState({
+          total: e.detail.total || 0,
+          cumulative: e.detail.cumulative || 0,
+          zones: e.detail.zones || [],
+          updatedAt: e.detail.updatedAt || Date.now()
+        });
+      }
+    };
+    window.addEventListener("crowd-update", handler);
+    return () => { mounted = false; clearInterval(poll); window.removeEventListener("crowd-update", handler); };
+  }, []);
+  
+  // 시간별 히스토리 누적 (1시간마다 1포인트)
+  useEffect(() => {
+    if (!crowdState.total && !crowdState.cumulative) return;
+    const now = new Date();
+    const hour = now.getHours();
+    const hourKey = `${now.toISOString().slice(0,10)}_${hour}`;
+    
+    setHourlyHistory(prev => {
+      const existing = prev.find(p => p.hourKey === hourKey);
+      if (existing) {
+        // 같은 시간대면 최대값 갱신
+        return prev.map(p => p.hourKey === hourKey ? {
+          ...p,
+          peak: Math.max(p.peak, crowdState.total),
+          cumulative: Math.max(p.cumulative, crowdState.cumulative),
+          last: crowdState.total
+        } : p);
+      }
+      // 새 시간대 추가
+      const next = [...prev, {
+        hourKey,
+        time: `${String(hour).padStart(2, "0")}:00`,
+        date: now.toISOString().slice(0, 10),
+        hour,
+        peak: crowdState.total,
+        last: crowdState.total,
+        cumulative: crowdState.cumulative
+      }];
+      return next.slice(-24);  // 최근 24시간만 보관
+    });
+  }, [crowdState.total, crowdState.cumulative]);
+  
+  // 일자별 데이터 (settings.dailyRecords 사용 - 기존 구조)
+  const dailyRecords = (settings.dailyRecords || []).slice(-7);  // 최근 7일
+  
+  // 게이트별 데이터
+  const gates = settings.gates || [];
+  const gateChartData = gates.map(g => {
+    const z = (crowdState.zones || []).find(zz => zz.id === g.id);
+    return {
+      name: g.name || "미명",
+      체류: z?.count || 0,
+      누적: z?.cumulative || 0
+    };
+  });
+  
+  const totalGateCount = gateChartData.reduce((s, g) => s + g.체류, 0);
+  const totalGateCum = gateChartData.reduce((s, g) => s + g.누적, 0);
+  
+  return (<>
+    {/* 시간별 출입 현황 */}
+    <CC_Card title="🕐 시간별 출입 현황" sub={`최근 ${hourlyHistory.length}시간 · 시간당 최고/현재 인원`} style={{ marginTop: 16 }}>
+      {hourlyHistory.length === 0 ? (
+        <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>📊 데이터 누적 중... 시간이 경과하면 표시됩니다</div>
+      ) : (
+        <div style={{ width: "100%", height: 240 }}>
+          <ResponsiveContainer>
+            <LineChart data={hourlyHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+              <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={60} tickFormatter={v => v.toLocaleString()} />
+              <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => v.toLocaleString() + " 명"} />
+              {Array.isArray(cat.thresholds?.YELLOW) && <ReferenceLine y={cat.thresholds.YELLOW[0]} stroke="#f5c451" strokeDasharray="4 4" label={{ value: "주의", fill: "#f5c451", fontSize: 10 }} />}
+              {Array.isArray(cat.thresholds?.ORANGE) && <ReferenceLine y={cat.thresholds.ORANGE[0]} stroke="#ff9a3c" strokeDasharray="4 4" label={{ value: "경계", fill: "#ff9a3c", fontSize: 10 }} />}
+              {Array.isArray(cat.thresholds?.RED) && <ReferenceLine y={cat.thresholds.RED[0]} stroke="#ff5e7e" strokeDasharray="4 4" label={{ value: "심각", fill: "#ff5e7e", fontSize: 10 }} />}
+              <Line type="monotone" dataKey="peak" stroke="#ff9a3c" strokeWidth={2} dot={{ fill: "#ff9a3c", r: 3 }} name="시간 최고" />
+              <Line type="monotone" dataKey="last" stroke="#4cd99a" strokeWidth={2} dot={{ fill: "#4cd99a", r: 3 }} name="현재" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </CC_Card>
+
+    {/* 누적 방문객 추이 (시간별) */}
+    <CC_Card title="📊 누적 방문객 추이" sub={`시간 흐름에 따른 누적 입장자 수`} style={{ marginTop: 16 }}>
+      {hourlyHistory.length === 0 ? (
+        <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>📊 데이터 누적 중...</div>
+      ) : (
+        <div style={{ width: "100%", height: 200 }}>
+          <ResponsiveContainer>
+            <LineChart data={hourlyHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+              <XAxis dataKey="time" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={60} tickFormatter={v => v.toLocaleString()} />
+              <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v) => v.toLocaleString() + " 명"} />
+              <Line type="monotone" dataKey="cumulative" stroke="#42A5F5" strokeWidth={2.5} dot={{ fill: "#42A5F5", r: 3 }} name="누적 방문" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </CC_Card>
+
+    {/* 게이트별 분포 + 일자별 출입 현황 (2열) */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+      {/* 게이트별 현재 분포 */}
+      <CC_Card title="🚪 출입구별 현재 분포" sub={`${gates.length}개 출입구`}>
+        {gates.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>등록된 출입구 없음</div>
+        ) : gateChartData.length === 0 || totalGateCount === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>아직 카운트된 인원이 없습니다</div>
+        ) : (
+          <div>
+            {gateChartData.map((g, i) => {
+              const ratio = totalGateCount > 0 ? (g.체류 / totalGateCount * 100) : 0;
+              const cumRatio = totalGateCum > 0 ? (g.누적 / totalGateCum * 100) : 0;
+              const colors = ["#4cd99a", "#42A5F5", "#a980ff", "#ff9a3c", "#f5c451", "#ff5e7e"];
+              const color = colors[i % colors.length];
+              return (<div key={i} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#f4f5fa" }}>🚪 {g.name}</span>
+                  <span className="mono" style={{ fontSize: 12, color, fontWeight: 700 }}>{g.체류.toLocaleString()}명 ({ratio.toFixed(1)}%)</span>
+                </div>
+                <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(255,255,255,0.04)", overflow: "hidden", marginBottom: 4 }}>
+                  <div style={{ width: `${Math.min(100, ratio)}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.3s" }} />
+                </div>
+                <div style={{ fontSize: 10, color: "#6c6e7d", textAlign: "right" }}>누적: {g.누적.toLocaleString()}명 ({cumRatio.toFixed(1)}%)</div>
+              </div>);
+            })}
+            <div style={{ paddingTop: 10, marginTop: 6, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "#94A3B8" }}>합계</span>
+              <span className="mono" style={{ color: "#f4f5fa", fontWeight: 700 }}>체류 {totalGateCount.toLocaleString()} / 누적 {totalGateCum.toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+      </CC_Card>
+
+      {/* 일자별 출입 현황 */}
+      <CC_Card title="📅 일자별 출입 현황" sub={`최근 ${dailyRecords.length}일 · 일별 마감 기록`}>
+        {dailyRecords.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>📊 일자별 기록이 없습니다<br/><span style={{ fontSize: 11 }}>모바일 카운터의 "금일 데이터 저장"으로 기록</span></div>
+        ) : (
+          <div style={{ width: "100%", height: 220 }}>
+            <ResponsiveContainer>
+              <LineChart data={dailyRecords.map(d => ({ ...d, dateLabel: d.date.slice(5) }))} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
+                <XAxis dataKey="dateLabel" tick={{ fill: "#6c6e7d", fontSize: 11 }} />
+                <YAxis tick={{ fill: "#6c6e7d", fontSize: 11 }} width={60} tickFormatter={v => v.toLocaleString()} />
+                <Tooltip contentStyle={{ background: "#0e0f17", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13 }} formatter={(v, name) => [v.toLocaleString() + "명", name]} />
+                <Line type="monotone" dataKey="cumulative" stroke="#42A5F5" strokeWidth={2.5} dot={{ fill: "#42A5F5", r: 4 }} name="일 누적" />
+                <Line type="monotone" dataKey="peakCurrent" stroke="#ff9a3c" strokeWidth={2} dot={{ fill: "#ff9a3c", r: 3 }} name="최고 체류" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CC_Card>
+    </div>
+
+    {/* 일자별 상세 표 */}
+    {dailyRecords.length > 0 && <CC_Card title="📋 일자별 상세 기록" sub={`${dailyRecords.length}일치`} style={{ marginTop: 16 }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <th style={{ padding: "10px 12px", textAlign: "left", color: "#6c6e7d", fontWeight: 600 }}>날짜</th>
+              <th style={{ padding: "10px 12px", textAlign: "right", color: "#42A5F5", fontWeight: 600 }}>📊 누적 방문</th>
+              <th style={{ padding: "10px 12px", textAlign: "right", color: "#ff9a3c", fontWeight: 600 }}>👥 최고 체류</th>
+              <th style={{ padding: "10px 12px", textAlign: "right", color: "#a980ff", fontWeight: 600 }}>🚪 종료 시 체류</th>
+              <th style={{ padding: "10px 12px", textAlign: "left", color: "#6c6e7d", fontWeight: 600 }}>출입구별 누적</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...dailyRecords].reverse().map((d, i) => (<tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <td style={{ padding: "10px 12px", color: "#f4f5fa", fontWeight: 600 }}>{d.date}</td>
+              <td className="mono" style={{ padding: "10px 12px", textAlign: "right", color: "#42A5F5", fontWeight: 700 }}>{(d.cumulative || 0).toLocaleString()}</td>
+              <td className="mono" style={{ padding: "10px 12px", textAlign: "right", color: "#ff9a3c" }}>{(d.peakCurrent || 0).toLocaleString()}</td>
+              <td className="mono" style={{ padding: "10px 12px", textAlign: "right", color: "#a980ff" }}>{(d.currentAtClose || 0).toLocaleString()}</td>
+              <td style={{ padding: "10px 12px", color: "#94A3B8", fontSize: 11 }}>
+                {(d.zones || []).filter(z => z.cumulative > 0).slice(0, 3).map(z => `${z.name}: ${(z.cumulative).toLocaleString()}`).join(" · ") || "-"}
+                {(d.zones || []).filter(z => z.cumulative > 0).length > 3 && ` 외 ${(d.zones || []).filter(z => z.cumulative > 0).length - 3}곳`}
+              </td>
+            </tr>))}
+          </tbody>
+        </table>
+      </div>
+    </CC_Card>}
   </>);
 }
 
