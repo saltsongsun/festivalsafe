@@ -468,6 +468,45 @@ function usePersist(key, init) {
     return () => { cancelled = true; };
   }, [key]);
 
+  // 🔄 주기적 폴링: 30초마다 Supabase 최신값 확인 (다른 기기 변경 감지)
+  useEffect(() => {
+    if (!key || !key.includes("_v")) return;  // 데이터 키만
+    const interval = setInterval(async () => {
+      if (!window.storage || !supabaseLoaded.current) return;
+      if (selfSave.current) return;  // 내가 막 저장한 직후엔 스킵
+      const sinceLastEdit = Date.now() - (lastEditTime.current || 0);
+      if (sinceLastEdit < 10000) return;  // 10초 내 편집했으면 스킵
+      
+      try {
+        const r = await window.storage.get(key);
+        if (!r?.value || r.value === lastJson.current) return;  // 변경 없음
+        
+        const cloud = JSON.parse(r.value);
+        // 🛡️ workSites/programs/assets 등 데이터 급감 체크
+        if (key.endsWith("_set_v10") && valRef.current && typeof valRef.current === "object") {
+          const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+          const cloudWorkers = (cloud.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+          if (myWorkers > 5 && cloudWorkers < myWorkers * 0.5) {
+            console.warn(`[usePersist] 🛡️ 폴링 중 근무자 급감 거부 (${myWorkers} → ${cloudWorkers})`);
+            return;
+          }
+        }
+        
+        // 클라우드 메타데이터가 더 최신이면 적용
+        const cloudTime = cloud._meta?.lastEditTime || 0;
+        const myTime = valRef.current?._meta?.lastEditTime || 0;
+        if (cloudTime > myTime) {
+          console.log(`[usePersist] 🔄 폴링: 클라우드 최신 적용 (cloud: ${new Date(cloudTime).toLocaleTimeString()}, my: ${myTime ? new Date(myTime).toLocaleTimeString() : "없음"})`, key.slice(0, 50));
+          lastJson.current = r.value;
+          setVal(cloud);
+          valRef.current = cloud;
+          try { localStorage.setItem(key, r.value); } catch {}
+        }
+      } catch (e) { /* 폴링 실패 무시 */ }
+    }, 30000);  // 30초마다
+    return () => clearInterval(interval);
+  }, [key]);
+
   // Realtime 이벤트 (자기 저장 3초간 무시 + 편집 직후 5초 보호)
   useEffect(() => {
     const handler = (e) => {
@@ -485,6 +524,21 @@ function usePersist(key, init) {
         if (j !== lastJson.current) {
           try {
             const p = JSON.parse(j);
+            
+            // 🛡️ 메타데이터 비교: 들어온 데이터가 내 데이터보다 옛 거면 거부
+            if (key.endsWith("_set_v10") && valRef.current?._meta?.lastEditTime && p?._meta?.lastEditTime) {
+              if (p._meta.lastEditTime < valRef.current._meta.lastEditTime - 5000) {
+                console.warn(`[usePersist] 🛡️ Realtime 옛 데이터 거부: ${new Date(p._meta.lastEditTime).toLocaleTimeString()} < my ${new Date(valRef.current._meta.lastEditTime).toLocaleTimeString()}`);
+                // 내 데이터 다시 push (다른 기기들도 갱신되도록)
+                if (window.storage && supabaseLoaded.current) {
+                  selfSave.current = true;
+                  window.storage.set(key, JSON.stringify(valRef.current)).finally(() => {
+                    setTimeout(() => { selfSave.current = false; }, 3000);
+                  });
+                }
+                return;
+              }
+            }
             
             // 🛡️ Realtime 보호: settings의 workSites가 갑자기 50% 이상 줄면 무시 (다른 기기의 옛 데이터)
             if (key.endsWith("_set_v10") && typeof p === "object" && !Array.isArray(p) && valRef.current && typeof valRef.current === "object") {
@@ -589,8 +643,21 @@ function usePersist(key, init) {
               setVal(latestVal); valRef.current = latestVal;
               try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
             }
+            
+            // 🛡️ 필드 변경 감지: 내가 안 만진 필드는 클라우드 우선 (Last-write-wins 약화)
+            // 내가 마지막으로 만진 시각이 5초 이전이면 → 클라우드의 최신 데이터를 머지
+            const sinceMyEdit = Date.now() - (lastEditTime.current || 0);
+            if (sinceMyEdit > 5000 && cloud._meta?.lastEditTime && cloud._meta.lastEditTime > (latestVal._meta?.lastEditTime || 0)) {
+              console.warn(`[usePersist] 🛡️ 클라우드가 더 최신 (cloud: ${new Date(cloud._meta.lastEditTime).toLocaleTimeString()}, my last edit ${Math.floor(sinceMyEdit/1000)}s ago). 클라우드 우선`);
+              latestVal = { ...cloud };  // 클라우드 전체 사용
+              setVal(latestVal); valRef.current = latestVal;
+              try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
+            }
           }
         } catch (e) { console.warn("[usePersist] 클라우드 머지 체크 실패:", e); }
+        
+        // 🕒 메타데이터: 마지막 편집 시각 기록 (다른 기기가 비교할 수 있도록)
+        latestVal = { ...latestVal, _meta: { ...(latestVal._meta || {}), lastEditTime: Date.now(), lastEditBy: (typeof window !== "undefined" && window._safeflowSession?.name) || "unknown" } };
       }
       
       const latestJson = JSON.stringify(latestVal);
@@ -1644,6 +1711,7 @@ const CC_SidebarContent = ({ active, alerts, settings, onNav, onLogout, festival
   const items = [
     { id: "dashboard", name: "대시보드", emoji: "🏠" },
     { id: "monitor", name: "실시간 모니터링", emoji: "📡" },
+    { id: "crowd", name: "인파 관리", emoji: "👥" },
     { id: "alert", name: "알림 / 경보", emoji: "🔔", badge: (alerts || []).length || null },
     { id: "incident", name: "사건 / 신고", emoji: "📁" },
     { id: "map", name: "지도 상황도", emoji: "🗺️" },
@@ -1842,6 +1910,51 @@ function MobileControlCenter({ session, accounts, setAccounts, settings, setSett
   const [page, setPage] = useState("dashboard");
   const [showMore, setShowMore] = useState(false);
 
+  // 🔄 인파 데이터 실시간 동기화
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.total !== undefined && setCategories) {
+        const crowdValue = e.detail.total || 0;
+        setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: crowdValue } : c));
+      }
+    };
+    window.addEventListener("crowd-update", handler);
+    
+    // 초기 로드
+    if (window.crowdDB) {
+      window.crowdDB.get().then(data => {
+        if (data && data.total !== undefined && setCategories) {
+          setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: data.total } : c));
+        }
+      }).catch(() => {});
+    }
+    try {
+      const local = JSON.parse(localStorage.getItem("_crowd") || "{}");
+      if (local.total !== undefined && setCategories) {
+        setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: local.total || 0 } : c));
+      }
+    } catch {}
+    
+    const poll = setInterval(() => {
+      if (window.crowdDB) {
+        window.crowdDB.get().then(data => {
+          if (data && data.total !== undefined && setCategories) {
+            setCategories(prev => prev.map(c => {
+              if (c.id !== "crowd") return c;
+              if (c.currentValue === data.total) return c;
+              return { ...c, currentValue: data.total };
+            }));
+          }
+        }).catch(() => {});
+      }
+    }, 10000);
+    
+    return () => {
+      window.removeEventListener("crowd-update", handler);
+      clearInterval(poll);
+    };
+  }, [setCategories]);
+  
   const overall = useMemo(() => {
     // 🚫 temp/humidity는 종합 위험도 계산에서 제외
     const lvs = (categories || []).filter(c => !EXCLUDE_FROM_OVERALL.includes(c.id)).map(c => getLevel(c));
@@ -3912,12 +4025,14 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
   
   // 새 근무자 추가
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newWorker, setNewWorker] = useState({ name: "", phone: "", role: "운영", siteId: "_pool", meals: 0 });
+  const [newWorker, setNewWorker] = useState({ name: "", phone: "", role: "운영", siteId: "_pool", meals: 0, createAccount: true });
+  const [addToast, setAddToast] = useState(null);
   
   const addWorker = () => {
     if (!newWorker.name.trim()) { alert("이름을 입력하세요"); return; }
-    const id = "wkr_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+    const id = "w_" + Date.now();  // 모바일과 동일한 ID 패턴 (w_)
     let targetSite = newWorker.siteId;
+    const trimmedName = newWorker.name.trim();
     
     setSettings(prev => {
       const ws = JSON.parse(JSON.stringify(prev.workSites || []));
@@ -3929,7 +4044,7 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       if (ti >= 0) {
         ws[ti].workers = [...(ws[ti].workers || []), {
           id,
-          name: newWorker.name.trim(),
+          name: trimmedName,
           phone: newWorker.phone.trim(),
           role: newWorker.role,
           meals: parseInt(newWorker.meals) || 0,
@@ -3941,8 +4056,34 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       return { ...prev, workSites: ws };
     });
     
-    setNewWorker({ name: "", phone: "", role: newWorker.role, siteId: newWorker.siteId, meals: 0 });
+    // 🔐 자동 계정 생성 (모바일 동일 로직: 이름 = ID, 비밀번호 = 1234)
+    let accountMsg = "";
+    if (newWorker.createAccount && setAccounts && accounts) {
+      const accountId = trimmedName;
+      const exists = accounts.find(a => a.id === accountId);
+      if (!exists) {
+        const role = ["관리자", "총괄"].includes(newWorker.role) ? "manager" : "staff";
+        setAccounts(prev => [...prev, {
+          id: accountId,
+          password: "1234",
+          name: trimmedName,
+          role,
+          phone: newWorker.phone.trim(),
+          workerId: id,
+          createdAt: new Date().toISOString()
+        }]);
+        accountMsg = ` · 계정 생성 (ID: ${accountId} / PW: 1234)`;
+      } else {
+        accountMsg = ` · ⚠️ 계정 ID 중복 (${accountId}) - 미생성`;
+      }
+    }
+    
+    setNewWorker({ name: "", phone: "", role: newWorker.role, siteId: newWorker.siteId, meals: 0, createAccount: newWorker.createAccount });
     setShowAddModal(false);
+    
+    // 토스트 표시
+    setAddToast(`✅ ${trimmedName} 추가됨${accountMsg}`);
+    setTimeout(() => setAddToast(null), 5000);
   };
   
   // 휴게시간 경고 해제 (관리자 확인)
@@ -4405,6 +4546,17 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
             <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>식수 (선택)</div>
             <input type="number" min="0" value={newWorker.meals} onChange={e => setNewWorker({...newWorker, meals: parseInt(e.target.value) || 0})} placeholder="0" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
           </div>
+          
+          {/* 자동 계정 생성 체크박스 */}
+          <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 8, background: newWorker.createAccount ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${newWorker.createAccount ? "rgba(76,217,154,0.2)" : "rgba(255,255,255,0.05)"}`, cursor: "pointer", transition: "all 0.15s" }}>
+            <input type="checkbox" checked={newWorker.createAccount} onChange={e => setNewWorker({...newWorker, createAccount: e.target.checked})} style={{ width: 18, height: 18, accentColor: "#4cd99a", cursor: "pointer" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: newWorker.createAccount ? "#4cd99a" : "#f4f5fa" }}>🔐 로그인 계정 자동 생성</div>
+              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                {newWorker.name.trim() ? <>ID: <span style={{ fontFamily: "JetBrains Mono", color: "#6b8aff" }}>{newWorker.name.trim()}</span> · PW: <span style={{ fontFamily: "JetBrains Mono", color: "#6b8aff" }}>1234</span> (역할: {["관리자", "총괄"].includes(newWorker.role) ? "manager" : "staff"})</> : "이름이 ID, 비밀번호는 1234로 자동 생성"}
+              </div>
+            </div>
+          </label>
         </div>
         
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
@@ -4412,10 +4564,15 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           <button onClick={addWorker} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(107,138,255,0.3)" }}>+ 추가하기</button>
         </div>
         
-        <div style={{ marginTop: 14, padding: 10, borderRadius: 8, background: "rgba(76,217,154,0.05)", border: "1px solid rgba(76,217,154,0.15)", fontSize: 11, color: "#94A3B8" }}>
-          💡 추가 후에도 카드를 드래그하여 다른 근무지로 이동할 수 있습니다. 계정 발급은 모바일의 사용자 관리에서 가능합니다.
+        <div style={{ marginTop: 14, padding: 10, borderRadius: 8, background: "rgba(66,165,245,0.05)", border: "1px solid rgba(66,165,245,0.15)", fontSize: 11, color: "#94A3B8" }}>
+          💡 추가된 인력은 모바일 인력 관리에서도 확인/편집 가능합니다. 카드를 드래그하여 다른 근무지로 이동할 수 있습니다.
         </div>
       </div>
+    </div>}
+    
+    {/* 토스트 알림 */}
+    {addToast && <div style={{ position: "fixed", top: 80, right: 20, zIndex: 3000, padding: "14px 20px", borderRadius: 12, background: "linear-gradient(180deg, rgba(76,217,154,0.95), rgba(76,217,154,0.85))", color: "#0e0f17", fontSize: 13, fontWeight: 700, boxShadow: "0 10px 30px rgba(76,217,154,0.3)", maxWidth: 480, animation: "slideInRight 0.3s ease" }}>
+      {addToast}
     </div>}
   </div>);
 }
@@ -4437,6 +4594,54 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
     };
     window.addEventListener("update-cat-actionItems", handler);
     return () => window.removeEventListener("update-cat-actionItems", handler);
+  }, [setCategories]);
+  
+  // 🔄 인파 데이터 실시간 동기화 (crowd-update 이벤트 수신)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.total !== undefined && setCategories) {
+        const crowdValue = e.detail.total || 0;
+        setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: crowdValue } : c));
+      }
+    };
+    window.addEventListener("crowd-update", handler);
+    
+    // 초기 로드: window.crowdDB에서 최신값 가져오기
+    if (window.crowdDB) {
+      window.crowdDB.get().then(data => {
+        if (data && data.total !== undefined && setCategories) {
+          setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: data.total } : c));
+        }
+      }).catch(() => {});
+    }
+    
+    // 폴백: localStorage에서 즉시 로드
+    try {
+      const local = JSON.parse(localStorage.getItem("_crowd") || "{}");
+      if (local.total !== undefined && setCategories) {
+        setCategories(prev => prev.map(c => c.id === "crowd" ? { ...c, currentValue: local.total || 0 } : c));
+      }
+    } catch {}
+    
+    // 10초마다 폴링 (Realtime 놓칠 경우 대비)
+    const poll = setInterval(() => {
+      if (window.crowdDB) {
+        window.crowdDB.get().then(data => {
+          if (data && data.total !== undefined && setCategories) {
+            setCategories(prev => prev.map(c => {
+              if (c.id !== "crowd") return c;
+              if (c.currentValue === data.total) return c;
+              return { ...c, currentValue: data.total };
+            }));
+          }
+        }).catch(() => {});
+      }
+    }, 10000);
+    
+    return () => {
+      window.removeEventListener("crowd-update", handler);
+      clearInterval(poll);
+    };
   }, [setCategories]);
   const overall = useMemo(() => {
     // 🚫 temp/humidity는 종합 위험도 계산에서 제외
@@ -4550,7 +4755,7 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
                   { label: "현재 인파", value: (crowd?.currentValue || 0).toLocaleString(), sub: crowd?.unit || "명", color: "#4cd99a", icon: "🏃" },
                   { label: "무전기 사용", value: allRadios.length, sub: "분배중", color: "#f5c451", icon: "📻" },
                 ];
-                return kpis.map(k => (<div key={k.label} style={{ padding: "14px 16px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+                return kpis.map(k => (<div key={k.label} style={{ padding: "14px 16px", borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25`, position: "relative" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
                     <span style={{ fontSize: 16 }}>{k.icon}</span>
                     <span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k.label}</span>
@@ -4559,6 +4764,15 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
                     <span style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", letterSpacing: "-0.02em", lineHeight: 1 }}>{k.value}</span>
                     <span style={{ fontSize: 11, color: "#6c6e7d" }}>{k.sub}</span>
                   </div>
+                  {/* 인파 카드에 +/- 버튼 */}
+                  {k.label === "현재 인파" && <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
+                    {[-10, -1, 1, 10].map(delta => (<button key={delta} onClick={() => {
+                      const cur = JSON.parse(localStorage.getItem("_crowd") || "{}");
+                      const newTotal = Math.max(0, (cur.total || 0) + delta);
+                      const newCum = (cur.cumulative || 0) + (delta > 0 ? delta : 0);
+                      if (window.crowdDB) window.crowdDB.set(newTotal, newCum, cur.zones || [], session?.id || "control");
+                    }} style={{ flex: 1, padding: "5px", borderRadius: 6, border: `1px solid ${delta > 0 ? "rgba(76,217,154,0.25)" : "rgba(255,94,126,0.25)"}`, background: delta > 0 ? "rgba(76,217,154,0.08)" : "rgba(255,94,126,0.08)", color: delta > 0 ? "#4cd99a" : "#ff5e7e", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "JetBrains Mono" }}>{delta > 0 ? `+${delta}` : delta}</button>))}
+                  </div>}
                 </div>));
               })()}
             </div>
@@ -4815,6 +5029,7 @@ function ControlCenterDashboard({ session, accounts, setAccounts, settings, setS
 
           {/* MONITOR 탭 */}
           {ccPage === "monitor" && <CC_MonitorPage categories={categories} settings={settings} setSettings={setSettings} session={session} />}
+          {ccPage === "crowd" && <CC_CrowdPage settings={settings} setSettings={setSettings} categories={categories} setCategories={setCategories} session={session} setCcPage={setCcPage} />}
           {ccPage === "alert" && <CC_AlertPage settings={settings} setSettings={setSettings} alerts={alerts} setAlerts={setAlerts} smsLog={smsLog} setSmsLog={setSmsLog} session={session} />}
           {ccPage === "incident" && <CC_IncidentPage settings={settings} setSettings={setSettings} session={session} />}
           {ccPage === "map" && <CC_MapPage settings={settings} setSettings={setSettings} session={session} />}
@@ -5086,6 +5301,187 @@ function CC_ChecklistEditor({ cat, session }) {
       </>
     )}
   </>);
+}
+
+// ─── PC: 인파 관리 (관제센터에서 직접 조작) ───────────────────────────────────
+function CC_CrowdPage({ settings, setSettings, categories, setCategories, session, setCcPage }) {
+  const [crowdState, setCrowdState] = useState({ total: 0, cumulative: 0, zones: [] });
+  const stateRef = useRef(crowdState);
+  
+  // 초기 로드 + 폴링
+  useEffect(() => {
+    let mounted = true;
+    const fetchDB = () => {
+      if (!window.crowdDB) return;
+      window.crowdDB.get().then(data => {
+        if (!mounted || !data) return;
+        const d = { total: data.total || 0, cumulative: data.cumulative || 0, zones: data.zones || [] };
+        stateRef.current = d;
+        setCrowdState(d);
+      }).catch(() => {});
+    };
+    fetchDB();
+    const poll = setInterval(fetchDB, 10000);
+    return () => { mounted = false; clearInterval(poll); };
+  }, []);
+  
+  // Realtime 수신
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.total !== undefined) {
+        const d = { total: e.detail.total || 0, cumulative: e.detail.cumulative || 0, zones: e.detail.zones || stateRef.current.zones || [] };
+        stateRef.current = d;
+        setCrowdState(d);
+      }
+    };
+    window.addEventListener("crowd-update", handler);
+    return () => window.removeEventListener("crowd-update", handler);
+  }, []);
+  
+  const crowd = (categories || []).find(c => c.id === "crowd");
+  const lv = crowd ? getLevel({ ...crowd, currentValue: crowdState.total }) : "BLUE";
+  const lvColor = { BLUE: "#4cd99a", YELLOW: "#f5c451", ORANGE: "#ff9a3c", RED: "#ff5e7e" }[lv];
+  const lvLabel = { BLUE: "정상", YELLOW: "주의", ORANGE: "경계", RED: "심각" }[lv];
+  
+  // 변경 함수
+  const updateCrowd = (deltaCurrent, deltaCumulative = 0) => {
+    const newTotal = Math.max(0, (stateRef.current.total || 0) + deltaCurrent);
+    const newCum = Math.max(0, (stateRef.current.cumulative || 0) + deltaCumulative);
+    if (window.crowdDB) {
+      window.crowdDB.set(newTotal, newCum, stateRef.current.zones || [], session?.id || "pc-control");
+    }
+  };
+  
+  const setExactCurrent = () => {
+    const v = parseInt(prompt("현재 체류 인원을 입력하세요:", crowdState.total) || "");
+    if (isNaN(v) || v < 0) return;
+    if (window.crowdDB) {
+      window.crowdDB.set(v, stateRef.current.cumulative || 0, stateRef.current.zones || [], session?.id || "pc-control");
+    }
+  };
+  
+  const setExactCumulative = () => {
+    const v = parseInt(prompt("누적 방문객 수를 입력하세요:", crowdState.cumulative) || "");
+    if (isNaN(v) || v < 0) return;
+    if (window.crowdDB) {
+      window.crowdDB.set(stateRef.current.total || 0, v, stateRef.current.zones || [], session?.id || "pc-control");
+    }
+  };
+  
+  const resetAll = () => {
+    if (!confirm("인파관리 데이터를 초기화하시겠습니까?\n현재 체류 인원과 누적 방문객이 모두 0이 됩니다.")) return;
+    if (window.crowdDB) {
+      window.crowdDB.set(0, 0, (stateRef.current.zones || []).map(z => ({ ...z, count: 0, cumulative: 0 })), session?.id || "pc-control");
+    }
+  };
+  
+  const resetCumOnly = () => {
+    if (!confirm("누적 방문객만 0으로 초기화하시겠습니까?\n(현재 체류 인원은 유지)")) return;
+    if (window.crowdDB) {
+      window.crowdDB.set(stateRef.current.total || 0, 0, stateRef.current.zones || [], session?.id || "pc-control");
+    }
+  };
+  
+  const incrementBy = (n) => updateCrowd(n, n > 0 ? n : 0);  // 입장은 누적도 증가
+  
+  return (<div>
+    {/* KPI 카드 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+      {/* 메인 카드 - 현재 인원 */}
+      <CC_Card style={{ background: `linear-gradient(180deg, ${lvColor}15, ${lvColor}05), #14151f`, border: `1px solid ${lvColor}40`, position: "relative", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>👥 현재 체류 인원</span>
+          <span style={{ padding: "3px 10px", borderRadius: 999, background: `${lvColor}25`, color: lvColor, fontSize: 11, fontWeight: 700 }}>{lvLabel}</span>
+        </div>
+        <div style={{ fontSize: 56, fontWeight: 800, color: lvColor, fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowdState.total || 0).toLocaleString()}</div>
+        <div style={{ fontSize: 14, color: "#94A3B8" }}>명 (실시간)</div>
+      </CC_Card>
+      
+      {/* 누적 방문객 */}
+      <CC_Card>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>📊 누적 방문객</div>
+        <div style={{ fontSize: 32, fontWeight: 700, color: "#42A5F5", fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowdState.cumulative || 0).toLocaleString()}</div>
+        <div style={{ fontSize: 12, color: "#94A3B8" }}>명 (오늘 총합)</div>
+      </CC_Card>
+      
+      {/* 임계값 정보 */}
+      <CC_Card>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>⚠️ 임계값 (RED)</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: "#ff5e7e", fontFamily: "JetBrains Mono", lineHeight: 1, marginBottom: 4 }}>{(crowd?.thresholds?.RED?.[0] || 30000).toLocaleString()}</div>
+        <div style={{ fontSize: 12, color: "#94A3B8" }}>명 이상 위험</div>
+      </CC_Card>
+      
+      {/* 단계 */}
+      <CC_Card>
+        <div style={{ fontSize: 11, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>📍 현재 단계</div>
+        <div style={{ fontSize: 28, fontWeight: 800, color: lvColor, lineHeight: 1, marginBottom: 4 }}>{lv}</div>
+        <div style={{ fontSize: 12, color: lvColor }}>{lvLabel} 단계</div>
+      </CC_Card>
+    </div>
+    
+    {/* 빠른 조작 */}
+    <CC_Card title="🎮 빠른 조작" sub="입장/퇴장 인원 카운트" style={{ marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* 입장 (체류 + 누적 동시 증가) */}
+        <div style={{ padding: 16, borderRadius: 12, background: "rgba(76,217,154,0.05)", border: "1px solid rgba(76,217,154,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>➕</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#4cd99a" }}>입장 (체류 + 누적 증가)</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {[1, 5, 10, 50].map(n => (<button key={n} onClick={() => incrementBy(n)} style={{ padding: "14px 8px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.08)", color: "#4cd99a", fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(76,217,154,0.18)"; e.currentTarget.style.transform = "scale(1.05)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(76,217,154,0.08)"; e.currentTarget.style.transform = "scale(1)"; }}>
+              +{n}
+            </button>))}
+          </div>
+        </div>
+        
+        {/* 퇴장 (체류만 감소) */}
+        <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,154,60,0.05)", border: "1px solid rgba(255,154,60,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>➖</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#ff9a3c" }}>퇴장 (체류만 감소)</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {[1, 5, 10, 50].map(n => (<button key={n} onClick={() => updateCrowd(-n, 0)} disabled={crowdState.total < n} style={{ padding: "14px 8px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.3)", background: crowdState.total < n ? "rgba(255,255,255,0.02)" : "rgba(255,154,60,0.08)", color: crowdState.total < n ? "#444" : "#ff9a3c", fontSize: 16, fontWeight: 700, cursor: crowdState.total < n ? "default" : "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { if (crowdState.total >= n) { e.currentTarget.style.background = "rgba(255,154,60,0.18)"; e.currentTarget.style.transform = "scale(1.05)"; } }}
+              onMouseLeave={e => { if (crowdState.total >= n) { e.currentTarget.style.background = "rgba(255,154,60,0.08)"; e.currentTarget.style.transform = "scale(1)"; } }}>
+              -{n}
+            </button>))}
+          </div>
+        </div>
+      </div>
+    </CC_Card>
+    
+    {/* 직접 입력 + 초기화 */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <CC_Card title="✏️ 직접 입력" sub="정확한 값으로 설정">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button onClick={setExactCurrent} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.05)", color: "#4cd99a", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>👥 현재 체류 인원 직접 입력 →</button>
+          <button onClick={setExactCumulative} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(66,165,245,0.3)", background: "rgba(66,165,245,0.05)", color: "#42A5F5", fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>📊 누적 방문객 직접 입력 →</button>
+        </div>
+      </CC_Card>
+      
+      <CC_Card title="🔄 초기화" sub="확인 후 적용">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button onClick={resetCumOnly} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>📊 누적만 초기화 (체류는 유지)</button>
+          <button onClick={resetAll} style={{ padding: "12px", borderRadius: 10, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>🚨 전체 초기화 (체류 + 누적 + 구역)</button>
+        </div>
+      </CC_Card>
+    </div>
+    
+    {/* 안내 */}
+    <CC_Card>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <span style={{ fontSize: 13, color: "#94A3B8" }}>모든 변경은 모바일 카운터와 실시간 동기화됩니다. 다른 기기 변경 사항이 자동 반영됩니다.</span>
+        </div>
+        <CC_Btn size="sm" variant="ghost" onClick={() => setCcPage("monitor")}>📡 모니터링 →</CC_Btn>
+      </div>
+    </CC_Card>
+  </div>);
 }
 
 // ─── PC: 03. 알림 / 경보 발령 ───────────────────────────────────
@@ -5596,12 +5992,23 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
             return (<div key={a.id} style={{ padding: 16, borderRadius: 14, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${color}25`, borderLeft: `3px solid ${color}`, position: "relative", transition: "transform 0.15s, border-color 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${color}50`; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${color}25`; }}>
-              {/* 헤더 */}
+              {/* 헤더 - 이름/카테고리 인라인 편집 */}
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
-                  <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{a.category}</div>
+                  {canEdit ? (<>
+                    <input value={a.name || ""} onChange={e => updateAsset(a.id, "name", e.target.value)} placeholder="물자명" style={{ width: "100%", padding: "4px 6px", marginBottom: 4, borderRadius: 4, border: "1px solid transparent", background: "transparent", color: "#f4f5fa", fontSize: 14, fontWeight: 700, boxSizing: "border-box", transition: "all 0.15s" }}
+                      onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                      onBlur={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }} />
+                    <select value={a.category || cats[0]} onChange={e => updateAsset(a.id, "category", e.target.value)} style={{ width: "100%", padding: "3px 6px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)", background: "transparent", color: "#94A3B8", fontSize: 11, cursor: "pointer", boxSizing: "border-box" }}
+                      onFocus={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                      onBlur={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}>
+                      {cats.map(c => (<option key={c} value={c} style={{ background: "#14151f" }}>{catIcon[c] || "📦"} {c}</option>))}
+                    </select>
+                  </>) : (<>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#f4f5fa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                    <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2 }}>{a.category}</div>
+                  </>)}
                 </div>
                 {canEdit && <button onClick={() => deleteAsset(a.id)} title="삭제" style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, cursor: "pointer", flexShrink: 0 }}>🗑</button>}
               </div>
@@ -13394,6 +13801,92 @@ export default function App() {
     } catch {}
   }, []);
   
+  // 🌐 window.crowdDB 정의 - 인파 데이터 동기화 인터페이스
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.crowdDB) return;  // 이미 정의됨
+    
+    const fid = localStorage.getItem("_fid") || "default";
+    const CROWD_KEY = `${fid}_crowd_v1`;
+    
+    window.crowdDB = {
+      // Supabase 또는 localStorage에서 최신 인파 데이터 로드
+      get: async () => {
+        try {
+          if (window.storage) {
+            const r = await window.storage.get(CROWD_KEY);
+            if (r?.value) {
+              return typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+            }
+          }
+          // 폴백: localStorage
+          const local = localStorage.getItem("_crowd");
+          if (local) return JSON.parse(local);
+          return { total: 0, cumulative: 0, zones: [] };
+        } catch (e) {
+          console.warn("[crowdDB] get 실패:", e);
+          return { total: 0, cumulative: 0, zones: [] };
+        }
+      },
+      
+      // 인파 데이터 저장 (Supabase + localStorage + crowd-update 이벤트)
+      set: async (total, cumulative, zones, by) => {
+        const data = {
+          total: parseInt(total) || 0,
+          cumulative: parseInt(cumulative) || 0,
+          zones: zones || [],
+          updatedBy: by || "unknown",
+          updatedAt: Date.now()
+        };
+        try {
+          // 1) localStorage 즉시 갱신
+          localStorage.setItem("_crowd", JSON.stringify(data));
+          
+          // 2) crowd-update 이벤트 발생 (다른 컴포넌트가 리로드)
+          window.dispatchEvent(new CustomEvent("crowd-update", { detail: data }));
+          
+          // 3) Supabase 저장 (있으면)
+          if (window.storage) {
+            await window.storage.set(CROWD_KEY, JSON.stringify(data));
+          }
+          
+          return data;
+        } catch (e) {
+          console.warn("[crowdDB] set 실패:", e);
+          return null;
+        }
+      }
+    };
+    
+    console.log("[SAFEFLOW] ✅ window.crowdDB 초기화 완료");
+    
+    // Supabase realtime 수신 시 crowd-update 이벤트 발생
+    const realtimeHandler = (e) => {
+      if (e.detail?.key === CROWD_KEY && e.detail?.value) {
+        try {
+          const data = typeof e.detail.value === "string" ? JSON.parse(e.detail.value) : e.detail.value;
+          localStorage.setItem("_crowd", JSON.stringify(data));
+          window.dispatchEvent(new CustomEvent("crowd-update", { detail: data }));
+          console.log("[crowdDB] 📡 Realtime 수신:", data.total);
+        } catch {}
+      }
+    };
+    window.addEventListener("supabase-sync", realtimeHandler);
+    
+    // 초기 로드: Supabase에서 최신값 가져와서 이벤트 발생
+    setTimeout(async () => {
+      const data = await window.crowdDB.get();
+      if (data && data.total !== undefined) {
+        window.dispatchEvent(new CustomEvent("crowd-update", { detail: data }));
+        console.log("[crowdDB] 초기 로드:", data.total);
+      }
+    }, 1500);
+    
+    return () => {
+      window.removeEventListener("supabase-sync", realtimeHandler);
+    };
+  }, []);
+  
   if (fatalError) {
     return (<div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a0d1a 0%, #0b0e17 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 400, textAlign: "center" }}>
@@ -13429,6 +13922,13 @@ function AppMain({ onError }) {
   const [selectedFestival, setSelectedFestival] = useState(null);
   const [page, setPage] = useState("dashboard");
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  
+  // 🌐 글로벌로 session 노출 (usePersist에서 lastEditBy 기록용)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window._safeflowSession = session;
+    }
+  }, [session]);
 
   // PWA 업데이트 감지
   useEffect(() => {
@@ -13992,7 +14492,7 @@ function AuthenticatedApp({ session, accounts, setAccounts, festivals, onLogout,
 
   return (<div style={{ fontFamily: "'Noto Sans KR',-apple-system,sans-serif" }}>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
-    <style>{`@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
+    <style>{`@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideInRight{from{transform:translateX(40%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
     {useNewMobile && <>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
