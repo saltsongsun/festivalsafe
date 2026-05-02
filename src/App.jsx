@@ -4444,6 +4444,16 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 16 }}>
       {/* 좌측: 인력 목록 */}
       <CC_Card title="👥 인력 목록" sub={`${filtered.length}명${sortMode === "name_asc" ? " · 이름 오름차순" : sortMode === "name_desc" ? " · 이름 내림차순" : sortMode === "role" ? " · 역할별" : sortMode === "site" ? " · 근무지별" : " · 드래그/탭하여 배치"}`}>
+        {/* 인라인 정렬 버튼 */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 8, padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "#6c6e7d", fontWeight: 600, marginRight: 4 }}>정렬:</span>
+          <button onClick={() => setSortMode("default")} style={{ padding: "4px 8px", borderRadius: 6, border: sortMode === "default" ? "1px solid #6b8aff" : "1px solid transparent", background: sortMode === "default" ? "rgba(107,138,255,0.12)" : "transparent", color: sortMode === "default" ? "#8fa6ff" : "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>기본</button>
+          <button onClick={() => setSortMode("name_asc")} title="가나다 순" style={{ padding: "4px 8px", borderRadius: 6, border: sortMode === "name_asc" ? "1px solid #4cd99a" : "1px solid transparent", background: sortMode === "name_asc" ? "rgba(76,217,154,0.12)" : "transparent", color: sortMode === "name_asc" ? "#4cd99a" : "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>↑ 가나다</button>
+          <button onClick={() => setSortMode("name_desc")} title="역순" style={{ padding: "4px 8px", borderRadius: 6, border: sortMode === "name_desc" ? "1px solid #ff9a3c" : "1px solid transparent", background: sortMode === "name_desc" ? "rgba(255,154,60,0.12)" : "transparent", color: sortMode === "name_desc" ? "#ff9a3c" : "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>↓ 하파타</button>
+          <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)", margin: "0 4px" }} />
+          <button onClick={() => setSortMode("role")} style={{ padding: "4px 8px", borderRadius: 6, border: sortMode === "role" ? "1px solid #a980ff" : "1px solid transparent", background: sortMode === "role" ? "rgba(169,128,255,0.12)" : "transparent", color: sortMode === "role" ? "#a980ff" : "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>📑 역할</button>
+          <button onClick={() => setSortMode("site")} style={{ padding: "4px 8px", borderRadius: 6, border: sortMode === "site" ? "1px solid #42A5F5" : "1px solid transparent", background: sortMode === "site" ? "rgba(66,165,245,0.12)" : "transparent", color: sortMode === "site" ? "#42A5F5" : "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>🏠 근무지</button>
+        </div>
         <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
           filtered.map(w => {
