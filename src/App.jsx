@@ -3963,6 +3963,19 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
   const [sortMode, setSortMode] = useState("default"); // default | name_asc | name_desc | role | site
   const [selectedWorker, setSelectedWorker] = useState(null); // 근무자 클릭 모달
   const [touchDragWorker, setTouchDragWorker] = useState(null); // 터치 드래그 중인 근무자 정보
+  const [selectionMode, setSelectionMode] = useState(false); // 선택 모드 (출석체크용)
+  const [selectedIds, setSelectedIds] = useState([]); // 선택된 워커 ID들
+  const [bulkPanel, setBulkPanel] = useState(false); // 일괄 작업 패널 표시
+  
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const selectAllVisible = () => {
+    setSelectedIds(filtered.map(w => w.id));
+  };
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
   const [touchPos, setTouchPos] = useState({ x: 0, y: 0 });
   
   const allWorkers = (settings.workSites || []).flatMap(s => (s.workers || []).map(w => ({ ...w, siteName: s.name, siteId: s.id, zoneId: s.zoneId })));
@@ -3970,6 +3983,8 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
   const onBreak = allWorkers.filter(w => w.workStatus === "break");
   const noShow = allWorkers.filter(w => w.workStatus === "noshow");
   const offDuty = allWorkers.filter(w => w.workStatus === "off");
+  const onAway = allWorkers.filter(w => w.workStatus === "away");
+  const onMoving = allWorkers.filter(w => w.workStatus === "moving");
   const totalMeals = allWorkers.reduce((s, w) => s + (w.meals || 0), 0);
   const allRadios = (settings.assets || []).find(a => a.id === "radio")?.units || [];
   const radiosUsed = allRadios.filter(u => u.assignedTo).length;
@@ -3996,6 +4011,8 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
   let filtered = allWorkers;
   if (filter === "working") filtered = filtered.filter(w => w.workStatus === "working" || (w.onDuty && !w.workStatus));
   else if (filter === "break") filtered = filtered.filter(w => w.workStatus === "break");
+  else if (filter === "away") filtered = filtered.filter(w => w.workStatus === "away");
+  else if (filter === "moving") filtered = filtered.filter(w => w.workStatus === "moving");
   else if (filter === "noshow") filtered = filtered.filter(w => w.workStatus === "noshow");
   else if (filter === "off") filtered = filtered.filter(w => w.workStatus === "off");
   else if (filter === "warn") filtered = needBreakWarning;
@@ -4095,14 +4112,22 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           // 상태 전환 처리
           if (status === "working" && oldStatus !== "working") {
             if (!w.workStartedAt) w.workStartedAt = Date.now();
-            // 휴식중에서 복귀 → 마지막 break 닫기
-            if (oldStatus === "break" && w.breaks && w.breaks.length > 0) {
+            // 휴식중/자리비움/이동중에서 복귀 → 마지막 break 닫기
+            if (["break", "away", "moving"].includes(oldStatus) && w.breaks && w.breaks.length > 0) {
               const lastBreak = w.breaks[w.breaks.length - 1];
               if (!lastBreak.endedAt) lastBreak.endedAt = Date.now();
             }
           } else if (status === "break") {
             if (!w.breaks) w.breaks = [];
-            w.breaks.push({ startedAt: Date.now() });
+            w.breaks.push({ startedAt: Date.now(), type: "break" });
+          } else if (status === "away") {
+            // 자리비움: 짧은 부재 (화장실, 잠시 등)
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now(), type: "away" });
+          } else if (status === "moving") {
+            // 이동중: 다른 장소로 이동
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now(), type: "moving" });
           } else if (status === "off") {
             // 퇴근 → 진행중 break 닫기 + 누적 시간 보존
             if (w.breaks && w.breaks.length > 0) {
@@ -4119,6 +4144,79 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       }
       return { ...prev, workSites: ws };
     });
+  };
+  
+  // 인력 제거 (완전 삭제)
+  const removeWorker = (workerId) => {
+    const w = allWorkers.find(ww => ww.id === workerId);
+    if (!w) return;
+    if (!confirm(`⚠️ 인력 제거\n\n"${w.name}"을(를) 완전히 제거하시겠습니까?\n\n근무 기록과 모든 데이터가 삭제됩니다.\n계정이 연결되어 있다면 계정도 함께 제거됩니다.`)) return;
+    
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      ws.forEach(s => { s.workers = (s.workers || []).filter(ww => ww.id !== workerId); });
+      return { ...prev, workSites: ws };
+    });
+    
+    // 연결된 계정도 제거 (선택적)
+    if (w.accountId && setAccounts) {
+      setAccounts(prev => prev.filter(a => a.id !== w.accountId && a.workerId !== workerId));
+    }
+  };
+  
+  // 일괄 상태 변경 (선택된 인력들에게 적용)
+  const bulkSetStatus = (workerIds, status) => {
+    if (workerIds.length === 0) return;
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        for (const w of (s.workers || [])) {
+          if (!workerIds.includes(w.id)) continue;
+          const oldStatus = w.workStatus || (w.onDuty ? "working" : null);
+          w.workStatus = status;
+          w.onDuty = status === "working";
+          
+          if (status === "working" && oldStatus !== "working") {
+            if (!w.workStartedAt) w.workStartedAt = Date.now();
+            if (["break", "away", "moving"].includes(oldStatus) && w.breaks?.length > 0) {
+              const lastBreak = w.breaks[w.breaks.length - 1];
+              if (!lastBreak.endedAt) lastBreak.endedAt = Date.now();
+            }
+          } else if (["break", "away", "moving"].includes(status)) {
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now(), type: status });
+          } else if (status === "off") {
+            if (w.breaks?.length > 0) {
+              const lastBreak = w.breaks[w.breaks.length - 1];
+              if (!lastBreak.endedAt) lastBreak.endedAt = Date.now();
+            }
+            w.workEndedAt = Date.now();
+          } else if (status === "noshow") {
+            w.workStartedAt = null;
+            w.breaks = [];
+          }
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+  };
+  
+  // 일괄 제거
+  const bulkRemove = (workerIds) => {
+    if (workerIds.length === 0) return;
+    if (!confirm(`⚠️ 일괄 제거\n\n선택한 ${workerIds.length}명을 완전히 제거하시겠습니까?\n\n근무 기록과 계정이 모두 삭제됩니다.`)) return;
+    
+    const accountIdsToRemove = workerIds.map(wid => allWorkers.find(w => w.id === wid)?.accountId).filter(Boolean);
+    
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      ws.forEach(s => { s.workers = (s.workers || []).filter(ww => !workerIds.includes(ww.id)); });
+      return { ...prev, workSites: ws };
+    });
+    
+    if (setAccounts) {
+      setAccounts(prev => prev.filter(a => !accountIdsToRemove.includes(a.id) && !workerIds.includes(a.workerId)));
+    }
   };
   
   // 개별 근무상태 초기화 (모든 기록 제거)
@@ -4329,21 +4427,22 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
       📌 {touchDragWorker.name}
     </div>}
     
-    {/* KPI 7개 */}
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10, marginBottom: 16 }}>
+    {/* KPI 8개 */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 8, marginBottom: 16 }}>
       {[
         { label: "총 인력", value: allWorkers.length, color: "#6b8aff", icon: "👥" },
         { label: "근무중", value: onDuty.length, sub: `${allWorkers.length > 0 ? Math.round(onDuty.length/allWorkers.length*100) : 0}%`, color: "#4cd99a", icon: "🟢" },
         { label: "휴식중", value: onBreak.length, color: "#42A5F5", icon: "☕" },
+        { label: "자리비움", value: onAway.length, color: onAway.length > 0 ? "#f5c451" : "#6c6e7d", icon: "🚶" },
+        { label: "이동중", value: onMoving.length, color: onMoving.length > 0 ? "#a980ff" : "#6c6e7d", icon: "🏃" },
         { label: "노쇼", value: noShow.length, color: noShow.length > 0 ? "#ff5e7e" : "#6c6e7d", icon: "🚫" },
-        { label: "퇴근", value: offDuty.length, color: "#a980ff", icon: "🚪" },
+        { label: "퇴근", value: offDuty.length, color: "#888", icon: "🚪" },
         { label: "휴게 필요", value: needBreakWarning.length, sub: needBreakWarning.length > 0 ? "확인 요" : "정상", color: needBreakWarning.length > 0 ? "#ff9a3c" : "#4cd99a", icon: "⚠️" },
-        { label: "무전기", value: `${radiosUsed}/${allRadios.length}`, color: "#f5c451", icon: "📻" },
-      ].map(k => (<div key={k.label} style={{ padding: "12px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}><span style={{ fontSize: 13 }}>{k.icon}</span><span style={{ fontSize: 10, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>{k.label}</span></div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
-          {k.sub && <span style={{ fontSize: 10, color: "#6c6e7d" }}>{k.sub}</span>}
+      ].map(k => (<div key={k.label} style={{ padding: "10px", borderRadius: 10, background: "linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)), #14151f", border: `1px solid ${k.color}25` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 5 }}><span style={{ fontSize: 12 }}>{k.icon}</span><span style={{ fontSize: 9, color: "#6c6e7d", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>{k.label}</span></div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: k.color, fontFamily: "JetBrains Mono", lineHeight: 1 }}>{k.value}</span>
+          {k.sub && <span style={{ fontSize: 9, color: "#6c6e7d" }}>{k.sub}</span>}
         </div>
       </div>))}
     </div>
@@ -4368,8 +4467,10 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           { k: "all", l: `전체 ${allWorkers.length}`, c: "#6b8aff" },
           { k: "working", l: `🟢 근무중 ${onDuty.length}`, c: "#4cd99a" },
           { k: "break", l: `☕ 휴식 ${onBreak.length}`, c: "#42A5F5" },
+          { k: "away", l: `🚶 자리비움 ${onAway.length}`, c: "#f5c451" },
+          { k: "moving", l: `🏃 이동중 ${onMoving.length}`, c: "#a980ff" },
           { k: "noshow", l: `🚫 노쇼 ${noShow.length}`, c: "#ff5e7e" },
-          { k: "off", l: `🚪 퇴근 ${offDuty.length}`, c: "#a980ff" },
+          { k: "off", l: `🚪 퇴근 ${offDuty.length}`, c: "#888" },
           { k: "warn", l: `⚠️ 휴게필요 ${needBreakWarning.length}`, c: "#ff9a3c" },
         ].map(f => (
           <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 12px", borderRadius: 999, border: filter === f.k ? `1.5px solid ${f.c}` : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? `${f.c}15` : "rgba(255,255,255,0.02)", color: filter === f.k ? f.c : "#b0b3c4", fontSize: 12, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>{f.l}</button>
@@ -4382,11 +4483,60 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           <option value="role" style={{ background: "#14151f" }}>📑 역할별</option>
           <option value="site" style={{ background: "#14151f" }}>🏠 근무지별</option>
         </select>
+        <CC_Btn size="sm" variant={selectionMode ? "primary" : "ghost"} onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) clearSelection(); }}>
+          {selectionMode ? `✓ 선택 모드 (${selectedIds.length}명)` : "☑️ 출석체크"}
+        </CC_Btn>
         <CC_Btn size="sm" variant="primary" onClick={() => setShowAddModal(true)}>+ 인력 추가</CC_Btn>
         <CC_Btn size="sm" variant="ghost" onClick={exportCSV}>📥 CSV</CC_Btn>
         <CC_Btn size="sm" variant="ghost" onClick={resetAllStatus}>🔄 전체 초기화</CC_Btn>
       </div>
     </CC_Card>
+    
+    {/* 🎯 출석체크 일괄 작업 패널 (선택 모드일 때만) */}
+    {selectionMode && <CC_Card tinted style={{ marginBottom: 16, border: "1.5px solid rgba(76,217,154,0.3)", background: "linear-gradient(180deg, rgba(76,217,154,0.05), rgba(76,217,154,0.01))" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(76,217,154,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>☑️</div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#4cd99a" }}>출석체크 모드 활성</div>
+          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+            {selectedIds.length === 0 ? "인력 카드를 클릭하여 선택하세요" : 
+             `${selectedIds.length}명 선택됨 · 아래 버튼으로 일괄 변경`}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <CC_Btn size="sm" variant="ghost" onClick={selectAllVisible}>모두 선택 ({filtered.length})</CC_Btn>
+          {selectedIds.length > 0 && <CC_Btn size="sm" variant="ghost" onClick={clearSelection}>선택 해제</CC_Btn>}
+        </div>
+      </div>
+      
+      {/* 일괄 상태 변경 버튼 */}
+      {selectedIds.length > 0 && <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(76,217,154,0.15)" }}>
+        <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>📋 선택한 {selectedIds.length}명에게 일괄 적용</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+          {[
+            { k: "working", l: "🟢 근무 시작/복귀", c: "#4cd99a" },
+            { k: "break", l: "☕ 휴식 시작", c: "#42A5F5" },
+            { k: "away", l: "🚶 자리비움", c: "#f5c451" },
+            { k: "moving", l: "🏃 이동중", c: "#a980ff" },
+            { k: "off", l: "🚪 퇴근 처리", c: "#888" },
+            { k: "noshow", l: "🚫 노쇼 처리", c: "#ff5e7e" },
+          ].map(s => (<button key={s.k} onClick={() => { 
+            if (!confirm(`선택한 ${selectedIds.length}명을 [${s.l}] 상태로 변경하시겠습니까?`)) return;
+            bulkSetStatus(selectedIds, s.k);
+            clearSelection();
+          }} style={{ padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${s.c}30`, background: `${s.c}10`, color: s.c, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = `${s.c}25`; e.currentTarget.style.transform = "scale(1.02)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = `${s.c}10`; e.currentTarget.style.transform = "scale(1)"; }}>
+            {s.l}
+          </button>))}
+          <button onClick={() => { bulkRemove(selectedIds); clearSelection(); }} style={{ padding: "10px 12px", borderRadius: 8, border: "1.5px solid rgba(255,94,126,0.4)", background: "rgba(255,94,126,0.1)", color: "#ff5e7e", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,94,126,0.2)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,94,126,0.1)"; }}>
+            🗑 일괄 제거
+          </button>
+        </div>
+      </div>}
+    </CC_Card>}
     
     {/* 🗺️ 구역별 인원 현황 */}
     {Object.keys(byZone).filter(zid => byZone[zid].total > 0).length > 0 && <CC_Card title="🗺️ 구역별 인원 현황" sub={`${Object.keys(byZone).filter(zid => byZone[zid].total > 0).length}개 구역 · 총 ${allWorkers.length}명`} style={{ marginBottom: 16 }}>
@@ -4458,19 +4608,43 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
           {filtered.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#6c6e7d", fontSize: 13 }}>해당 인력이 없습니다</div> :
           filtered.map(w => {
             const status = w.workStatus || (w.onDuty ? "working" : null);
-            const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#556";
-            const stLabel = status === "working" ? "근무" : status === "break" ? "휴식" : status === "noshow" ? "노쇼" : status === "off" ? "퇴근" : "대기";
+            const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "away" ? "#f5c451" : status === "moving" ? "#a980ff" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#888" : "#556";
+            const stLabel = status === "working" ? "근무" : status === "break" ? "휴식" : status === "away" ? "자리비움" : status === "moving" ? "이동중" : status === "noshow" ? "노쇼" : status === "off" ? "퇴근" : "대기";
             const needWarn = needBreakWarning.find(nw => nw.id === w.id);
+            const isSelected = selectedIds.includes(w.id);
             return (<div key={w.id}
-              draggable
-              onDragStart={e => { e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
+              draggable={!selectionMode}
+              onDragStart={e => { if (selectionMode) return; e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", w.siteId); e.currentTarget.style.opacity = "0.4"; }}
               onDragEnd={e => { e.currentTarget.style.opacity = "1"; }}
-              onTouchStart={e => handleTouchStart(w, e)}
+              onTouchStart={e => { if (selectionMode) return; handleTouchStart(w, e); }}
               onClick={(e) => {
-                // 드래그 안 한 클릭만 모달 열기
-                if (!touchDragWorker) setSelectedWorker(w);
+                if (selectionMode) {
+                  toggleSelect(w.id);
+                } else if (!touchDragWorker) {
+                  setSelectedWorker(w);
+                }
               }}
-              style={{ padding: 10, marginBottom: 4, borderRadius: 8, background: needWarn ? "rgba(255,154,60,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${needWarn ? "rgba(255,154,60,0.3)" : "rgba(255,255,255,0.04)"}`, display: "grid", gridTemplateColumns: "auto auto 1fr auto", gap: 10, alignItems: "center", cursor: "pointer", transition: "background 0.15s", touchAction: "none", userSelect: "none" }}>
+              style={{ 
+                padding: 10, 
+                marginBottom: 4, 
+                borderRadius: 8, 
+                background: isSelected ? "rgba(76,217,154,0.15)" : needWarn ? "rgba(255,154,60,0.08)" : "rgba(255,255,255,0.02)", 
+                border: `1.5px solid ${isSelected ? "rgba(76,217,154,0.6)" : needWarn ? "rgba(255,154,60,0.3)" : "rgba(255,255,255,0.04)"}`, 
+                display: "grid", 
+                gridTemplateColumns: selectionMode ? "auto auto auto 1fr auto" : "auto auto 1fr auto", 
+                gap: 10, 
+                alignItems: "center", 
+                cursor: "pointer", 
+                transition: "all 0.15s", 
+                touchAction: selectionMode ? "auto" : "none", 
+                userSelect: "none",
+                boxShadow: isSelected ? "0 4px 12px rgba(76,217,154,0.2)" : "none"
+              }}>
+              {selectionMode && (
+                <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${isSelected ? "#4cd99a" : "rgba(255,255,255,0.2)"}`, background: isSelected ? "#4cd99a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e0f17", fontSize: 14, fontWeight: 800 }}>
+                  {isSelected && "✓"}
+                </div>
+              )}
               <span style={{ fontSize: 13, color: "#6c6e7d" }} title="드래그">⠿</span>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: stColor }} />
               <div style={{ minWidth: 0 }}>
@@ -4483,7 +4657,7 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                 </div>
                 <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName}</div>
               </div>
-              <span style={{ fontSize: 10, color: "#6c6e7d" }}>›</span>
+              <span style={{ fontSize: 10, color: "#6c6e7d" }}>{selectionMode ? "" : "›"}</span>
             </div>);
           })}
         </div>
@@ -4565,20 +4739,31 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {ws.map(w => {
                       const status = w.workStatus || (w.onDuty ? "working" : null);
-                      const wColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#6b8aff";
-                      const wBg = status === "working" ? "rgba(76,217,154,0.12)" : status === "break" ? "rgba(66,165,245,0.12)" : status === "noshow" ? "rgba(255,94,126,0.12)" : status === "off" ? "rgba(169,128,255,0.12)" : "rgba(107,138,255,0.1)";
+                      const wColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "away" ? "#f5c451" : status === "moving" ? "#a980ff" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#888" : "#6b8aff";
+                      const wBg = status === "working" ? "rgba(76,217,154,0.12)" : status === "break" ? "rgba(66,165,245,0.12)" : status === "away" ? "rgba(245,196,81,0.12)" : status === "moving" ? "rgba(169,128,255,0.12)" : status === "noshow" ? "rgba(255,94,126,0.12)" : status === "off" ? "rgba(136,136,136,0.12)" : "rgba(107,138,255,0.1)";
                       const isWarn = needBreakWarning.find(nw => nw.id === w.id);
+                      const isSelectedHere = selectedIds.includes(w.id);
                       return (<span key={w.id}
-                        draggable
-                        onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
-                        onTouchStart={e => { e.stopPropagation(); handleTouchStart({ ...w, siteId: s.id, siteName: s.name }, e); }}
-                        onClick={(e) => { e.stopPropagation(); if (!touchDragWorker) setSelectedWorker({ ...w, siteId: s.id, siteName: s.name }); }}
-                        title={`${w.name} ${w.role || ""} ${w.phone || ""} (탭/드래그)`}
-                        style={{ padding: "4px 10px", borderRadius: 999, background: wBg, border: `1px solid ${wColor}30`, color: wColor, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", touchAction: "none", userSelect: "none" }}>
-                        {status === "break" && "☕ "}
-                        {status === "noshow" && "🚫 "}
-                        {status === "off" && "🚪 "}
-                        {status === "working" && "● "}
+                        draggable={!selectionMode}
+                        onDragStart={e => { if (selectionMode) return; e.stopPropagation(); e.dataTransfer.setData("workerId", w.id); e.dataTransfer.setData("fromSite", s.id); }}
+                        onTouchStart={e => { if (selectionMode) return; e.stopPropagation(); handleTouchStart({ ...w, siteId: s.id, siteName: s.name }, e); }}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (selectionMode) {
+                            toggleSelect(w.id);
+                          } else if (!touchDragWorker) {
+                            setSelectedWorker({ ...w, siteId: s.id, siteName: s.name });
+                          }
+                        }}
+                        title={`${w.name} ${w.role || ""} ${w.phone || ""} ${selectionMode ? "(클릭하여 선택)" : "(탭/드래그)"}`}
+                        style={{ padding: "4px 10px", borderRadius: 999, background: isSelectedHere ? "rgba(76,217,154,0.3)" : wBg, border: `${isSelectedHere ? "1.5" : "1"}px solid ${isSelectedHere ? "#4cd99a" : wColor + "30"}`, color: isSelectedHere ? "#4cd99a" : wColor, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", touchAction: selectionMode ? "auto" : "none", userSelect: "none", boxShadow: isSelectedHere ? "0 0 0 2px rgba(76,217,154,0.2)" : "none" }}>
+                        {isSelectedHere && "✓ "}
+                        {!isSelectedHere && status === "break" && "☕ "}
+                        {!isSelectedHere && status === "away" && "🚶 "}
+                        {!isSelectedHere && status === "moving" && "🏃 "}
+                        {!isSelectedHere && status === "noshow" && "🚫 "}
+                        {!isSelectedHere && status === "off" && "🚪 "}
+                        {!isSelectedHere && status === "working" && "● "}
                         {w.name}
                         {isWarn && !w.breakOverride && <span style={{ marginLeft: 3, color: "#ff9a3c" }}>⚠️</span>}
                       </span>);
@@ -4628,8 +4813,8 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
         {(() => {
           const w = allWorkers.find(x => x.id === selectedWorker.id) || selectedWorker;
           const status = w.workStatus || (w.onDuty ? "working" : null);
-          const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#a980ff" : "#6c6e7d";
-          const stLabel = status === "working" ? "🟢 근무중" : status === "break" ? "☕ 휴식중" : status === "noshow" ? "🚫 노쇼" : status === "off" ? "🚪 퇴근" : "⏳ 대기";
+          const stColor = status === "working" ? "#4cd99a" : status === "break" ? "#42A5F5" : status === "away" ? "#f5c451" : status === "moving" ? "#a980ff" : status === "noshow" ? "#ff5e7e" : status === "off" ? "#888" : "#6c6e7d";
+          const stLabel = status === "working" ? "🟢 근무중" : status === "break" ? "☕ 휴식중" : status === "away" ? "🚶 자리비움" : status === "moving" ? "🏃 이동중" : status === "noshow" ? "🚫 노쇼" : status === "off" ? "🚪 퇴근" : "⏳ 대기";
           const isWarn = needBreakWarning.find(nw => nw.id === w.id);
           
           // 근무 시간 계산
@@ -4679,19 +4864,21 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
               <button onClick={() => removeBreakOverride(w.id)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(255,94,126,0.2)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>해제</button>
             </div>}
 
-            {/* 상태 변경 버튼 */}
+            {/* 상태 변경 버튼 (6가지) */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, color: "#6c6e7d", marginBottom: 8, fontWeight: 600 }}>근무 상태 변경</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {[
-                  { k: "working", l: "🟢 근무 시작/복귀", c: "#4cd99a" },
-                  { k: "break", l: "☕ 휴식 시작", c: "#42A5F5" },
-                  { k: "off", l: "🚪 퇴근", c: "#a980ff" },
-                  { k: "noshow", l: "🚫 노쇼 처리", c: "#ff5e7e" },
+                  { k: "working", l: "🟢 근무중", c: "#4cd99a" },
+                  { k: "break", l: "☕ 휴식", c: "#42A5F5" },
+                  { k: "away", l: "🚶 자리비움", c: "#f5c451" },
+                  { k: "moving", l: "🏃 이동중", c: "#a980ff" },
+                  { k: "off", l: "🚪 퇴근", c: "#888" },
+                  { k: "noshow", l: "🚫 노쇼", c: "#ff5e7e" },
                 ].map(s => {
                   const isActive = status === s.k;
-                  return (<button key={s.k} onClick={() => setWorkerStatus(w.id, s.k)} disabled={isActive} style={{ padding: "12px", borderRadius: 10, border: isActive ? `1.5px solid ${s.c}` : "1px solid rgba(255,255,255,0.1)", background: isActive ? `${s.c}15` : "rgba(255,255,255,0.03)", color: isActive ? s.c : "#b0b3c4", fontSize: 13, fontWeight: 700, cursor: isActive ? "default" : "pointer", opacity: isActive ? 0.7 : 1 }}>
-                    {s.l}{isActive && " (현재)"}
+                  return (<button key={s.k} onClick={() => setWorkerStatus(w.id, s.k)} disabled={isActive} style={{ padding: "12px 8px", borderRadius: 10, border: isActive ? `1.5px solid ${s.c}` : "1px solid rgba(255,255,255,0.1)", background: isActive ? `${s.c}20` : "rgba(255,255,255,0.03)", color: isActive ? s.c : "#b0b3c4", fontSize: 12, fontWeight: 700, cursor: isActive ? "default" : "pointer", opacity: isActive ? 0.85 : 1, transition: "all 0.15s" }}>
+                    {s.l}{isActive && " ●"}
                   </button>);
                 })}
               </div>
@@ -4706,9 +4893,10 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
               </select>
             </div>
 
-            {/* 근무 상태 초기화 */}
-            <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <button onClick={() => { resetWorkerStatus(w.id); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 근무 상태 초기화 (시간/휴게/확인 기록 모두)</button>
+            {/* 근무 상태 초기화 + 인력 제거 */}
+            <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={() => { resetWorkerStatus(w.id); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,154,60,0.25)", background: "rgba(255,154,60,0.05)", color: "#ff9a3c", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 근무 상태 초기화 (시간/휴게/확인 기록만)</button>
+              <button onClick={() => { removeWorker(w.id); setSelectedWorker(null); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.06)", color: "#ff5e7e", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🗑 인력 제거 (계정 포함 완전 삭제)</button>
             </div>
           </>);
         })()}
