@@ -10187,11 +10187,170 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
     showToast(`📥 #${unit?.number} 반납 완료`, "info");
   };
 
-  const [filter, setFilter] = useState("all"); // all | siteId
+  const [filter, setFilter] = useState("all"); // all | siteId | status:xxx
   const [search, setSearch] = useState("");
   const [editId, setEditId] = useState(null); // {siteId, workerId}
   const [addSiteId, setAddSiteId] = useState(null);
   const [newW, setNewW] = useState({ name: "", phone: "", role: "운영", meals: 1, mealNote: "" });
+  const [sortMode, setSortMode] = useState("default"); // default | name_asc | name_desc | role | site
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [statusModal, setStatusModal] = useState(null); // 상태 변경 모달 (worker)
+  
+  const toggleSelect = (id) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const clearSelection = () => setSelectedIds([]);
+  
+  // 근무 상태 변경 (개별)
+  const setWorkerStatus = (workerId, status) => {
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        const w = (s.workers || []).find(ww => ww.id === workerId);
+        if (w) {
+          const old = w.workStatus || (w.onDuty ? "working" : null);
+          w.workStatus = status;
+          w.onDuty = status === "working";
+          if (status === "working" && old !== "working") {
+            if (!w.workStartedAt) w.workStartedAt = Date.now();
+            if (["break","away","moving"].includes(old) && w.breaks?.length > 0) {
+              const lb = w.breaks[w.breaks.length - 1];
+              if (!lb.endedAt) lb.endedAt = Date.now();
+            }
+          } else if (["break","away","moving"].includes(status)) {
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now(), type: status });
+          } else if (status === "off") {
+            if (w.breaks?.length > 0) {
+              const lb = w.breaks[w.breaks.length - 1];
+              if (!lb.endedAt) lb.endedAt = Date.now();
+            }
+            w.workEndedAt = Date.now();
+          } else if (status === "noshow") {
+            w.workStartedAt = null;
+            w.breaks = [];
+          }
+          break;
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+    showToast(`상태 변경: ${{working:"🟢 근무",break:"☕ 휴식",away:"🚶 자리비움",moving:"🏃 이동중",off:"🚪 퇴근",noshow:"🚫 노쇼"}[status]}`);
+  };
+  
+  // 일괄 상태 변경
+  const bulkSetStatus = (workerIds, status) => {
+    if (!workerIds.length) return;
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      for (const s of ws) {
+        for (const w of (s.workers || [])) {
+          if (!workerIds.includes(w.id)) continue;
+          const old = w.workStatus || (w.onDuty ? "working" : null);
+          w.workStatus = status;
+          w.onDuty = status === "working";
+          if (status === "working" && old !== "working") {
+            if (!w.workStartedAt) w.workStartedAt = Date.now();
+            if (["break","away","moving"].includes(old) && w.breaks?.length > 0) {
+              const lb = w.breaks[w.breaks.length - 1];
+              if (!lb.endedAt) lb.endedAt = Date.now();
+            }
+          } else if (["break","away","moving"].includes(status)) {
+            if (!w.breaks) w.breaks = [];
+            w.breaks.push({ startedAt: Date.now(), type: status });
+          } else if (status === "off") {
+            if (w.breaks?.length > 0) {
+              const lb = w.breaks[w.breaks.length - 1];
+              if (!lb.endedAt) lb.endedAt = Date.now();
+            }
+            w.workEndedAt = Date.now();
+          } else if (status === "noshow") {
+            w.workStartedAt = null;
+            w.breaks = [];
+          }
+        }
+      }
+      return { ...prev, workSites: ws };
+    });
+    showToast(`✅ ${workerIds.length}명 상태 변경 완료`);
+  };
+  
+  // 일괄 제거
+  const bulkRemove = (workerIds) => {
+    if (!workerIds.length) return;
+    if (!confirm(`⚠️ ${workerIds.length}명을 완전히 제거하시겠습니까?\n근무 기록과 계정이 모두 삭제됩니다.`)) return;
+    const accIdsToRemove = [];
+    workerIds.forEach(wid => {
+      const w = allWorkers.find(ww => ww.id === wid);
+      if (w?.accountId) accIdsToRemove.push(w.accountId);
+    });
+    setSettings(prev => {
+      const ws = JSON.parse(JSON.stringify(prev.workSites || []));
+      ws.forEach(s => { s.workers = (s.workers || []).filter(ww => !workerIds.includes(ww.id)); });
+      return { ...prev, workSites: ws };
+    });
+    if (setAccounts) {
+      setAccounts(prev => prev.filter(a => !accIdsToRemove.includes(a.id) && !workerIds.includes(a.workerId)));
+    }
+    showToast(`🗑 ${workerIds.length}명 제거 완료`);
+    clearSelection();
+  };
+  
+  // 일괄 무전기 불출/회수
+  const bulkAssignRadio = (workerIds) => {
+    const targets = workerIds.filter(id => {
+      const w = allWorkers.find(ww => ww.id === id);
+      return !w?.radios?.length;
+    });
+    if (!targets.length) { alert("선택 인력 모두 무전기를 보유하고 있습니다"); return; }
+    if (!confirm(`${targets.length}명에게 무전기 일괄 불출하시겠습니까?`)) return;
+    setSettings(prev => {
+      const assets = JSON.parse(JSON.stringify(prev.assets || []));
+      const asset = assets.find(a => a.category === "무전기" && a.trackUnits);
+      if (!asset) { alert("등록된 무전기가 없습니다"); return prev; }
+      let assigned = 0;
+      for (const wid of targets) {
+        const unit = (asset.units || []).find(u => !u.assignedTo && u.status !== "broken" && u.status !== "lost");
+        if (!unit) break;
+        const worker = allWorkers.find(ww => ww.id === wid);
+        unit.assignedTo = wid;
+        unit.assignedToName = worker?.name;
+        unit.status = "assigned";
+        unit.assignedAt = Date.now();
+        assigned++;
+      }
+      asset.qty = (asset.units || []).filter(u => u.status === "available").length;
+      setTimeout(() => showToast(`✅ ${assigned}명 무전기 불출`), 100);
+      return { ...prev, assets };
+    });
+  };
+  
+  const bulkReturnRadio = (workerIds) => {
+    const targets = workerIds.filter(id => {
+      const w = allWorkers.find(ww => ww.id === id);
+      return w?.radios?.length > 0;
+    });
+    if (!targets.length) { alert("회수할 무전기가 없습니다"); return; }
+    if (!confirm(`선택 인력의 무전기를 일괄 회수하시겠습니까?`)) return;
+    setSettings(prev => {
+      const assets = JSON.parse(JSON.stringify(prev.assets || []));
+      let returned = 0;
+      for (const a of assets) {
+        if (a.category !== "무전기" || !a.trackUnits) continue;
+        for (const u of (a.units || [])) {
+          if (targets.includes(u.assignedTo)) {
+            delete u.assignedTo;
+            delete u.assignedToName;
+            delete u.assignedAt;
+            u.status = "available";
+            returned++;
+          }
+        }
+        a.qty = (a.units || []).filter(uu => uu.status === "available").length;
+      }
+      setTimeout(() => showToast(`↺ ${returned}대 회수 완료`), 100);
+      return { ...prev, assets };
+    });
+  };
 
   // 모든 근무자 평탄화 + 무전기/근무 정보 결합
   const allWorkers = sites.flatMap(s => {
@@ -10222,23 +10381,43 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
   });
 
   // 필터/검색
-  const filtered = allWorkers.filter(w => {
-    if (filter !== "all" && w.siteId !== filter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (w.name || "").toLowerCase().includes(q) ||
-             (w.phone || "").includes(q) ||
-             (w.role || "").toLowerCase().includes(q) ||
-             (w.siteName || "").toLowerCase().includes(q) ||
-             w.radios.some(r => r.number.includes(q));
+  let filtered = allWorkers.filter(w => {
+    if (filter === "all") return true;
+    if (filter.startsWith("status:")) {
+      const st = filter.slice(7);
+      const ws = w.workStatus || (w.onDuty ? "working" : null);
+      return ws === st;
     }
+    if (w.siteId !== filter) return false;
     return true;
   });
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(w =>
+      (w.name || "").toLowerCase().includes(q) ||
+      (w.phone || "").includes(q) ||
+      (w.role || "").toLowerCase().includes(q) ||
+      (w.siteName || "").toLowerCase().includes(q) ||
+      w.radios.some(r => r.number.includes(q))
+    );
+  }
+  // 정렬
+  if (sortMode === "name_asc") filtered = [...filtered].sort((a,b) => (a.name||"").localeCompare(b.name||"", "ko"));
+  else if (sortMode === "name_desc") filtered = [...filtered].sort((a,b) => (b.name||"").localeCompare(a.name||"", "ko"));
+  else if (sortMode === "role") filtered = [...filtered].sort((a,b) => (a.role||"").localeCompare(b.role||"", "ko") || (a.name||"").localeCompare(b.name||"", "ko"));
+  else if (sortMode === "site") filtered = [...filtered].sort((a,b) => (a.siteName||"").localeCompare(b.siteName||"", "ko") || (a.name||"").localeCompare(b.name||"", "ko"));
 
+  // 통계 (상태별 분포)
+  const byStatus = { working: 0, break: 0, away: 0, moving: 0, off: 0, noshow: 0 };
+  allWorkers.forEach(w => {
+    const s = w.workStatus || (w.onDuty ? "working" : null);
+    if (s && byStatus[s] !== undefined) byStatus[s]++;
+  });
+  
   // 통계
   const stats = {
     total: allWorkers.length,
-    onDuty: allWorkers.filter(w => w.onDuty).length,
+    onDuty: byStatus.working,
     withRadio: allWorkers.filter(w => w.radios.length > 0).length,
     totalMeals: allWorkers.reduce((s, w) => s + (parseInt(w.meals) || 0), 0),
   };
@@ -10415,6 +10594,70 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
       </div>
     </Card>
 
+    {/* 상태 필터 */}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+      {[
+        { k: "all", l: `전체 ${allWorkers.length}`, c: "#6b8aff" },
+        { k: "status:working", l: `🟢 근무 ${byStatus.working}`, c: "#4cd99a" },
+        { k: "status:break", l: `☕ 휴식 ${byStatus.break}`, c: "#42A5F5" },
+        { k: "status:away", l: `🚶 자리비움 ${byStatus.away}`, c: "#f5c451" },
+        { k: "status:moving", l: `🏃 이동중 ${byStatus.moving}`, c: "#a980ff" },
+        { k: "status:noshow", l: `🚫 노쇼 ${byStatus.noshow}`, c: "#ff5e7e" },
+        { k: "status:off", l: `🚪 퇴근 ${byStatus.off}`, c: "#888" },
+      ].map(f => (
+        <button key={f.k} onClick={() => setFilter(f.k)} style={{ padding: "6px 11px", borderRadius: 14, border: filter === f.k ? `1.5px solid ${f.c}` : "1px solid rgba(255,255,255,0.08)", background: filter === f.k ? `${f.c}15` : "rgba(255,255,255,0.03)", color: filter === f.k ? f.c : "#94A3B8", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{f.l}</button>
+      ))}
+    </div>
+    
+    {/* 정렬 + 출석체크 */}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+      <select value={sortMode} onChange={e => setSortMode(e.target.value)} style={{ padding: "6px 10px", borderRadius: 14, border: sortMode !== "default" ? "1.5px solid #a980ff" : "1px solid rgba(255,255,255,0.08)", background: sortMode !== "default" ? "rgba(169,128,255,0.1)" : "rgba(255,255,255,0.03)", color: sortMode !== "default" ? "#a980ff" : "#94A3B8", fontSize: 11, fontWeight: 700, cursor: "pointer", outline: "none" }}>
+        <option value="default" style={{ background: "#14151f" }}>↕ 기본 순서</option>
+        <option value="name_asc" style={{ background: "#14151f" }}>↑ 가나다</option>
+        <option value="name_desc" style={{ background: "#14151f" }}>↓ 하파타</option>
+        <option value="role" style={{ background: "#14151f" }}>📑 역할별</option>
+        <option value="site" style={{ background: "#14151f" }}>🏠 근무지별</option>
+      </select>
+      {canEdit && <button onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) clearSelection(); }} style={{ padding: "6px 12px", borderRadius: 14, border: selectionMode ? "1.5px solid #4cd99a" : "1px solid rgba(255,255,255,0.08)", background: selectionMode ? "rgba(76,217,154,0.15)" : "rgba(255,255,255,0.03)", color: selectionMode ? "#4cd99a" : "#94A3B8", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+        {selectionMode ? `✓ 선택 (${selectedIds.length})` : "☑️ 출석체크"}
+      </button>}
+    </div>
+    
+    {/* 출석체크 모드 - 일괄 작업 패널 */}
+    {selectionMode && <Card style={{ background: "linear-gradient(135deg, rgba(76,217,154,0.06), rgba(76,217,154,0.01))", border: "1.5px solid rgba(76,217,154,0.3)", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(76,217,154,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>☑️</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#4cd99a" }}>출석체크 모드</div>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{selectedIds.length === 0 ? "카드 클릭하여 선택" : `${selectedIds.length}명 선택됨`}</div>
+        </div>
+        <button onClick={() => setSelectedIds(filtered.map(w => w.id))} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>모두 ({filtered.length})</button>
+        {selectedIds.length > 0 && <button onClick={clearSelection} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>해제</button>}
+      </div>
+      
+      {selectedIds.length > 0 && <div style={{ paddingTop: 10, borderTop: "1px solid rgba(76,217,154,0.15)" }}>
+        <div style={{ fontSize: 10, color: "#6c6e7d", marginBottom: 6, fontWeight: 700 }}>📋 {selectedIds.length}명 일괄 적용</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 6 }}>
+          {[
+            { k: "working", l: "🟢", n: "근무", c: "#4cd99a" },
+            { k: "break", l: "☕", n: "휴식", c: "#42A5F5" },
+            { k: "away", l: "🚶", n: "자리비움", c: "#f5c451" },
+            { k: "moving", l: "🏃", n: "이동중", c: "#a980ff" },
+            { k: "off", l: "🚪", n: "퇴근", c: "#888" },
+            { k: "noshow", l: "🚫", n: "노쇼", c: "#ff5e7e" },
+          ].map(s => (<button key={s.k} onClick={() => { if (!confirm(`${selectedIds.length}명을 [${s.l} ${s.n}]로 변경?`)) return; bulkSetStatus(selectedIds, s.k); clearSelection(); }} style={{ padding: "10px 6px", borderRadius: 8, border: `1.5px solid ${s.c}30`, background: `${s.c}10`, color: s.c, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            <div style={{ fontSize: 16 }}>{s.l}</div>
+            <div>{s.n}</div>
+          </button>))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          <button onClick={() => bulkAssignRadio(selectedIds)} style={{ padding: "10px 6px", borderRadius: 8, border: "1.5px solid rgba(245,196,81,0.4)", background: "rgba(245,196,81,0.1)", color: "#f5c451", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>📻 일괄 불출</button>
+          <button onClick={() => bulkReturnRadio(selectedIds)} style={{ padding: "10px 6px", borderRadius: 8, border: "1.5px solid rgba(76,217,154,0.4)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↺ 일괄 회수</button>
+          <button onClick={() => bulkRemove(selectedIds)} style={{ padding: "10px 6px", borderRadius: 8, border: "1.5px solid rgba(255,94,126,0.4)", background: "rgba(255,94,126,0.1)", color: "#ff5e7e", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🗑 제거</button>
+        </div>
+      </div>}
+    </Card>}
+
     {/* 근무지 필터 */}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
       <button onClick={() => setFilter("all")} style={{ padding: "8px 14px", borderRadius: 16, border: filter === "all" ? "1.5px solid #42A5F5" : "1px solid rgba(255,255,255,0.1)", background: filter === "all" ? "rgba(33,150,243,0.1)" : "rgba(255,255,255,0.03)", color: filter === "all" ? "#42A5F5" : "#94A3B8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>전체 ({allWorkers.length})</button>
@@ -10491,19 +10734,45 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
         </div>
       </Card>);
 
-      return (<Card key={w.id} style={{ border: w.onDuty ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+      return (<Card key={w.id} onClick={selectionMode ? () => toggleSelect(w.id) : undefined} style={{ 
+        border: selectionMode && selectedIds.includes(w.id) ? "2px solid #4cd99a" : w.onDuty ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(255,255,255,0.06)",
+        background: selectionMode && selectedIds.includes(w.id) ? "rgba(76,217,154,0.08)" : undefined,
+        cursor: selectionMode ? "pointer" : "default",
+        boxShadow: selectionMode && selectedIds.includes(w.id) ? "0 4px 12px rgba(76,217,154,0.2)" : "none"
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* 선택 모드 체크박스 */}
+          {selectionMode && (
+            <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${selectedIds.includes(w.id) ? "#4cd99a" : "rgba(255,255,255,0.2)"}`, background: selectedIds.includes(w.id) ? "#4cd99a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e0f17", fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
+              {selectedIds.includes(w.id) && "✓"}
+            </div>
+          )}
           {/* 아바타 */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: w.onDuty ? "linear-gradient(135deg, rgba(76,175,80,0.25), rgba(76,175,80,0.05))" : "linear-gradient(135deg, rgba(33,150,243,0.15), rgba(33,150,243,0.03))", border: `1px solid ${w.onDuty ? "rgba(76,175,80,0.4)" : "rgba(33,150,243,0.25)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{w.onDuty ? "🟢" : "👤"}</div>
-            {w.onDuty && <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, background: "#66BB6A", border: "2px solid #0d1018", boxShadow: "0 0 8px rgba(76,175,80,0.6)", animation: "pulse 2s infinite" }} />}
+            {(() => {
+              const ws = w.workStatus || (w.onDuty ? "working" : null);
+              const stEmoji = ws === "working" ? "🟢" : ws === "break" ? "☕" : ws === "away" ? "🚶" : ws === "moving" ? "🏃" : ws === "noshow" ? "🚫" : ws === "off" ? "🚪" : "👤";
+              const stBg = ws === "working" ? "linear-gradient(135deg, rgba(76,175,80,0.25), rgba(76,175,80,0.05))" : ws === "break" ? "linear-gradient(135deg, rgba(66,165,245,0.25), rgba(66,165,245,0.05))" : ws === "away" ? "linear-gradient(135deg, rgba(245,196,81,0.25), rgba(245,196,81,0.05))" : ws === "moving" ? "linear-gradient(135deg, rgba(169,128,255,0.25), rgba(169,128,255,0.05))" : ws === "noshow" ? "linear-gradient(135deg, rgba(255,94,126,0.25), rgba(255,94,126,0.05))" : ws === "off" ? "linear-gradient(135deg, rgba(136,136,136,0.25), rgba(136,136,136,0.05))" : "linear-gradient(135deg, rgba(33,150,243,0.15), rgba(33,150,243,0.03))";
+              const stBorder = ws === "working" ? "rgba(76,175,80,0.4)" : ws === "break" ? "rgba(66,165,245,0.4)" : ws === "away" ? "rgba(245,196,81,0.4)" : ws === "moving" ? "rgba(169,128,255,0.4)" : ws === "noshow" ? "rgba(255,94,126,0.4)" : ws === "off" ? "rgba(136,136,136,0.4)" : "rgba(33,150,243,0.25)";
+              return <>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: stBg, border: `1px solid ${stBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{stEmoji}</div>
+                {ws === "working" && <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, background: "#66BB6A", border: "2px solid #0d1018", boxShadow: "0 0 8px rgba(76,175,80,0.6)", animation: "pulse 2s infinite" }} />}
+              </>;
+            })()}
           </div>
           {/* 메인 정보 */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2, flexWrap: "wrap" }}>
               <span style={{ color: "#E2E8F0", fontSize: 16, fontWeight: 700 }}>{w.name}</span>
               <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(33,150,243,0.1)", color: "#42A5F5", fontSize: 10, fontWeight: 700 }}>{w.role || "운영"}</span>
-              {w.onDuty && <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(76,175,80,0.1)", color: "#66BB6A", fontSize: 10, fontWeight: 700 }}>● 근무중 {w.checkInTime}</span>}
+              {(() => {
+                const ws = w.workStatus || (w.onDuty ? "working" : null);
+                const lblMap = { working: "● 근무중", break: "☕ 휴식", away: "🚶 자리비움", moving: "🏃 이동중", noshow: "🚫 노쇼", off: "🚪 퇴근" };
+                const colorMap = { working: "#66BB6A", break: "#42A5F5", away: "#f5c451", moving: "#a980ff", noshow: "#ff5e7e", off: "#888" };
+                if (!ws) return null;
+                return <span style={{ padding: "2px 8px", borderRadius: 6, background: `${colorMap[ws]}15`, color: colorMap[ws], fontSize: 10, fontWeight: 700 }}>{lblMap[ws]}</span>;
+              })()}
+              {w.radios.length > 0 && <span title={`무전기 ${w.radios.length}대`} style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,196,81,0.15)", color: "#f5c451", fontSize: 10, fontWeight: 700 }}>📻 {w.radios.length}</span>}
             </div>
             <div style={{ color: "#94A3B8", fontSize: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
               <span>📍 {w.siteName}</span>
@@ -10511,9 +10780,10 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
               {w.accountId && <span style={{ color: "#66BB6A" }}>🆔 {w.accountId}</span>}
             </div>
           </div>
-          {/* 액션 */}
-          {canEdit && <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button onClick={() => setEditId({ siteId: w.siteId, workerId: w.id })} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>✏️</button>
+          {/* 액션 (선택 모드 아닐 때만) */}
+          {!selectionMode && canEdit && <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); setStatusModal(w); }} title="상태 변경" style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(76,217,154,0.2)", background: "rgba(76,217,154,0.05)", color: "#4cd99a", fontSize: 13, cursor: "pointer" }}>🔄</button>
+            <button onClick={(e) => { e.stopPropagation(); setEditId({ siteId: w.siteId, workerId: w.id }); }} title="정보 수정" style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94A3B8", fontSize: 13, cursor: "pointer" }}>✏️</button>
           </div>}
         </div>
         {/* 추가 정보 그리드 */}
@@ -10645,6 +10915,68 @@ function WorkersPage({ settings, setSettings, session, accounts, setAccounts }) 
             • 연결된 계정의 근무지 정보도 함께 갱신<br/>
             • 미배치는 대기 상태(휴식·이동중)에 사용
           </div>
+        </div>
+      </div>);
+    })()}
+
+    {/* 🔄 상태 변경 모달 */}
+    {statusModal && (() => {
+      const w = statusModal;
+      const curStatus = w.workStatus || (w.onDuty ? "working" : null);
+      return (<div onClick={() => setStatusModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 600, maxHeight: "85vh", background: "linear-gradient(180deg, #11141d 0%, #0d1018 100%)", borderRadius: "20px 20px 0 0", padding: "16px 16px 20px", overflow: "auto", boxShadow: "0 -8px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#f4f5fa" }}>🔄 {w.name}님 상태 변경</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>📍 {w.siteName} · {w.role || "운영"}</div>
+            </div>
+            <button onClick={() => setStatusModal(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+          </div>
+          
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 8, fontWeight: 700 }}>현재 상태</div>
+          <div style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.03)", marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#f4f5fa" }}>
+            {curStatus === "working" ? "🟢 근무중" : curStatus === "break" ? "☕ 휴식중" : curStatus === "away" ? "🚶 자리비움" : curStatus === "moving" ? "🏃 이동중" : curStatus === "noshow" ? "🚫 노쇼" : curStatus === "off" ? "🚪 퇴근" : "⏳ 대기"}
+          </div>
+          
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 8, fontWeight: 700 }}>변경할 상태 선택</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {[
+              { k: "working", l: "🟢", n: "근무", c: "#4cd99a" },
+              { k: "break", l: "☕", n: "휴식", c: "#42A5F5" },
+              { k: "away", l: "🚶", n: "자리비움", c: "#f5c451" },
+              { k: "moving", l: "🏃", n: "이동중", c: "#a980ff" },
+              { k: "off", l: "🚪", n: "퇴근", c: "#888" },
+              { k: "noshow", l: "🚫", n: "노쇼", c: "#ff5e7e" },
+            ].map(s => {
+              const active = curStatus === s.k;
+              return (<button key={s.k} disabled={active} onClick={() => { setWorkerStatus(w.id, s.k); setStatusModal(null); }} style={{ padding: "16px 6px", borderRadius: 12, border: active ? `2px solid ${s.c}` : `1.5px solid ${s.c}30`, background: active ? `${s.c}20` : `${s.c}08`, color: s.c, fontSize: 12, fontWeight: 700, cursor: active ? "default" : "pointer", opacity: active ? 0.7 : 1 }}>
+                <div style={{ fontSize: 22, marginBottom: 4 }}>{s.l}</div>
+                <div>{s.n}</div>
+                {active && <div style={{ fontSize: 9, marginTop: 2 }}>● 현재</div>}
+              </button>);
+            })}
+          </div>
+          
+          {/* 무전기 빠른 처리 */}
+          <div style={{ paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 8, fontWeight: 700 }}>📻 무전기</div>
+            {w.radios.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {w.radios.map((r, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(245,196,81,0.08)", border: "1px solid rgba(245,196,81,0.2)" }}>
+                  <span style={{ fontSize: 14 }}>📻</span>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: "#f5c451", fontFamily: "JetBrains Mono" }}>#{r.number}</span>
+                  <button onClick={() => returnRadio(r.assetId, r.unitId)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↺ 회수</button>
+                </div>))}
+              </div>
+            ) : (
+              <button onClick={() => { setStatusModal(null); setRadioModalWorker(w); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px dashed rgba(245,196,81,0.4)", background: "rgba(245,196,81,0.05)", color: "#f5c451", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>📻 무전기 불출하기</button>
+            )}
+          </div>
+          
+          {/* 인력 제거 */}
+          {canEdit && <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <button onClick={() => { removeWorker(w.siteId, w.id); setStatusModal(null); }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.3)", background: "rgba(255,94,126,0.06)", color: "#ff5e7e", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🗑 인력 제거 (계정 포함 완전 삭제)</button>
+          </div>}
         </div>
       </div>);
     })()}
