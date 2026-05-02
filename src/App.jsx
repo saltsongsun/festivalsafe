@@ -497,6 +497,11 @@ function usePersist(key, init) {
             { f: "programs", min: 3 },
             { f: "stages", min: 1 },
             { f: "emergencyContacts", min: 1 },
+            { f: "assets", min: 2 },
+            { f: "assetCategories", min: 3 },
+            { f: "artists", min: 1 },
+            { f: "incidents", min: 1 },
+            { f: "workSites", min: 1 },
           ];
           for (const c of polChecks) {
             const my = (valRef.current[c.f] || []).length;
@@ -564,6 +569,11 @@ function usePersist(key, init) {
                 { f: "stages", min: 1 },
                 { f: "programs", min: 3 },
                 { f: "emergencyContacts", min: 1 },
+                { f: "assets", min: 2 },
+                { f: "assetCategories", min: 3 },
+                { f: "artists", min: 1 },
+                { f: "incidents", min: 1 },
+                { f: "workSites", min: 1 },
               ];
               for (const c of lossChecks) {
                 const myLen = (valRef.current[c.f] || []).length;
@@ -578,6 +588,34 @@ function usePersist(key, init) {
                   }
                   return;
                 }
+              }
+              
+              // 🛡️ 워커 (workSites 안의 workers) 손실 보호
+              const myWorkersTotal = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              const incWorkersTotal = (p.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
+              if (myWorkersTotal >= 3 && incWorkersTotal < myWorkersTotal) {
+                console.warn(`[usePersist] 🛡️ Realtime workers 손실 거부 (${myWorkersTotal} → ${incWorkersTotal})`);
+                if (window.storage && supabaseLoaded.current) {
+                  selfSave.current = true;
+                  window.storage.set(key, JSON.stringify(valRef.current)).finally(() => {
+                    setTimeout(() => { selfSave.current = false; }, 3000);
+                  });
+                }
+                return;
+              }
+              
+              // 🛡️ assets 안의 units (개별 단위 추적) 손실 보호
+              const myUnitsTotal = (valRef.current.assets || []).reduce((s, a) => s + (a.units || []).length, 0);
+              const incUnitsTotal = (p.assets || []).reduce((s, a) => s + (a.units || []).length, 0);
+              if (myUnitsTotal >= 5 && incUnitsTotal < myUnitsTotal * 0.5) {
+                console.warn(`[usePersist] 🛡️ Realtime asset units 손실 거부 (${myUnitsTotal} → ${incUnitsTotal})`);
+                if (window.storage && supabaseLoaded.current) {
+                  selfSave.current = true;
+                  window.storage.set(key, JSON.stringify(valRef.current)).finally(() => {
+                    setTimeout(() => { selfSave.current = false; }, 3000);
+                  });
+                }
+                return;
               }
             }
             
@@ -6213,6 +6251,11 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
   const [addOpen, setAddOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", category: "무전기", total: 1, qty: 1, location: "" });
   const [filter, setFilter] = useState("all");
+  
+  // 상세 편집 모달
+  const [editAsset, setEditAsset] = useState(null);
+  const [showCatEdit, setShowCatEdit] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
 
   const addQuick = () => {
     if (!newItem.name.trim()) { alert("물자명을 입력하세요"); return; }
@@ -6230,13 +6273,35 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
   const updateAsset = (id, field, val) => {
     setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => a.id === id ? { ...a, [field]: val } : a) }));
   };
+  
+  // 여러 필드 한번에 업데이트 (모달 저장용)
+  const updateAssetBulk = (id, patch) => {
+    setSettings(prev => ({ ...prev, assets: (prev.assets || []).map(a => a.id === id ? { ...a, ...patch } : a) }));
+  };
+  
+  // 카테고리 관리
+  const addCategory = () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    if ((cats || []).includes(name)) { alert("이미 있는 카테고리입니다"); return; }
+    setSettings(prev => ({ ...prev, assetCategories: [...(prev.assetCategories || []), name] }));
+    setNewCatName("");
+  };
+  
+  const removeCategory = (cat) => {
+    const inUse = assets.filter(a => a.category === cat).length;
+    if (inUse > 0) { alert(`이 카테고리를 사용 중인 물자가 ${inUse}개 있습니다. 먼저 다른 카테고리로 변경하세요.`); return; }
+    if (!confirm(`"${cat}" 카테고리를 삭제하시겠습니까?`)) return;
+    setSettings(prev => ({ ...prev, assetCategories: (prev.assetCategories || []).filter(c => c !== cat) }));
+  };
 
   const filtered = filter === "all" ? assets : assets.filter(a => a.category === filter);
 
   // 카테고리 아이콘 매핑
   const catIcon = { "무전기": "📻", "생수": "💧", "리플렛": "📄", "멀티탭": "🔌", "응급키트": "🩹", "조끼": "🦺", "안전모": "⛑️", "안전장비": "🦺", "의자": "🪑", "테이블": "🪟", "조명": "💡", "음향": "🔊", "기타": "📦" };
 
-  return (<div>
+  return (<>
+  <div>
     {/* KPI 6개 */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 16 }}>
       {[
@@ -6417,6 +6482,9 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
                 <button onClick={() => updateAsset(a.id, "qty", Math.min(a.total, (a.qty || 0) + 1))} disabled={(a.qty || 0) >= (a.total || 0)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid rgba(76,217,154,0.2)", background: "rgba(76,217,154,0.05)", color: (a.qty || 0) >= (a.total || 0) ? "#444" : "#7ee5b3", fontSize: 12, fontWeight: 700, cursor: (a.qty || 0) >= (a.total || 0) ? "default" : "pointer" }}>+1</button>
                 <button onClick={() => { if (confirm(`${a.name} 전체 반납 처리?`)) updateAsset(a.id, "qty", a.total || 0); }} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(107,138,255,0.2)", background: "rgba(107,138,255,0.05)", color: "#8fa6ff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↺ 전체</button>
               </div>}
+              
+              {/* 상세 편집 버튼 (관리자) */}
+              {canEdit && <button onClick={() => setEditAsset(a)} style={{ width: "100%", marginTop: 6, padding: "6px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)", color: "#94A3B8", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>⚙️ 상세 편집</button>}
             </div>);
           })}
         </div>
@@ -6461,6 +6529,170 @@ function CC_ResourcePage({ settings, setSettings, session, accounts }) {
         </div>
       }
     </CC_Card>
+    
+    {/* 🏷️ 카테고리 관리 (관리자만) */}
+    {canEdit && <CC_Card title="🏷️ 카테고리 관리" sub={`${cats.length}개 카테고리`} style={{ marginBottom: 16 }}>
+      {!showCatEdit ? (
+        <CC_Btn size="sm" variant="ghost" onClick={() => setShowCatEdit(true)}>⚙️ 카테고리 편집</CC_Btn>
+      ) : (
+        <div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {cats.map(c => {
+              const inUse = assets.filter(a => a.category === c).length;
+              return (<div key={c} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <span style={{ fontSize: 13, color: "#f4f5fa" }}>{catIcon[c] || "📦"} {c}</span>
+                <span style={{ fontSize: 10, color: "#6c6e7d" }}>({inUse})</span>
+                <button onClick={() => removeCategory(c)} disabled={inUse > 0} title={inUse > 0 ? `${inUse}개 물자가 사용 중` : "삭제"} style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: inUse > 0 ? "rgba(255,255,255,0.04)" : "rgba(255,94,126,0.15)", color: inUse > 0 ? "#444" : "#ff5e7e", fontSize: 10, fontWeight: 700, cursor: inUse > 0 ? "not-allowed" : "pointer", padding: 0 }}>×</button>
+              </div>);
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <input value={newCatName} onChange={e => setNewCatName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCategory(); }} placeholder="새 카테고리명 (예: 우산, 마스크)" style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+            <button onClick={addCategory} disabled={!newCatName.trim()} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: !newCatName.trim() ? "rgba(255,255,255,0.05)" : "linear-gradient(180deg, #6b8aff, #5a7aff)", color: !newCatName.trim() ? "#666" : "#fff", fontWeight: 700, fontSize: 12, cursor: !newCatName.trim() ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>+ 추가</button>
+          </div>
+          <CC_Btn size="sm" variant="ghost" onClick={() => setShowCatEdit(false)}>닫기</CC_Btn>
+        </div>
+      )}
+    </CC_Card>}
+  </div>
+  
+  {/* 🛠️ 상세 편집 모달 */}
+  {editAsset && <AssetDetailModal asset={editAsset} cats={cats} catIcon={catIcon} onClose={() => setEditAsset(null)} onSave={(patch) => { updateAssetBulk(editAsset.id, patch); setEditAsset(null); }} onDelete={() => { deleteAsset(editAsset.id); setEditAsset(null); }} />}
+  </>);
+}
+
+// 물자 상세 편집 모달
+function AssetDetailModal({ asset, cats, catIcon, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState({
+    name: asset.name || "",
+    category: asset.category || "기타",
+    total: asset.total || 0,
+    qty: asset.qty || 0,
+    location: asset.location || "",
+    note: asset.note || "",
+    unitPrice: asset.unitPrice || "",
+    supplier: asset.supplier || "",
+    purchaseDate: asset.purchaseDate || "",
+    minStock: asset.minStock || "",
+    trackUnits: asset.trackUnits || false
+  });
+  
+  const save = () => {
+    if (!form.name.trim()) { alert("물자명을 입력하세요"); return; }
+    onSave({
+      name: form.name.trim(),
+      category: form.category,
+      total: parseInt(form.total) || 0,
+      qty: parseInt(form.qty) || 0,
+      location: form.location.trim(),
+      note: form.note.trim(),
+      unitPrice: form.unitPrice ? parseInt(form.unitPrice) : undefined,
+      supplier: form.supplier.trim(),
+      purchaseDate: form.purchaseDate,
+      minStock: form.minStock ? parseInt(form.minStock) : undefined,
+      trackUnits: form.trackUnits
+    });
+  };
+  
+  return (<div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 540, maxHeight: "90vh", overflow: "auto", background: "linear-gradient(180deg, #14151f, #0e0f17)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#f4f5fa" }}>{catIcon[form.category] || "📦"} 물자 상세 편집</div>
+          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>모든 정보 한 번에 수정</div>
+        </div>
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", cursor: "pointer", fontSize: 16 }}>✕</button>
+      </div>
+      
+      <div style={{ display: "grid", gap: 12 }}>
+        {/* 기본 정보 */}
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>물자명 *</div>
+          <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} autoFocus style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+        </div>
+        
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>카테고리</div>
+          <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "#0a0b12", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }}>
+            {cats.map(c => (<option key={c} value={c} style={{ background: "#14151f" }}>{catIcon[c] || "📦"} {c}</option>))}
+          </select>
+        </div>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>가용 수량</div>
+            <input type="number" min="0" value={form.qty} onChange={e => setForm({...form, qty: e.target.value})} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>총 수량</div>
+            <input type="number" min="0" value={form.total} onChange={e => setForm({...form, total: e.target.value})} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+          </div>
+        </div>
+        
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>📍 보관 위치</div>
+          <input value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="예: 본부, 창고 A, 정문 부스" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 14, boxSizing: "border-box" }} />
+        </div>
+        
+        <div>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>📝 메모</div>
+          <textarea value={form.note} onChange={e => setForm({...form, note: e.target.value})} placeholder="특이사항, 사용 방법, 주의 사항 등" rows={3} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+        </div>
+        
+        {/* 추가 정보 (구매/공급) */}
+        <div style={{ paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>📦 구매/관리 정보 (선택)</div>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>💰 단가 (원)</div>
+              <input type="number" min="0" value={form.unitPrice} onChange={e => setForm({...form, unitPrice: e.target.value})} placeholder="0" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>⚠️ 최소 재고</div>
+              <input type="number" min="0" value={form.minStock} onChange={e => setForm({...form, minStock: e.target.value})} placeholder="0" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, fontFamily: "JetBrains Mono", boxSizing: "border-box" }} />
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>🏪 공급처</div>
+            <input value={form.supplier} onChange={e => setForm({...form, supplier: e.target.value})} placeholder="공급/제조사" style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          
+          <div>
+            <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 4, fontWeight: 600 }}>📅 구매일</div>
+            <input type="date" value={form.purchaseDate} onChange={e => setForm({...form, purchaseDate: e.target.value})} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.3)", color: "#f4f5fa", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+        </div>
+        
+        {/* 단위 추적 */}
+        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 8, background: form.trackUnits ? "rgba(76,217,154,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${form.trackUnits ? "rgba(76,217,154,0.2)" : "rgba(255,255,255,0.05)"}`, cursor: "pointer" }}>
+          <input type="checkbox" checked={form.trackUnits} onChange={e => setForm({...form, trackUnits: e.target.checked})} style={{ width: 16, height: 16, accentColor: "#4cd99a", cursor: "pointer" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: form.trackUnits ? "#4cd99a" : "#f4f5fa" }}>🔢 개별 단위 추적</div>
+            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>각 단위에 시리얼/번호 부여하여 누가 사용 중인지 추적 (예: 무전기 1번~10번)</div>
+          </div>
+        </label>
+        
+        {/* 가용률 미리보기 */}
+        {form.total > 0 && <div style={{ padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11, color: "#94A3B8" }}>
+            <span>가용률</span>
+            <span className="mono" style={{ fontWeight: 700, color: "#4cd99a" }}>{Math.round((form.qty / form.total) * 100)}%</span>
+          </div>
+          <div style={{ width: "100%", height: 5, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+            <div style={{ width: `${Math.min(100, (form.qty / form.total) * 100)}%`, height: "100%", background: "#4cd99a" }} />
+          </div>
+        </div>}
+      </div>
+      
+      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        <button onClick={onDelete} style={{ padding: "12px 16px", borderRadius: 8, border: "1px solid rgba(255,94,126,0.25)", background: "rgba(255,94,126,0.05)", color: "#ff5e7e", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗑 삭제</button>
+        <div style={{ flex: 1 }} />
+        <button onClick={onClose} style={{ padding: "12px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#b0b3c4", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>취소</button>
+        <button onClick={save} style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: "linear-gradient(180deg, #6b8aff, #5a7aff)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(107,138,255,0.3)" }}>💾 저장</button>
+      </div>
+    </div>
   </div>);
 }
 
