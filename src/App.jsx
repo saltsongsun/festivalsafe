@@ -482,13 +482,29 @@ function usePersist(key, init) {
         if (!r?.value || r.value === lastJson.current) return;  // 변경 없음
         
         const cloud = JSON.parse(r.value);
-        // 🛡️ workSites/programs/assets 등 데이터 급감 체크
+        // 🛡️ workSites/programs/assets/gates 등 데이터 급감 체크
         if (key.endsWith("_set_v10") && valRef.current && typeof valRef.current === "object") {
           const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
           const cloudWorkers = (cloud.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
           if (myWorkers > 5 && cloudWorkers < myWorkers * 0.5) {
             console.warn(`[usePersist] 🛡️ 폴링 중 근무자 급감 거부 (${myWorkers} → ${cloudWorkers})`);
             return;
+          }
+          // gates/zones 같은 핵심 배열도 폴링에서 보호
+          const polChecks = [
+            { f: "gates", min: 1 },
+            { f: "zones", min: 1 },
+            { f: "programs", min: 3 },
+            { f: "stages", min: 1 },
+            { f: "emergencyContacts", min: 1 },
+          ];
+          for (const c of polChecks) {
+            const my = (valRef.current[c.f] || []).length;
+            const cl = (cloud[c.f] || []).length;
+            if (my >= c.min && cl < my * 0.5) {
+              console.warn(`[usePersist] 🛡️ 폴링 중 ${c.f} 급감 거부 (${my} → ${cl})`);
+              return;
+            }
           }
         }
         
@@ -540,6 +556,31 @@ function usePersist(key, init) {
               }
             }
             
+            // 🛡️ 핵심 데이터 손실 보호: incoming이 내 데이터보다 갑자기 줄면 거부
+            if (key.endsWith("_set_v10") && valRef.current && typeof valRef.current === "object") {
+              const lossChecks = [
+                { f: "gates", min: 1 },
+                { f: "zones", min: 1 },
+                { f: "stages", min: 1 },
+                { f: "programs", min: 3 },
+                { f: "emergencyContacts", min: 1 },
+              ];
+              for (const c of lossChecks) {
+                const myLen = (valRef.current[c.f] || []).length;
+                const incLen = (p[c.f] || []).length;
+                if (myLen >= c.min && incLen < myLen) {
+                  console.warn(`[usePersist] 🛡️ Realtime ${c.f} 손실 거부 (${myLen} → ${incLen})`);
+                  if (window.storage && supabaseLoaded.current) {
+                    selfSave.current = true;
+                    window.storage.set(key, JSON.stringify(valRef.current)).finally(() => {
+                      setTimeout(() => { selfSave.current = false; }, 3000);
+                    });
+                  }
+                  return;
+                }
+              }
+            }
+            
             // 🛡️ Realtime 보호: settings의 workSites가 갑자기 50% 이상 줄면 무시 (다른 기기의 옛 데이터)
             if (key.endsWith("_set_v10") && typeof p === "object" && !Array.isArray(p) && valRef.current && typeof valRef.current === "object") {
               const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
@@ -565,6 +606,8 @@ function usePersist(key, init) {
                 { field: "stages", min: 1 },
                 { field: "artists", min: 1 },
                 { field: "emergencyContacts", min: 1 },
+                { field: "gates", min: 1 },
+                { field: "zones", min: 1 },
               ];
               for (const c of checks) {
                 const myCount = (valRef.current[c.field] || []).length;
@@ -645,13 +688,30 @@ function usePersist(key, init) {
             }
             
             // 🛡️ 필드 변경 감지: 내가 안 만진 필드는 클라우드 우선 (Last-write-wins 약화)
-            // 내가 마지막으로 만진 시각이 5초 이전이면 → 클라우드의 최신 데이터를 머지
+            // 내가 마지막으로 만진 시각이 30초 이전이면 → 클라우드의 최신 데이터를 머지
+            // ⚠️ 단, 내 데이터가 클라우드보다 데이터가 더 많으면 (gates 추가 등) 클라우드로 덮어쓰지 않음
             const sinceMyEdit = Date.now() - (lastEditTime.current || 0);
-            if (sinceMyEdit > 5000 && cloud._meta?.lastEditTime && cloud._meta.lastEditTime > (latestVal._meta?.lastEditTime || 0)) {
-              console.warn(`[usePersist] 🛡️ 클라우드가 더 최신 (cloud: ${new Date(cloud._meta.lastEditTime).toLocaleTimeString()}, my last edit ${Math.floor(sinceMyEdit/1000)}s ago). 클라우드 우선`);
-              latestVal = { ...cloud };  // 클라우드 전체 사용
-              setVal(latestVal); valRef.current = latestVal;
-              try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
+            if (sinceMyEdit > 30000 && cloud._meta?.lastEditTime && cloud._meta.lastEditTime > (latestVal._meta?.lastEditTime || 0)) {
+              // 클라우드가 더 최신이지만, 내가 추가한 데이터가 있는지 검사
+              const myGates = (latestVal.gates || []).length;
+              const cloudGates = (cloud.gates || []).length;
+              const myZones = (latestVal.zones || []).length;
+              const cloudZones = (cloud.zones || []).length;
+              const myWS = (latestVal.workSites || []).length;
+              const cloudWS = (cloud.workSites || []).length;
+              const myProgs = (latestVal.programs || []).length;
+              const cloudProgs = (cloud.programs || []).length;
+              
+              // 내가 더 많이 가진 필드가 있으면 클라우드 우선 안 함
+              if (myGates > cloudGates || myZones > cloudZones || myWS > cloudWS || myProgs > cloudProgs) {
+                console.warn(`[usePersist] 🛡️ 내 데이터가 더 많음 - 클라우드 머지 거부 (gates ${myGates}>${cloudGates}, zones ${myZones}>${cloudZones}, programs ${myProgs}>${cloudProgs})`);
+                // 그대로 진행 (내 데이터로 저장)
+              } else {
+                console.warn(`[usePersist] 🛡️ 클라우드가 더 최신 (cloud: ${new Date(cloud._meta.lastEditTime).toLocaleTimeString()}, my last edit ${Math.floor(sinceMyEdit/1000)}s ago). 클라우드 우선`);
+                latestVal = { ...cloud };
+                setVal(latestVal); valRef.current = latestVal;
+                try { localStorage.setItem(key, JSON.stringify(latestVal)); } catch {}
+              }
             }
           }
         } catch (e) { console.warn("[usePersist] 클라우드 머지 체크 실패:", e); }
