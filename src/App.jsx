@@ -4220,6 +4220,100 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
     }
   };
   
+  // 📻 무전기 불출 (사용 가능한 무전기 중 첫 번째 + 지정한 시리얼)
+  const assignRadio = (workerId, unitId) => {
+    setSettings(prev => {
+      const assets = JSON.parse(JSON.stringify(prev.assets || []));
+      // 무전기 카테고리 자산들 검사
+      for (const asset of assets) {
+        if (asset.category !== "무전기") continue;
+        if (!asset.trackUnits || !asset.units) continue;
+        const unit = asset.units.find(u => u.id === unitId);
+        if (unit) {
+          // 다른 워커가 쓰던 거면 안 됨
+          if (unit.assignedTo && unit.assignedTo !== workerId) {
+            alert(`이 무전기는 이미 다른 사람에게 불출되어 있습니다`);
+            return prev;
+          }
+          unit.assignedTo = workerId;
+          unit.status = "assigned";
+          unit.assignedAt = Date.now();
+          // 가용 수량 감소
+          asset.qty = (asset.units || []).filter(u => u.status === "available").length;
+          break;
+        }
+      }
+      return { ...prev, assets };
+    });
+  };
+  
+  // 자동 불출 (사용 가능한 무전기 중 첫 번째)
+  const autoAssignRadio = (workerId) => {
+    setSettings(prev => {
+      const assets = JSON.parse(JSON.stringify(prev.assets || []));
+      for (const asset of assets) {
+        if (asset.category !== "무전기") continue;
+        if (!asset.trackUnits || !asset.units) continue;
+        const available = asset.units.find(u => !u.assignedTo && u.status !== "broken" && u.status !== "lost");
+        if (available) {
+          available.assignedTo = workerId;
+          available.status = "assigned";
+          available.assignedAt = Date.now();
+          asset.qty = asset.units.filter(u => u.status === "available").length;
+          return { ...prev, assets };
+        }
+      }
+      alert("⚠️ 사용 가능한 무전기가 없습니다.\n물자 관리에서 무전기를 등록하거나, 단위 추적을 활성화하세요.");
+      return prev;
+    });
+  };
+  
+  // 무전기 회수
+  const returnRadio = (workerId, unitId) => {
+    setSettings(prev => {
+      const assets = JSON.parse(JSON.stringify(prev.assets || []));
+      for (const asset of assets) {
+        if (asset.category !== "무전기") continue;
+        if (!asset.trackUnits || !asset.units) continue;
+        const unit = asset.units.find(u => u.id === unitId);
+        if (unit && unit.assignedTo === workerId) {
+          delete unit.assignedTo;
+          unit.status = "available";
+          delete unit.assignedAt;
+          asset.qty = asset.units.filter(u => u.status === "available").length;
+          break;
+        }
+      }
+      return { ...prev, assets };
+    });
+  };
+  
+  // 워커 ID로 불출된 무전기 가져오기
+  const getAssignedRadios = (workerId) => {
+    const result = [];
+    (settings.assets || []).forEach(a => {
+      if (a.category !== "무전기" || !a.trackUnits) return;
+      (a.units || []).forEach(u => {
+        if (u.assignedTo === workerId) result.push({ ...u, assetName: a.name, assetId: a.id });
+      });
+    });
+    return result;
+  };
+  
+  // 사용 가능한 무전기 (전체)
+  const getAvailableRadios = () => {
+    const result = [];
+    (settings.assets || []).forEach(a => {
+      if (a.category !== "무전기" || !a.trackUnits) return;
+      (a.units || []).forEach(u => {
+        if (!u.assignedTo && u.status !== "broken" && u.status !== "lost") {
+          result.push({ ...u, assetName: a.name, assetId: a.id });
+        }
+      });
+    });
+    return result;
+  };
+  
   // 개별 근무상태 초기화 (모든 기록 제거)
   const resetWorkerStatus = (workerId) => {
     if (!confirm("이 근무자의 근무 상태와 기록을 초기화하시겠습니까?\n(근무 시작/종료 시간, 휴게 기록, 관리자 확인 모두 초기화)")) return;
@@ -4536,6 +4630,68 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
             🗑 일괄 제거
           </button>
         </div>
+        
+        {/* 무전기 일괄 불출/회수 */}
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(76,217,154,0.15)" }}>
+          <div style={{ fontSize: 11, color: "#6c6e7d", marginBottom: 6, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>📻 무전기 일괄 처리</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => {
+              const available = getAvailableRadios();
+              const targets = selectedIds.filter(id => getAssignedRadios(id).length === 0);
+              if (targets.length === 0) { alert("선택된 인력 모두가 이미 무전기를 보유하고 있습니다"); return; }
+              if (available.length < targets.length) { alert(`⚠️ 무전기 부족\n선택 ${targets.length}명, 가용 ${available.length}대\n\n가용 분만 불출됩니다`); }
+              if (!confirm(`선택한 ${targets.length}명에게 무전기를 일괄 불출하시겠습니까?`)) return;
+              setSettings(prev => {
+                const assets = JSON.parse(JSON.stringify(prev.assets || []));
+                const asset = assets.find(a => a.category === "무전기" && a.trackUnits);
+                if (!asset) { alert("등록된 무전기가 없습니다"); return prev; }
+                let assigned = 0;
+                for (const wid of targets) {
+                  const unit = asset.units.find(u => !u.assignedTo && u.status !== "broken" && u.status !== "lost");
+                  if (!unit) break;
+                  unit.assignedTo = wid;
+                  unit.status = "assigned";
+                  unit.assignedAt = Date.now();
+                  assigned++;
+                }
+                asset.qty = asset.units.filter(u => u.status === "available").length;
+                setTimeout(() => alert(`✅ ${assigned}명에게 무전기 불출 완료`), 100);
+                return { ...prev, assets };
+              });
+            }} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1.5px solid rgba(245,196,81,0.4)", background: "rgba(245,196,81,0.1)", color: "#f5c451", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,196,81,0.2)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(245,196,81,0.1)"; }}>
+              📻 무전기 일괄 불출
+            </button>
+            <button onClick={() => {
+              const targets = selectedIds.filter(id => getAssignedRadios(id).length > 0);
+              if (targets.length === 0) { alert("선택된 인력에 불출된 무전기가 없습니다"); return; }
+              if (!confirm(`선택한 인력의 무전기 ${targets.reduce((s, id) => s + getAssignedRadios(id).length, 0)}대를 일괄 회수하시겠습니까?`)) return;
+              setSettings(prev => {
+                const assets = JSON.parse(JSON.stringify(prev.assets || []));
+                let returned = 0;
+                for (const asset of assets) {
+                  if (asset.category !== "무전기" || !asset.trackUnits) continue;
+                  for (const unit of (asset.units || [])) {
+                    if (targets.includes(unit.assignedTo)) {
+                      delete unit.assignedTo;
+                      unit.status = "available";
+                      delete unit.assignedAt;
+                      returned++;
+                    }
+                  }
+                  asset.qty = asset.units.filter(u => u.status === "available").length;
+                }
+                setTimeout(() => alert(`✅ ${returned}대 회수 완료`), 100);
+                return { ...prev, assets };
+              });
+            }} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1.5px solid rgba(76,217,154,0.4)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(76,217,154,0.2)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(76,217,154,0.1)"; }}>
+              ↺ 무전기 일괄 회수
+            </button>
+          </div>
+        </div>
       </div>}
     </CC_Card>}
     
@@ -4673,6 +4829,10 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                   <span style={{ padding: "2px 6px", borderRadius: 4, background: `${stColor}15`, color: stColor, fontSize: 10, fontWeight: 700 }}>{stLabel}</span>
                   {needWarn && !w.breakOverride && <span style={{ fontSize: 11, color: "#ff9a3c", animation: "blink 1.5s infinite" }} title="휴게시간 부족">⚠️</span>}
                   {w.breakOverride && <span style={{ fontSize: 10, color: "#94A3B8" }} title={`확인: ${w.breakOverrideBy}`}>✓확인</span>}
+                  {(() => {
+                    const radios = getAssignedRadios(w.id);
+                    return radios.length > 0 ? <span title={`무전기 ${radios.length}대 불출중`} style={{ padding: "2px 6px", borderRadius: 4, background: "rgba(245,196,81,0.15)", color: "#f5c451", fontSize: 10, fontWeight: 700 }}>📻 {radios.length}</span> : null;
+                  })()}
                 </div>
                 <div style={{ fontSize: 11, color: "#6c6e7d", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {w.siteName}</div>
               </div>
@@ -4911,6 +5071,61 @@ function CC_WorkforcePage({ settings, setSettings, session, accounts, setAccount
                 {!(settings.workSites || []).some(s => s.id === "_pool") && <option value="_pool">⚠️ 미배치 풀 (배치 해제)</option>}
               </select>
             </div>
+
+            {/* 📻 무전기 불출/회수 */}
+            {(() => {
+              const myRadios = getAssignedRadios(w.id);
+              const availableRadios = getAvailableRadios();
+              const hasRadioAssets = (settings.assets || []).some(a => a.category === "무전기" && a.trackUnits);
+              return (<div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: myRadios.length > 0 ? "rgba(245,196,81,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${myRadios.length > 0 ? "rgba(245,196,81,0.25)" : "rgba(255,255,255,0.05)"}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>📻</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: myRadios.length > 0 ? "#f5c451" : "#94A3B8" }}>무전기 불출 현황</span>
+                  </div>
+                  <span style={{ fontSize: 10, color: "#6c6e7d" }}>전체 가용: {availableRadios.length}대</span>
+                </div>
+                
+                {!hasRadioAssets ? (
+                  <div style={{ padding: 8, fontSize: 11, color: "#6c6e7d", textAlign: "center" }}>물자 관리에서 무전기를 등록하고<br/>"개별 단위 추적"을 활성화하세요</div>
+                ) : myRadios.length === 0 ? (
+                  <div>
+                    <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 8, textAlign: "center", padding: 4 }}>현재 불출된 무전기 없음</div>
+                    {availableRadios.length === 0 ? (
+                      <div style={{ padding: 8, fontSize: 11, color: "#ff5e7e", textAlign: "center", background: "rgba(255,94,126,0.05)", borderRadius: 6 }}>⚠️ 사용 가능한 무전기 없음</div>
+                    ) : (
+                      <div>
+                        <button onClick={() => autoAssignRadio(w.id)} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1.5px solid rgba(245,196,81,0.4)", background: "rgba(245,196,81,0.1)", color: "#f5c451", fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 6 }}>📻 무전기 자동 불출</button>
+                        <details style={{ fontSize: 11 }}>
+                          <summary style={{ cursor: "pointer", color: "#94A3B8", padding: 4 }}>특정 시리얼 선택 ▾</summary>
+                          <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 4, maxHeight: 120, overflowY: "auto" }}>
+                            {availableRadios.map(r => (<button key={r.id} onClick={() => assignRadio(w.id, r.id)} title={r.assetName} style={{ padding: "6px", borderRadius: 6, border: "1px solid rgba(245,196,81,0.2)", background: "rgba(245,196,81,0.05)", color: "#f5c451", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "JetBrains Mono" }}>{r.serial || r.id.slice(-4)}</button>))}
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {myRadios.map(r => {
+                        const since = r.assignedAt ? Math.floor((Date.now() - r.assignedAt) / 60000) : 0;
+                        const sinceLabel = since < 60 ? `${since}분 전` : `${Math.floor(since/60)}시간 ${since%60}분 전`;
+                        return (<div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 6, background: "rgba(245,196,81,0.08)", border: "1px solid rgba(245,196,81,0.2)" }}>
+                          <span style={{ fontSize: 14 }}>📻</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#f5c451", fontFamily: "JetBrains Mono" }}>{r.serial || r.id.slice(-6)}</div>
+                            <div style={{ fontSize: 10, color: "#94A3B8" }}>{r.assetName} {r.assignedAt && `· ${sinceLabel}`}</div>
+                          </div>
+                          <button onClick={() => returnRadio(w.id, r.id)} style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(76,217,154,0.3)", background: "rgba(76,217,154,0.1)", color: "#4cd99a", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>↺ 회수</button>
+                        </div>);
+                      })}
+                    </div>
+                    {availableRadios.length > 0 && <button onClick={() => autoAssignRadio(w.id)} style={{ width: "100%", marginTop: 6, padding: "6px", borderRadius: 6, border: "1px dashed rgba(245,196,81,0.3)", background: "transparent", color: "#f5c451", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>+ 무전기 추가 불출</button>}
+                  </div>
+                )}
+              </div>);
+            })()}
 
             {/* 근무 상태 초기화 + 인력 제거 */}
             <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 8 }}>
