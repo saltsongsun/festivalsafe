@@ -479,69 +479,41 @@ function usePersist(key, init) {
       
       try {
         const r = await window.storage.get(key);
-        if (!r?.value || r.value === lastJson.current) return;  // 변경 없음
+        if (!r?.value || r.value === lastJson.current) return;
         
         const cloud = JSON.parse(r.value);
-        const cloudTime = cloud?._meta?.lastEditTime || 0;
-        const myTime = valRef.current?._meta?.lastEditTime || 0;
+        const cloudT = cloud?._meta?.lastEditTime || 0;
+        const myT = valRef.current?._meta?.lastEditTime || 0;
         
-        // 🕐 시간 기준 우선 동기화 (가장 중요)
-        // 1) 클라우드가 더 최신 → 무조건 적용 (length 검사 무시)
-        if (key.endsWith("_set_v10") && cloudTime > 0 && cloudTime > myTime) {
-          console.log(`[usePersist] ✨ 폴링: 클라우드 더 최신 → 적용 (cloud ${new Date(cloudTime).toLocaleTimeString()}, my ${myTime ? new Date(myTime).toLocaleTimeString() : "없음"})`);
-          lastJson.current = r.value;
-          setVal(cloud);
-          valRef.current = cloud;
-          try { localStorage.setItem(key, r.value); } catch {}
-          return;
-        }
-        
-        // 2) 내가 더 최신 → 무시 (내 데이터가 우선)
-        if (key.endsWith("_set_v10") && myTime > 0 && myTime > cloudTime) {
-          // 클라우드 옛 데이터, 무시
-          return;
-        }
-        
-        // 3) 메타 시간 동일하거나 둘 다 없음 → length 검사로 보수적 처리
-        if (key.endsWith("_set_v10") && valRef.current && typeof valRef.current === "object") {
-          const myWorkers = (valRef.current.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
-          const cloudWorkers = (cloud.workSites || []).reduce((s, x) => s + (x.workers || []).length, 0);
-          if (myWorkers > 5 && cloudWorkers < myWorkers * 0.5) {
-            console.warn(`[usePersist] 🛡️ 폴링 중 근무자 급감 거부 (메타 동일, ${myWorkers} → ${cloudWorkers})`);
+        // 🕐 시간 기준만으로 동기화 결정
+        if (key.endsWith("_set_v10")) {
+          // 1) 클라우드가 더 최신 → 무조건 적용
+          if (cloudT > myT) {
+            console.log(`[usePersist] ✨ 폴링 적용: cloud(${new Date(cloudT).toLocaleTimeString()}) > my(${myT ? new Date(myT).toLocaleTimeString() : "없음"})`);
+            lastJson.current = r.value;
+            setVal(cloud); valRef.current = cloud;
+            try { localStorage.setItem(key, r.value); } catch {}
             return;
           }
-          const polChecks = [
-            { f: "gates", min: 1 },
-            { f: "zones", min: 1 },
-            { f: "programs", min: 3 },
-            { f: "stages", min: 1 },
-            { f: "emergencyContacts", min: 1 },
-            { f: "assets", min: 2 },
-            { f: "assetCategories", min: 3 },
-            { f: "artists", min: 1 },
-            { f: "incidents", min: 1 },
-            { f: "workSites", min: 1 },
-          ];
-          for (const c of polChecks) {
-            const my = (valRef.current[c.f] || []).length;
-            const cl = (cloud[c.f] || []).length;
-            if (my >= c.min && cl < my * 0.5) {
-              console.warn(`[usePersist] 🛡️ 폴링 중 ${c.f} 급감 거부 (메타 동일, ${my} → ${cl})`);
-              return;
-            }
+          // 2) 둘 다 메타 없는 옛 데이터 → 클라우드에 있으면 적용
+          if (cloudT === 0 && myT === 0 && cloud && Object.keys(cloud).length > 0) {
+            console.log(`[usePersist] 🔄 폴링 적용: 메타 없음, 첫 동기화`);
+            lastJson.current = r.value;
+            setVal(cloud); valRef.current = cloud;
+            try { localStorage.setItem(key, r.value); } catch {}
+            return;
           }
+          // 3) 내가 더 최신 → 무시 (옛 클라우드 데이터)
+          return;
         }
         
-        // 4) 메타 없는 키 (단순 키) - 그냥 내용 다르면 적용
-        if (!key.endsWith("_set_v10")) {
-          console.log(`[usePersist] 🔄 폴링: 단순 키 갱신`, key.slice(0, 50));
-          lastJson.current = r.value;
-          setVal(cloud);
-          valRef.current = cloud;
-          try { localStorage.setItem(key, r.value); } catch {}
-        }
+        // settings 외 키는 단순 적용
+        console.log(`[usePersist] 🔄 폴링 적용: 단순 키`, key.slice(0, 50));
+        lastJson.current = r.value;
+        setVal(cloud); valRef.current = cloud;
+        try { localStorage.setItem(key, r.value); } catch {}
       } catch (e) { /* 폴링 실패 무시 */ }
-    }, 30000);  // 30초마다
+    }, 5000);  // 5초마다 폴링 (Realtime이 안 될 때 안전망)
     return () => clearInterval(interval);
   }, [key]);
 
@@ -562,71 +534,47 @@ function usePersist(key, init) {
         if (j !== lastJson.current) {
           try {
             const p = JSON.parse(j);
-            const incomingTime = p?._meta?.lastEditTime || 0;
-            const myMetaTime = valRef.current?._meta?.lastEditTime || 0;
-            const sinceMyEdit = Date.now() - (lastEditTime.current || 0);
+            const incomingT = p?._meta?.lastEditTime || 0;
+            const myT = valRef.current?._meta?.lastEditTime || 0;
             
-            // 🕐 시간 기준 우선 판단 (settings 키일 때)
+            // 🕐 시간 기준만으로 결정 (settings 키)
             if (key.endsWith("_set_v10")) {
-              // 1) 들어온 게 더 최신 → 무조건 적용 (length 검사 무시!)
-              if (incomingTime > 0 && incomingTime > myMetaTime) {
-                console.log(`[usePersist] ✨ Realtime: 더 최신 데이터 적용 (incoming ${new Date(incomingTime).toLocaleTimeString()} > my ${myMetaTime ? new Date(myMetaTime).toLocaleTimeString() : "없음"})`);
+              // 1) 들어온 게 더 최신 → 무조건 적용
+              if (incomingT > myT) {
+                console.log(`[usePersist] ✨ Realtime 적용: incoming(${new Date(incomingT).toLocaleTimeString()}) > my(${myT ? new Date(myT).toLocaleTimeString() : "없음"})`);
                 lastJson.current = j;
-                setVal(p);
-                valRef.current = p;
+                setVal(p); valRef.current = p;
                 localStorage.setItem(key, j);
                 return;
               }
-              
-              // 2) 내가 더 최신 → 거부 + 내 데이터 다시 push (다른 기기 갱신)
-              if (myMetaTime > 0 && myMetaTime > incomingTime) {
-                console.warn(`[usePersist] 🛡️ Realtime 옛 데이터 거부 (incoming ${new Date(incomingTime).toLocaleTimeString()} < my ${new Date(myMetaTime).toLocaleTimeString()})`);
+              // 2) 둘 다 메타 없음 (옛 데이터 호환) → 적용
+              if (incomingT === 0 && myT === 0) {
+                console.log(`[usePersist] 🔄 Realtime 적용: 메타 없음`);
+                lastJson.current = j;
+                setVal(p); valRef.current = p;
+                localStorage.setItem(key, j);
+                return;
+              }
+              // 3) 내가 더 최신 → 무시 + 내 것 다시 push
+              if (myT > incomingT) {
+                console.warn(`[usePersist] 🛡️ Realtime 옛 데이터 거부 (incoming ${incomingT ? new Date(incomingT).toLocaleTimeString() : "없음"} < my ${new Date(myT).toLocaleTimeString()})`);
                 if (window.storage && supabaseLoaded.current) {
                   selfSave.current = true;
                   window.storage.set(key, JSON.stringify(valRef.current)).finally(() => {
-                    setTimeout(() => { selfSave.current = false; }, 3000);
+                    setTimeout(() => { selfSave.current = false; }, 1500);
                   });
                 }
                 return;
               }
-              
-              // 3) 시간 동일 또는 둘 다 없음
-              // 내가 방금 편집한 직후라면 (5초 내) 내 데이터 우선
-              if (sinceMyEdit < 5000) {
-                console.log(`[usePersist] ⏸️ 편집 직후 (${Math.floor(sinceMyEdit/1000)}초) - Realtime 무시`);
-                return;
-              }
-              
-              // 4) 메타 정보 없는 옛 데이터 - length 검사로 보수 처리
-              if (valRef.current && typeof valRef.current === "object") {
-                const lossChecks = [
-                  { f: "gates", min: 1 },
-                  { f: "zones", min: 1 },
-                  { f: "stages", min: 1 },
-                  { f: "programs", min: 3 },
-                  { f: "emergencyContacts", min: 1 },
-                  { f: "assets", min: 2 },
-                  { f: "assetCategories", min: 3 },
-                  { f: "artists", min: 1 },
-                  { f: "incidents", min: 1 },
-                  { f: "workSites", min: 1 },
-                ];
-                for (const c of lossChecks) {
-                  const myLen = (valRef.current[c.f] || []).length;
-                  const incLen = (p[c.f] || []).length;
-                  if (myLen >= c.min && incLen < myLen * 0.5) {
-                    console.warn(`[usePersist] 🛡️ Realtime ${c.f} 급감 거부 (메타 없음, ${myLen} → ${incLen})`);
-                    return;
-                  }
-                }
-              }
+              // 4) 시간 같음 → 무시 (내 변경 그대로)
+              return;
             }
             
+            // settings 외 키는 그냥 적용
             lastJson.current = j;
-            setVal(p);
-            valRef.current = p;
+            setVal(p); valRef.current = p;
             localStorage.setItem(key, j);
-            console.log("[usePersist] 📡 Realtime 수신 적용:", key.slice(0, 50));
+            console.log("[usePersist] 📡 Realtime 적용:", key.slice(0, 50));
           } catch (e) { console.warn("[usePersist] Realtime 처리 오류:", e); }
         }
       }
@@ -638,11 +586,26 @@ function usePersist(key, init) {
   // set: 로컬 즉시 + Supabase 2초 디바운스 (단, Supabase 로드 후에만)
   const set = useCallback((v) => {
     const next = typeof v === "function" ? v(valRef.current) : v;
-    setVal(next); valRef.current = next;
-    const json = JSON.stringify(next);
+    
+    // ⏱️ settings 키일 때 _meta.lastEditTime 즉시 기록 (디바운스 기다리지 않음)
+    let withMeta = next;
+    const now = Date.now();
+    if (key.endsWith("_set_v10") && typeof next === "object" && next !== null && !Array.isArray(next)) {
+      withMeta = { 
+        ...next, 
+        _meta: { 
+          ...(next._meta || {}), 
+          lastEditTime: now,
+          lastEditBy: (typeof window !== "undefined" && window._safeflowSession?.name) || "unknown"
+        }
+      };
+    }
+    
+    setVal(withMeta); valRef.current = withMeta;
+    const json = JSON.stringify(withMeta);
     lastJson.current = json;
-    userInteracted.current = true; // 사용자 직접 변경 표시
-    lastEditTime.current = Date.now(); // ⏱️ 편집 시각 기록 (realtime 보호용)
+    userInteracted.current = true;
+    lastEditTime.current = now;
     try { localStorage.setItem(key, json); } catch (e) { console.warn("[usePersist] localStorage 실패:", key); }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
